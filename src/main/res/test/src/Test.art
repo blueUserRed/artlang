@@ -1,0 +1,4 @@
+fn main() {
+    print "hi";
+    print 3;
+}
