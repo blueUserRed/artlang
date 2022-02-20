@@ -21,6 +21,8 @@ object Tokenizer {
             '{' -> { emit(TokenType.L_BRACE, "{", null); consume() }
             '}' -> { emit(TokenType.R_BRACE, "}", null); consume() }
             ';' -> { emit(TokenType.SEMICOLON, ";", null); consume() }
+            '"' -> string('"')
+            '\'' -> string('\'')
             ' ', '\t', '\n', '\r' -> consume()
             else -> {
                 if (current.isLetter() || current == '_') {
@@ -43,9 +45,21 @@ object Tokenizer {
         }
         when (val identifier = code.substring(start until cur)) {
             "fn" -> emit(TokenType.K_FN, "fn", null, start)
-            "print" -> emit(TokenType.K_FN, "print", null, start)
+            "print" -> emit(TokenType.K_PRINT, "print", null, start)
             else -> emit(TokenType.IDENTIFIER, identifier, identifier, start)
         }
+    }
+
+    private fun string(endChar: Char) {
+        val start = cur
+        consume() //consume initial " or '
+        while (current() != endChar) {
+            consume()
+            if (end()) throw RuntimeException("Unterminated String")
+        }
+        consume() //consume ending " or '
+        val string = code.substring((start + 1)..(cur - 2))
+        emit(TokenType.STRING, string, string, start)
     }
 
     private fun current(): Char = code[cur]

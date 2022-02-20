@@ -1,3 +1,4 @@
 fn main() {
-    print test;
+    print hi;
+    print 'test';
 }
