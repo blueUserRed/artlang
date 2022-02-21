@@ -17,9 +17,9 @@ fun main() {
     tokens.forEach(::println)
     println("------------------------------------\n\n")
 
-    val statements = Parser.parse(tokens)
+    val program = Parser.parse(tokens)
 
     println("----------------AST-----------------")
-    statements.forEach { println(it.accept(ASTPrinter())) }
+    println(program.accept(ASTPrinter()))
     println("------------------------------------\n\n")
 }

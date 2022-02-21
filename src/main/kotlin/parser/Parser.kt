@@ -11,13 +11,23 @@ object Parser {
     private var cur: Int = 0
     private var tokens: List<Token> = listOf()
 
-    fun parse(tokens: List<Token>): List<Statement> {
+    fun parse(tokens: List<Token>): Statement.Program {
         cur = 0
         this.tokens = tokens
 
-        val statements = mutableListOf<Statement>()
-        while (!match(TokenType.EOF)) statements.add(parseStatement())
-        return statements
+        val functions = mutableListOf<Statement.Function>()
+        while (!match(TokenType.EOF)) functions.add(parseFunc())
+        return Statement.Program(functions.toTypedArray())
+    }
+
+    private fun parseFunc(): Statement.Function {
+        consumeOrError(TokenType.K_FN, "Expected function")
+        consumeOrError(TokenType.IDENTIFIER, "Expected function name")
+        val funcName = last()
+        consumeOrError(TokenType.L_PAREN, "Expected () after function name")
+        consumeOrError(TokenType.R_PAREN, "Expected () after function name")
+        consumeOrError(TokenType.L_BRACE, "Expected code block after function declaration")
+        return Statement.Function(parseBlock(), funcName)
     }
 
     private fun parseStatement(): Statement {

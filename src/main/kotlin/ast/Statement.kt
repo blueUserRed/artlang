@@ -1,5 +1,7 @@
 package ast
 
+import tokenizer.Token
+
 abstract class Statement {
 
     abstract fun <T> accept(visitor: StatementVisitor<T>): T
@@ -9,7 +11,7 @@ abstract class Statement {
         override fun <T> accept(visitor: StatementVisitor<T>): T = visitor.visit(this)
     }
 
-    class Function(val statements: Array<Statement>) : Statement() {
+    class Function(val statements: Block, val name: Token) : Statement() {
 
         override fun <T> accept(visitor: StatementVisitor<T>): T = visitor.visit(this)
     }

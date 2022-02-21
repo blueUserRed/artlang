@@ -1,5 +1,7 @@
 package ast
 
+import tokenizer.TokenType
+
 class ASTPrinter : ExpressionVisitor<String>, StatementVisitor<String> {
 
     override fun visit(exp: Expression.Binary): String {
@@ -7,6 +9,7 @@ class ASTPrinter : ExpressionVisitor<String>, StatementVisitor<String> {
     }
 
     override fun visit(exp: Expression.Literal): String {
+        if (exp.literal.tokenType == TokenType.STRING) return "'${exp.literal.lexeme}'"
         return exp.literal.lexeme
     }
 
@@ -15,11 +18,17 @@ class ASTPrinter : ExpressionVisitor<String>, StatementVisitor<String> {
     }
 
     override fun visit(stmt: Statement.Function): String {
-        TODO("Not yet implemented")
+        val builder = StringBuilder()
+        builder.append("fn ").append(stmt.name.lexeme).append("() {\n")
+        for (s in stmt.statements.statements) builder.append(s.accept(this))
+        builder.append("}\n")
+        return builder.toString()
     }
 
     override fun visit(stmt: Statement.Program): String {
-        TODO("Not yet implemented")
+        val builder = StringBuilder()
+        for (func in stmt.funcs) builder.append(func.accept(this))
+        return builder.toString()
     }
 
     override fun visit(stmt: Statement.Print): String {
