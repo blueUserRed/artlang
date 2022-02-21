@@ -1,4 +1,1 @@
-fn main() {
-    print hi;
-    print 'test';
-}
+fn print identifier + ++ -- *= /= ()

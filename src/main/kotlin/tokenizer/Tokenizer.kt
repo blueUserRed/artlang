@@ -24,12 +24,67 @@ object Tokenizer {
             '"' -> string('"')
             '\'' -> string('\'')
             ' ', '\t', '\n', '\r' -> consume()
+
             else -> {
+
                 if (current.isLetter() || current == '_') {
                     identifier()
                     continue
                 }
-                throw RuntimeException("Unknown char '$current'")
+
+                if (current == '+') {
+                    if (peek() == '+') {
+                        consume(); consume()
+                        emit(TokenType.D_PLUS, "++", null, cur - 2)
+                        continue
+                    }
+                    if (peek() == '=') {
+                        consume(); consume()
+                        emit(TokenType.PLUS_EQ, "+=", null, cur - 2)
+                        continue
+                    }
+                    emit(TokenType.PLUS, "+", null)
+                    consume()
+                    continue
+                }
+
+                if (current == '-') {
+                    if (peek() == '-') {
+                        consume(); consume()
+                        emit(TokenType.D_MINUS, "--", null, cur - 2)
+                        continue
+                    }
+                    if (peek() == '=') {
+                        consume(); consume()
+                        emit(TokenType.MINUS_EQ, "-=", null, cur - 2)
+                        continue
+                    }
+                    emit(TokenType.MINUS, "-", null)
+                    consume()
+                    continue
+                }
+
+                if (current == '*') {
+                    if (peek() == '=') {
+                        consume(); consume()
+                        emit(TokenType.STAR_EQ, "*=", null, cur - 2)
+                        continue
+                    }
+                    emit(TokenType.STAR, "*", null)
+                    continue
+                }
+
+                if (current == '/') {
+                    if (peek() == '=') {
+                        consume(); consume()
+                        emit(TokenType.SLASH_EQ, "/=", null, cur - 2)
+                        continue
+                    }
+                    emit(TokenType.SLASH, "/", null)
+                    continue
+                }
+
+                throw RuntimeException("Unknown char '$current'") //TODO: replace with other Exception, do error reporting
             }
         }
         return tokens

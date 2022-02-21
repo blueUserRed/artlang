@@ -11,5 +11,8 @@ data class Token(val tokenType: TokenType, val lexeme: String, val literal: Any?
 enum class TokenType {
     INT, FLOAT, STRING, IDENTIFIER,
     K_FN, K_PRINT,
-    L_PAREN, R_PAREN, L_BRACE, R_BRACE, SEMICOLON
+    L_PAREN, R_PAREN, L_BRACE, R_BRACE, SEMICOLON,
+    PLUS, MINUS, D_PLUS, D_MINUS, STAR, SLASH,
+    EQ, GT, LT, GT_EU, LT_EU, D_EQ, NOT_EQ, NOT,
+    PLUS_EQ, MINUS_EQ, STAR_EQ, SLASH_EQ
 }
