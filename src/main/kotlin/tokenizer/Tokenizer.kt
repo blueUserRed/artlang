@@ -149,6 +149,18 @@ object Tokenizer {
         when (val identifier = code.substring(start until cur)) {
             "fn" -> emit(TokenType.K_FN, "fn", null, start)
             "print" -> emit(TokenType.K_PRINT, "print", null, start)
+            "println" -> emit(TokenType.K_PRINTLN, "println", null, start)
+            "class" -> emit(TokenType.K_CLASS, "class", null, start)
+            "var" -> emit(TokenType.K_VAR, "var", null, start)
+            "const" -> emit(TokenType.K_CONST, "const", null, start)
+            "priv" -> emit(TokenType.K_PRIV, "priv", null, start)
+            "pub" -> emit(TokenType.K_PUB, "pub", null, start)
+            "abstract" -> emit(TokenType.K_ABSTRACT, "abstract", null, start)
+            "static" -> emit(TokenType.K_STATIC, "static", null, start)
+            "for" -> emit(TokenType.K_FOR, "for", null, start)
+            "loop" -> emit(TokenType.K_LOOP, "loop", null, start)
+            "else" -> emit(TokenType.K_ELSE, "else", null, start)
+            "while" -> emit(TokenType.K_WHILE, "while", null, start)
             else -> emit(TokenType.IDENTIFIER, identifier, identifier, start)
         }
     }

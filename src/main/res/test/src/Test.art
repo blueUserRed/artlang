@@ -1,4 +1,9 @@
 //fn print identifier + ++ -- *= /= ()
+pub static class {
+priv static fn print
+abstract fn ()
+var v
+else loop while for
 x y z +
 /*
     hejldjf
