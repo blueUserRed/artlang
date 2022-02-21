@@ -33,12 +33,12 @@ object Tokenizer {
                 }
 
                 if (current == '+') {
-                    if (peek() == '+') {
+                    if (canPeek() && peek() == '+') {
                         consume(); consume()
                         emit(TokenType.D_PLUS, "++", null, cur - 2)
                         continue
                     }
-                    if (peek() == '=') {
+                    if (canPeek() && peek() == '=') {
                         consume(); consume()
                         emit(TokenType.PLUS_EQ, "+=", null, cur - 2)
                         continue
@@ -49,12 +49,12 @@ object Tokenizer {
                 }
 
                 if (current == '-') {
-                    if (peek() == '-') {
+                    if (canPeek() && peek() == '-') {
                         consume(); consume()
                         emit(TokenType.D_MINUS, "--", null, cur - 2)
                         continue
                     }
-                    if (peek() == '=') {
+                    if (canPeek() && peek() == '=') {
                         consume(); consume()
                         emit(TokenType.MINUS_EQ, "-=", null, cur - 2)
                         continue
@@ -65,7 +65,7 @@ object Tokenizer {
                 }
 
                 if (current == '*') {
-                    if (peek() == '=') {
+                    if (canPeek() && peek() == '=') {
                         consume(); consume()
                         emit(TokenType.STAR_EQ, "*=", null, cur - 2)
                         continue
@@ -75,12 +75,60 @@ object Tokenizer {
                 }
 
                 if (current == '/') {
-                    if (peek() == '=') {
+                    if (canPeek() && peek() == '=') {
                         consume(); consume()
                         emit(TokenType.SLASH_EQ, "/=", null, cur - 2)
                         continue
                     }
+                    if (canPeek() && peek() == '/') {
+                        lineComment()
+                        continue
+                    }
+                    if (canPeek() && peek() == '*') {
+                        blockComment()
+                        continue
+                    }
                     emit(TokenType.SLASH, "/", null)
+                    continue
+                }
+
+                if (current == '=') {
+                    if (canPeek() && peek() == '=') {
+                        consume(); consume()
+                        emit(TokenType.D_EQ, "==", null, cur - 2)
+                        continue
+                    }
+                    emit(TokenType.EQ, "=", null)
+                    continue
+                }
+
+                if (current == '<') {
+                    if (canPeek() && peek() == '=') {
+                        consume(); consume()
+                        emit(TokenType.LT_EQ, "<=", null, cur - 2)
+                        continue
+                    }
+                    emit(TokenType.LT, "<", null)
+                    continue
+                }
+
+                if (current == '>') {
+                    if (canPeek() && peek() == '=') {
+                        consume(); consume()
+                        emit(TokenType.GT_EQ, ">=", null, cur - 2)
+                        continue
+                    }
+                    emit(TokenType.GT, ">", null)
+                    continue
+                }
+
+                if (current == '!') {
+                    if (canPeek() && peek() == '=') {
+                        consume(); consume()
+                        emit(TokenType.NOT_EQ, "!=", null, cur - 2)
+                        continue
+                    }
+                    emit(TokenType.NOT, "!", null)
                     continue
                 }
 
@@ -117,6 +165,15 @@ object Tokenizer {
         emit(TokenType.STRING, string, string, start)
     }
 
+    private fun lineComment() {
+        while (consume() != '\n' && !end());
+    }
+
+    private fun blockComment() {
+        consume(); consume()
+        while (!end()) if (tryConsume('*') && tryConsume('/')) break else consume()
+    }
+
     private fun current(): Char = code[cur]
 
     private fun consume(): Char = code[cur++]
@@ -124,6 +181,8 @@ object Tokenizer {
     private fun peek(): Char = code[cur + 1]
 
     private fun end(): Boolean = cur >= code.length
+
+    private fun canPeek(): Boolean = cur < code.length - 1
 
     private fun tryConsume(c: Char): Boolean {
         return if (current() == c) {
