@@ -1,3 +1,5 @@
+import ast.ASTPrinter
+import parser.Parser
 import tokenizer.Tokenizer
 
 fun main() {
@@ -15,4 +17,9 @@ fun main() {
     tokens.forEach(::println)
     println("------------------------------------\n\n")
 
+    val statements = Parser.parse(tokens)
+
+    println("----------------AST-----------------")
+    statements.forEach { println(it.accept(ASTPrinter())) }
+    println("------------------------------------\n\n")
 }

@@ -24,4 +24,9 @@ abstract class Statement {
         override fun <T> accept(visitor: StatementVisitor<T>): T = visitor.visit(this)
     }
 
+    class Block(val statements: Array<Statement>) : Statement() {
+
+        override fun <T> accept(visitor: StatementVisitor<T>): T = visitor.visit(this)
+    }
+
 }

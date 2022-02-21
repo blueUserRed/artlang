@@ -6,7 +6,7 @@ abstract class Expression {
 
     abstract fun <T> accept(visitor: ExpressionVisitor<T>): T
 
-    class Binary(val left: Expression, val right: Expression, val operator: Token) : Expression() {
+    class Binary(val left: Expression, val operator: Token, val right: Expression) : Expression() {
 
         override fun <T> accept(visitor: ExpressionVisitor<T>): T = visitor.visit(this)
     }

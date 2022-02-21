@@ -1,6 +1,7 @@
 package tokenizer
 
 import java.lang.RuntimeException
+import kotlin.math.pow
 
 object Tokenizer {
 
@@ -29,6 +30,11 @@ object Tokenizer {
 
                 if (current.isLetter() || current == '_') {
                     identifier()
+                    continue
+                }
+
+                if (current.isDigit()) {
+                    number()
                     continue
                 }
 
@@ -71,6 +77,7 @@ object Tokenizer {
                         continue
                     }
                     emit(TokenType.STAR, "*", null)
+                    consume()
                     continue
                 }
 
@@ -89,6 +96,7 @@ object Tokenizer {
                         continue
                     }
                     emit(TokenType.SLASH, "/", null)
+                    consume()
                     continue
                 }
 
@@ -99,6 +107,7 @@ object Tokenizer {
                         continue
                     }
                     emit(TokenType.EQ, "=", null)
+                    consume()
                     continue
                 }
 
@@ -109,6 +118,7 @@ object Tokenizer {
                         continue
                     }
                     emit(TokenType.LT, "<", null)
+                    consume()
                     continue
                 }
 
@@ -119,6 +129,7 @@ object Tokenizer {
                         continue
                     }
                     emit(TokenType.GT, ">", null)
+                    consume()
                     continue
                 }
 
@@ -129,12 +140,14 @@ object Tokenizer {
                         continue
                     }
                     emit(TokenType.NOT, "!", null)
+                    consume()
                     continue
                 }
 
                 throw RuntimeException("Unknown char '$current'") //TODO: replace with other Exception, do error reporting
             }
         }
+        tokens.add(Token(TokenType.EOF, "", null, path, cur))
         return tokens
     }
 
@@ -186,6 +199,51 @@ object Tokenizer {
         while (!end()) if (tryConsume('*') && tryConsume('/')) break else consume()
     }
 
+    private fun number() {
+
+        val start = cur
+
+        var radix = 10
+        if (tryConsume('0')) {
+            if (tryConsume('b')) radix = 2
+            else if (tryConsume('o')) radix = 8
+            else if (tryConsume('x')) radix = 16
+            else cur--
+
+        }
+
+        var num = 0L
+        while(!end() && consume().isLetterOrDigit()) {
+            num *= radix
+            try {
+                num += last().digitToInt(radix)
+            } catch (e: NumberFormatException) {
+                cur--
+                val decNum = num / radix
+                emit(TokenType.INT, code.substring(start until cur), decNum.toInt(), start)
+                return
+//                return OnjToken(OnjTokenType.INT, if (negative) -decNum else decNum, start)
+            }
+        }
+        cur--
+
+        if (end() || radix != 10 || !tryConsume('.')) {
+            emit(TokenType.INT, code.substring(start until cur), num.toInt(), start)
+            return
+        }
+//            return OnjToken(OnjTokenType.INT, if (negative) -num else num, start)
+
+        var afterComma = 0.0
+        var numIts = 1
+        while(!end() && consume().isDigit()) {
+            afterComma += last().digitToInt(10) / 10.0.pow(numIts)
+            numIts++
+        }
+        val commaNum = (num + afterComma)
+//        return OnjToken(OnjTokenType.FLOAT, if (negative) -commaNum else commaNum, start)
+        emit (TokenType.FLOAT, code.substring(start until cur), commaNum.toFloat(), start)
+    }
+
     private fun current(): Char = code[cur]
 
     private fun consume(): Char = code[cur++]
@@ -195,6 +253,8 @@ object Tokenizer {
     private fun end(): Boolean = cur >= code.length
 
     private fun canPeek(): Boolean = cur < code.length - 1
+
+    private fun last(): Char = code[cur - 1]
 
     private fun tryConsume(c: Char): Boolean {
         return if (current() == c) {
