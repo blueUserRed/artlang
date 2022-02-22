@@ -2,11 +2,12 @@ package classFile
 
 import java.nio.file.Files
 import java.nio.file.Paths
-import java.util.*
 
 class ClassFileBuilder {
 
     private val constantPool: MutableList<ConstantInfo> = mutableListOf()
+    private val methods: MutableList<MethodBuilder> = mutableListOf()
+    private val attributes: MutableList<Attribute> = mutableListOf()
 
     var thisClass: String = ""
     var superClass: String = ""
@@ -44,6 +45,9 @@ class ClassFileBuilder {
         return constantPool.size
     }
 
+    fun addMethod(method: MethodBuilder) = methods.add(method)
+    fun addAttribute(attrib: Attribute) = attributes.add(attrib)
+
     fun build(path: String) {
 
         val thisClassIndex = classInfo(utf8Info(thisClass))
@@ -65,7 +69,10 @@ class ClassFileBuilder {
 
         out.write(Utils.getLastTwoBytes(0)) //interface count //TODO: Unhardcode
         out.write(Utils.getLastTwoBytes(0)) //field count
-        out.write(Utils.getLastTwoBytes(0)) //methods count
+
+        out.write(Utils.getLastTwoBytes(methods.size))
+        for (method in methods) out.write(method.build(this))
+
         out.write(Utils.getLastTwoBytes(0)) //attributes count
 
         out.close()
@@ -212,7 +219,111 @@ class ConstantIntegerInfo(val i: Int) : ConstantInfo(3) {
     }
 }
 
+class MethodBuilder {
+
+    var name: String = ""
+    var descriptor: String = ""
+
+    var maxStack: Int = 0
+    var maxLocals: Int = 0
+
+    private val code: MutableList<Byte> = mutableListOf()
+    private val attributes: MutableList<Attribute> = mutableListOf()
+    private val codeAttributes: MutableList<Attribute> = mutableListOf()
+
+    var isPublic: Boolean = false
+    var isPrivate: Boolean = false
+    var isProtected: Boolean = false
+    var isStatic: Boolean = false
+    var isFinal: Boolean = false
+    var isSynchronized: Boolean = false
+    var isBridge: Boolean = false
+    var isVarargs: Boolean = false
+    var isNative: Boolean = false
+    var isAbstract: Boolean = false
+    var isStrict: Boolean = false
+    var isSynthetic: Boolean = false
 
 
+    fun build(fileBuilder: ClassFileBuilder): ByteArray {
 
+        removeCodeAttrib() //remove code Attribute if present, for example if method is build more than once
+        attributes.add(
+            CodeAttribute(
+                fileBuilder.utf8Info("Code"),
+                maxStack, maxLocals,
+                code.toByteArray(),
+                codeAttributes.toTypedArray()
+            )
+        )
 
+        val attribBytes = Utils.arrayConcat(*Array(attributes.size) { attributes[it].toBytes() })
+
+        return Utils.arrayConcat(
+            getAccessFlagsAsBytes(),
+            Utils.getLastTwoBytes(fileBuilder.utf8Info(name)),
+            Utils.getLastTwoBytes(fileBuilder.utf8Info(descriptor)),
+            Utils.getLastTwoBytes(attributes.size),
+            attribBytes
+        )
+    }
+
+    fun addAttribute(attrib: Attribute) = attributes.add(attrib)
+    fun addCodeAttribute(attrib: Attribute) = codeAttributes.add(attrib)
+
+    private fun removeCodeAttrib() {
+        val iter = attributes.iterator()
+        while (iter.hasNext()) if (iter.next() is CodeAttribute) iter.remove()
+    }
+
+    private fun getAccessFlagsAsBytes(): ByteArray {
+        var flags = 0
+        if (isPublic) flags = flags or 0x0001
+        if (isPrivate) flags = flags or 0x0002
+        if (isProtected) flags = flags or 0x0004
+        if (isStatic) flags = flags or 0x0008
+        if (isFinal) flags = flags or 0x0010
+        if (isSynchronized) flags = flags or 0x0020
+        if (isBridge) flags = flags or 0x0040
+        if (isVarargs) flags = flags or 0x0080
+        if (isNative) flags = flags or 0x0100
+        if (isAbstract) flags = flags or 0x0400
+        if (isStrict) flags = flags or 0x0800
+        if (isSynthetic) flags = flags or 0x1000
+        return Utils.getLastTwoBytes(flags)
+    }
+}
+
+abstract class Attribute {
+    abstract fun toBytes(): ByteArray
+}
+
+class CodeAttribute(
+    val nameIndex: Int,
+    val maxStack: Int,
+    val maxLocals: Int,
+    val code: ByteArray,
+    val attributes: Array<Attribute>
+) : Attribute() {
+
+    override fun toBytes(): ByteArray {
+
+        val attribBytes = Utils.arrayConcat(*Array(attributes.size) { attributes[it].toBytes() })
+
+        val b = Utils.arrayConcat(
+            code,
+            Utils.getLastTwoBytes(0), //Exception Table length
+            Utils.getLastTwoBytes(attributes.size),
+            attribBytes
+        )
+
+        return Utils.arrayConcat(
+            Utils.getLastTwoBytes(nameIndex),
+            Utils.getIntAsBytes(b.size + 8),
+            Utils.getLastTwoBytes(maxStack),
+            Utils.getLastTwoBytes(maxLocals),
+            Utils.getIntAsBytes(code.size),
+            b
+        )
+    }
+}
