@@ -1,7 +1,0 @@
-package compiler
-
-class Opcodes {
-
-
-
-}

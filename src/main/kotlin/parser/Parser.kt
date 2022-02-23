@@ -33,7 +33,35 @@ object Parser {
     private fun parseStatement(): Statement {
         if (match(TokenType.L_BRACE)) return parseBlock()
         if (match(TokenType.K_PRINT)) return parsePrint()
+        if (match(TokenType.K_LET)) return parseVariableDeclaration()
+
+        val start = cur
+        try {
+            return parseVariableAssignment()
+        } catch (e: RuntimeException) {
+            cur = start
+        }
+
         return parseExpressionStatement()
+    }
+
+    private fun parseVariableAssignment(): Statement {
+        consumeOrError(TokenType.IDENTIFIER, "")
+        val name = last()
+        consumeOrError(TokenType.EQ, "")
+        val exp = parseExpression()
+        consumeOrError(TokenType.SEMICOLON, "")
+        return Statement.VariableAssignment(name, exp)
+    }
+
+    private fun parseVariableDeclaration(): Statement {
+        consumeOrError(TokenType.IDENTIFIER, "expected identifier after let")
+        val name = last()
+        //TODO: datatype
+        consumeOrError(TokenType.EQ, "initializer expected")
+        val initializer = parseExpression()
+        consumeOrError(TokenType.SEMICOLON, "Expected a Semicolon after variable Declaration")
+        return Statement.VariableDeclaration(name, initializer)
     }
 
     private fun parseExpressionStatement(): Statement {
@@ -57,16 +85,17 @@ object Parser {
     }
 
     private fun parseFactorExpression(): Expression {
-        var left = parsePrimaryExpression()
+        var left = parseLiteralExpression()
         while (match(TokenType.STAR, TokenType.SLASH)) {
             val operator = last()
-            val right = parsePrimaryExpression()
+            val right = parseLiteralExpression()
             left = Expression.Binary(left, operator, right)
         }
         return left
     }
 
-    private fun parsePrimaryExpression(): Expression {
+    private fun parseLiteralExpression(): Expression {
+        if (match(TokenType.IDENTIFIER)) return Expression.Variable(last())
         if (!match(TokenType.INT, TokenType.FLOAT, TokenType.STRING)) throw RuntimeException("Not a expression")
         return Expression.Literal(last())
     }

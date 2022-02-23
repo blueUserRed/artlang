@@ -164,7 +164,7 @@ object Tokenizer {
             "print" -> emit(TokenType.K_PRINT, "print", null, start)
             "println" -> emit(TokenType.K_PRINTLN, "println", null, start)
             "class" -> emit(TokenType.K_CLASS, "class", null, start)
-            "var" -> emit(TokenType.K_VAR, "var", null, start)
+            "let" -> emit(TokenType.K_LET, "let", null, start)
             "const" -> emit(TokenType.K_CONST, "const", null, start)
             "priv" -> emit(TokenType.K_PRIV, "priv", null, start)
             "pub" -> emit(TokenType.K_PUB, "pub", null, start)

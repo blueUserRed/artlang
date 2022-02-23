@@ -7,6 +7,7 @@ import ast.StatementVisitor
 import classFile.ClassFileBuilder
 import classFile.MethodBuilder
 import tokenizer.TokenType
+import passes.TypeChecker.Datatype
 
 class Compiler : StatementVisitor<Void?>, ExpressionVisitor<Void?> {
 
@@ -29,15 +30,20 @@ class Compiler : StatementVisitor<Void?>, ExpressionVisitor<Void?> {
     override fun visit(exp: Expression.Binary): Void? {
         compExp(exp.left)
         compExp(exp.right)
-        if (exp.operator.tokenType == TokenType.PLUS) emit(iadd)
-        else TODO("not yet implemented")
+        when (exp.operator.tokenType) {
+            TokenType.PLUS -> emit(iadd)
+            TokenType.MINUS -> emit(isub)
+            TokenType.STAR -> emit(imul)
+            TokenType.SLASH -> emit(idiv)
+            else -> TODO("not yet implemented")
+        }
         decStack()
         return null
     }
 
     override fun visit(exp: Expression.Literal): Void? {
-        if (exp.literal.tokenType != TokenType.INT) TODO("not yet implemented")
-        emitIntLoad(exp.literal.literal as Int)
+        if (exp.type == Datatype.INT) emitIntLoad(exp.literal.literal as Int)
+        else if (exp.type == Datatype.STRING) emitStringLoad(exp.literal.literal as String)
         incStack()
         return null
     }
@@ -101,7 +107,14 @@ class Compiler : StatementVisitor<Void?>, ExpressionVisitor<Void?> {
         incStack()
         compExp(stmt.toPrint)
         emit(invokevirtual)
-        val dataTypeToPrint = "I" //TODO: in typechecker, figure out which type to print
+
+        val dataTypeToPrint = when (stmt.toPrint.type) {
+            Datatype.INT -> "I"
+            Datatype.FLOAT -> "F"
+            Datatype.STRING -> "Ljava/lang/String;"
+            else -> TODO("not yet implemented")
+        }
+
         emit(*Utils.getLastTwoBytes(file!!.methodRefInfo(
             file!!.classInfo(file!!.utf8Info("java/io/PrintStream")),
             file!!.nameAndTypeInfo(
@@ -137,6 +150,9 @@ class Compiler : StatementVisitor<Void?>, ExpressionVisitor<Void?> {
         else emit(ldc_w, ((index and 0xFF00) shr 8).toByte(), (index and 0xFF).toByte())
     }
 
+    private fun emitStringLoad(s: String) = emitLdc(file!!.stringInfo(file!!.utf8Info(s)))
+
+
     private fun compExp(exp: Expression){
         exp.accept(this)
         assert(curStack == 1)
@@ -164,6 +180,9 @@ class Compiler : StatementVisitor<Void?>, ExpressionVisitor<Void?> {
     companion object {
 
         const val iadd: Byte = 0x60.toByte()
+        const val isub: Byte = 0x64.toByte()
+        const val imul: Byte = 0x68.toByte()
+        const val idiv: Byte = 0x6C.toByte()
 
         const val iconst_m1: Byte = 0x02.toByte()
         const val iconst_0: Byte = 0x03.toByte()
@@ -188,6 +207,18 @@ class Compiler : StatementVisitor<Void?>, ExpressionVisitor<Void?> {
         const val invokevirtual: Byte = 0xB6.toByte()
 
         const val _return: Byte = 0xB1.toByte()
+    }
+
+    override fun visit(exp: Expression.Variable): Void? {
+        TODO("Not yet implemented")
+    }
+
+    override fun visit(stmt: Statement.VariableDeclaration): Void? {
+        TODO("Not yet implemented")
+    }
+
+    override fun visit(stmt: Statement.VariableAssignment): Void? {
+        TODO("Not yet implemented")
     }
 
 }

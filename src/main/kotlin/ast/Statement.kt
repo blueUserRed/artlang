@@ -31,4 +31,14 @@ abstract class Statement {
         override fun <T> accept(visitor: StatementVisitor<T>): T = visitor.visit(this)
     }
 
+    class VariableDeclaration(val name: Token, val initializer: Expression) : Statement() {
+
+        override fun <T> accept(visitor: StatementVisitor<T>): T = visitor.visit(this)
+    }
+
+    class VariableAssignment(val name: Token, val expr: Expression) : Statement() {
+
+        override fun <T> accept(visitor: StatementVisitor<T>): T = visitor.visit(this)
+    }
+
 }

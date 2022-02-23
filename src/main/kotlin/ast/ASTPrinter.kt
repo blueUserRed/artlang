@@ -32,7 +32,7 @@ class ASTPrinter : ExpressionVisitor<String>, StatementVisitor<String> {
     }
 
     override fun visit(stmt: Statement.Print): String {
-        return "print ${stmt.toPrint.accept(this)}\n"
+        return "(p ${stmt.toPrint.accept(this)})\n"
     }
 
     override fun visit(stmt: Statement.Block): String {
@@ -41,6 +41,18 @@ class ASTPrinter : ExpressionVisitor<String>, StatementVisitor<String> {
         for (s in stmt.statements) builder.append(s.accept(this))
         builder.append("}")
         return builder.toString()
+    }
+
+    override fun visit(exp: Expression.Variable): String {
+        return exp.name.lexeme
+    }
+
+    override fun visit(stmt: Statement.VariableDeclaration): String {
+        return "(let ${stmt.name.lexeme} ${stmt.initializer.accept(this)})\n"
+    }
+
+    override fun visit(stmt: Statement.VariableAssignment): String {
+        return "(${stmt.name.lexeme} = ${stmt.expr.accept(this)})\n"
     }
 
 }

@@ -1,3 +1,3 @@
 fn main() {
-    print 2 + 2 + 1;
+    print "Hello World!";
 }

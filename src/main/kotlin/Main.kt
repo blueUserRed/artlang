@@ -1,11 +1,13 @@
 import ast.ASTPrinter
 import compiler.Compiler
 import parser.Parser
+import passes.TypeChecker
 import tokenizer.Tokenizer
 
 fun main() {
 
     val file = "test/src/Test.art"
+    val outdir = "src/main/res/test/out"
 
     val code = Utils.readFile(file)
     println("----------------code----------------")
@@ -24,10 +26,14 @@ fun main() {
     println(program.accept(ASTPrinter()))
     println("------------------------------------\n\n")
 
-    val outdir = "src/main/res/test/out"
-    Compiler().compile(program, outdir, "Test")
+    println("running type checker")
+    program.accept(TypeChecker())
+    println("done\n")
 
     println("Compiling into dir: $outdir")
+    Compiler().compile(program, outdir, "Test")
     println("done")
+
+
 
 }
