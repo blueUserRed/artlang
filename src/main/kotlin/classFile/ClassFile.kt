@@ -45,6 +45,38 @@ class ClassFileBuilder {
         return constantPool.size
     }
 
+    fun integerInfo(i: Int): Int {
+        val toAdd = ConstantIntegerInfo(i)
+        val find = findInfo(toAdd)
+        if (find != null) return find + 1
+        constantPool.add(toAdd)
+        return constantPool.size
+    }
+
+    fun fieldRefInfo(classIndex: Int, nameAndTypeIndex: Int): Int {
+        val toAdd = ConstantFieldRefInfo(classIndex, nameAndTypeIndex)
+        val find = findInfo(toAdd)
+        if (find != null) return find + 1
+        constantPool.add(toAdd)
+        return constantPool.size
+    }
+
+    fun nameAndTypeInfo(nameIndex: Int, descriptorIndex: Int): Int {
+        val toAdd = ConstantNameAndTypeInfo(nameIndex, descriptorIndex)
+        val find = findInfo(toAdd)
+        if (find != null) return find + 1
+        constantPool.add(toAdd)
+        return constantPool.size
+    }
+
+    fun methodRefInfo(classIndex: Int, nameAndTypeIndex: Int): Int {
+        val toAdd = ConstantMethodRefInfo(classIndex, nameAndTypeIndex)
+        val find = findInfo(toAdd)
+        if (find != null) return find + 1
+        constantPool.add(toAdd)
+        return constantPool.size
+    }
+
     fun addMethod(method: MethodBuilder) = methods.add(method)
     fun addAttribute(attrib: Attribute) = attributes.add(attrib)
 
@@ -52,6 +84,8 @@ class ClassFileBuilder {
 
         val thisClassIndex = classInfo(utf8Info(thisClass))
         val superClassIndex = classInfo(utf8Info(superClass))
+
+        val methodBytes = Utils.arrayConcat(*Array(methods.size) { methods[it].build(this) })
 
         val out = Files.newOutputStream(Paths.get(path))
 
@@ -62,7 +96,6 @@ class ClassFileBuilder {
         out.write(getConstantPoolAsBytes())
 
         out.write(getAccessFlagsAsBytes())
-        println(getAccessFlagsAsBytes().contentToString())
 
         out.write(Utils.getLastTwoBytes(thisClassIndex))
         out.write(Utils.getLastTwoBytes(superClassIndex))
@@ -71,7 +104,7 @@ class ClassFileBuilder {
         out.write(Utils.getLastTwoBytes(0)) //field count
 
         out.write(Utils.getLastTwoBytes(methods.size))
-        for (method in methods) out.write(method.build(this))
+        out.write(methodBytes)
 
         out.write(Utils.getLastTwoBytes(0)) //attributes count
 
@@ -270,6 +303,10 @@ class MethodBuilder {
 
     fun addAttribute(attrib: Attribute) = attributes.add(attrib)
     fun addCodeAttribute(attrib: Attribute) = codeAttributes.add(attrib)
+
+    fun emitByteCode(vararg bytes: Byte) {
+        for (byte in bytes) code.add(byte)
+    }
 
     private fun removeCodeAttrib() {
         val iter = attributes.iterator()

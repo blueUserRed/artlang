@@ -1,4 +1,5 @@
 import ast.ASTPrinter
+import compiler.Compiler
 import parser.Parser
 import tokenizer.Tokenizer
 
@@ -22,4 +23,11 @@ fun main() {
     println("----------------AST-----------------")
     println(program.accept(ASTPrinter()))
     println("------------------------------------\n\n")
+
+    val outdir = "src/main/res/test/out"
+    Compiler().compile(program, outdir, "Test")
+
+    println("Compiling into dir: $outdir")
+    println("done")
+
 }

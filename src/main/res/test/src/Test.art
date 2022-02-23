@@ -1,9 +1,3 @@
-
-fn test() {
-    print 2 * 2 + 1;
-}
-
 fn main() {
-    32 * 2;
-    print "test";
+    print 2 + 2 + 1;
 }
