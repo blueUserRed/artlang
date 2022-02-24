@@ -1,5 +1,6 @@
 package classFile
 
+import java.lang.RuntimeException
 import java.nio.file.Files
 import java.nio.file.Paths
 
@@ -263,6 +264,7 @@ class MethodBuilder {
     private val code: MutableList<Byte> = mutableListOf()
     private val attributes: MutableList<Attribute> = mutableListOf()
     private val codeAttributes: MutableList<Attribute> = mutableListOf()
+    private val stackMapFrames: MutableList<StackMapTableAttribute.StackMapFrame> = mutableListOf()
 
     var isPublic: Boolean = false
     var isPrivate: Boolean = false
@@ -277,10 +279,18 @@ class MethodBuilder {
     var isStrict: Boolean = false
     var isSynthetic: Boolean = false
 
+    val curCodeOffset: Int
+        get() = code.size
+
 
     fun build(fileBuilder: ClassFileBuilder): ByteArray {
+        removeAttrib<CodeAttribute>() //remove code/StackMapTable Attribute if present, for example if method is build more than once
+        removeAttrib<StackMapTableAttribute>()
 
-        removeCodeAttrib() //remove code Attribute if present, for example if method is build more than once
+        val stackMapTable = StackMapTableAttribute(fileBuilder.utf8Info("StackMapTable"))
+        stackMapTable.frames = stackMapFrames
+        codeAttributes.add(stackMapTable)
+
         attributes.add(
             CodeAttribute(
                 fileBuilder.utf8Info("Code"),
@@ -289,6 +299,7 @@ class MethodBuilder {
                 codeAttributes.toTypedArray()
             )
         )
+
 
         val attribBytes = Utils.arrayConcat(*Array(attributes.size) { attributes[it].toBytes() })
 
@@ -303,14 +314,15 @@ class MethodBuilder {
 
     fun addAttribute(attrib: Attribute) = attributes.add(attrib)
     fun addCodeAttribute(attrib: Attribute) = codeAttributes.add(attrib)
+    fun addStackMapFrame(stackMapFrame: StackMapTableAttribute.StackMapFrame) = stackMapFrames.add(stackMapFrame)
 
     fun emitByteCode(vararg bytes: Byte) {
         for (byte in bytes) code.add(byte)
     }
 
-    private fun removeCodeAttrib() {
+    private inline fun <reified T> removeAttrib() where T : Attribute {
         val iter = attributes.iterator()
-        while (iter.hasNext()) if (iter.next() is CodeAttribute) iter.remove()
+        while (iter.hasNext()) if (iter.next() is T) iter.remove()
     }
 
     private fun getAccessFlagsAsBytes(): ByteArray {
@@ -363,4 +375,75 @@ class CodeAttribute(
             b
         )
     }
+}
+
+class StackMapTableAttribute(val nameIndex: Int) : Attribute() {
+
+    var frames: MutableList<StackMapFrame> = mutableListOf()
+
+    override fun toBytes(): ByteArray {
+        val frameBytes = Utils.arrayConcat(*Array(frames.size) { frames[it].toBytes() })
+        return Utils.arrayConcat(
+            Utils.getLastTwoBytes(nameIndex),
+            Utils.getIntAsBytes(frameBytes.size + 2),
+            Utils.getLastTwoBytes(frames.size),
+            frameBytes
+        )
+    }
+
+    abstract class StackMapFrame {
+        abstract fun toBytes(): ByteArray
+    }
+
+    class SameStackMapFrame(val offset: Int) : StackMapFrame() {
+
+        init {
+            if (offset !in 0..63) throw RuntimeException("in StackMapFrame offset must be between 0 an 63")
+        }
+
+        override fun toBytes(): ByteArray = arrayOf((offset and 0xFF).toByte()).toByteArray()
+    }
+
+    class FullStackMapFrame(val offsetDelta: Int) : StackMapFrame() {
+
+        var locals: MutableList<VerificationTypeInfo> = mutableListOf()
+        var stack: MutableList<VerificationTypeInfo> = mutableListOf()
+
+        override fun toBytes(): ByteArray = Utils.arrayConcat(
+            arrayOf(255.toByte()).toByteArray(),
+            Utils.getLastTwoBytes(offsetDelta),
+            Utils.getLastTwoBytes(locals.size),
+            *Array(locals.size) { locals[it].toBytes() },
+            Utils.getLastTwoBytes(stack.size),
+            *Array(stack.size) { stack[it].toBytes() }
+        )
+    }
+
+    enum class VerificationTypeInfo(val tag: Byte) {
+        TOP(0), INTEGER(1), FLOAT(2), DOUBLE(3), LONG(4), NULL(5), UNINITIALIZED_THIS(6),
+
+        OBJECT_VARIABLE(7) {
+
+            override fun toBytes(): ByteArray = Utils.arrayConcat(
+                arrayOf(tag).toByteArray(),
+                Utils.getLastTwoBytes(classIndex)
+            )
+        },
+
+        UNINITIALIZED_VARIABLE(8) {
+
+            override fun toBytes(): ByteArray = Utils.arrayConcat(
+                arrayOf(tag).toByteArray(),
+                Utils.getLastTwoBytes(offset)
+            )
+        },
+
+        ;
+
+        var classIndex: Int = 0
+        var offset: Int = 0
+
+        open fun toBytes(): ByteArray = arrayOf(tag).toByteArray()
+    }
+
 }

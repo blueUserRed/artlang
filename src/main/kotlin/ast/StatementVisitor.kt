@@ -8,4 +8,5 @@ interface StatementVisitor<T> {
     fun visit(stmt: Statement.Block): T
     fun visit(stmt: Statement.VariableDeclaration): T
     fun visit(stmt: Statement.VariableAssignment): T
+    fun visit(stmt: Statement.Loop): T
 }

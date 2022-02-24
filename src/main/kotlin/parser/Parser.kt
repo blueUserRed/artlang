@@ -34,6 +34,7 @@ object Parser {
         if (match(TokenType.L_BRACE)) return parseBlock()
         if (match(TokenType.K_PRINT)) return parsePrint()
         if (match(TokenType.K_LET)) return parseVariableDeclaration()
+        if (match(TokenType.K_LOOP)) return parseLoop()
 
         val start = cur
         try {
@@ -44,6 +45,8 @@ object Parser {
 
         return parseExpressionStatement()
     }
+
+    private fun parseLoop(): Statement = Statement.Loop(parseStatement())
 
     private fun parseVariableAssignment(): Statement {
         consumeOrError(TokenType.IDENTIFIER, "")

@@ -6,8 +6,11 @@ import ast.Statement
 import ast.StatementVisitor
 import classFile.ClassFileBuilder
 import classFile.MethodBuilder
+import classFile.StackMapTableAttribute
 import tokenizer.TokenType
 import passes.TypeChecker.Datatype
+import classFile.StackMapTableAttribute.VerificationTypeInfo
+import java.util.*
 
 class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
 
@@ -15,8 +18,12 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
     private var name: String = ""
     private var curFile: String = ""
 
-    private var curStack: Int = 0
+//    private var curStack: Int = 0
+    private var stack: Stack<VerificationTypeInfo> = Stack()
     private var maxStack: Int = 0
+    private var locals: MutableList<VerificationTypeInfo?> = mutableListOf()
+
+    private var lastStackMapFrameOffset: Int = 0
 
     private var method: MethodBuilder? = null
     private var file: ClassFileBuilder? = null
@@ -28,8 +35,8 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
     }
 
     override fun visit(exp: Expression.Binary) {
-        compExpr(exp.left)
-        compExpr(exp.right)
+        comp(exp.left)
+        comp(exp.right)
         when (exp.operator.tokenType) {
             TokenType.PLUS -> emit(iadd)
             TokenType.MINUS -> emit(isub)
@@ -41,19 +48,26 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
     }
 
     override fun visit(exp: Expression.Literal) {
-        if (exp.type == Datatype.INT) emitIntLoad(exp.literal.literal as Int)
-        else if (exp.type == Datatype.STRING) emitStringLoad(exp.literal.literal as String)
-        incStack()
+        if (exp.type == Datatype.INT) {
+            emitIntLoad(exp.literal.literal as Int)
+            incStack(VerificationTypeInfo.INTEGER)
+        }
+        else if (exp.type == Datatype.STRING) {
+            emitStringLoad(exp.literal.literal as String)
+            incStack(getObjVerificationType("java/lang/String"))
+        }
     }
 
     override fun visit(stmt: Statement.ExpressionStatement) {
-        compExpr(stmt.exp)
+        comp(stmt.exp)
         emit(pop)
         decStack()
     }
 
     override fun visit(stmt: Statement.Function) {
-        curStack = 0
+//        curStack = 0
+        stack = Stack()
+        locals = MutableList(stmt.amountLocals) { null }
         maxStack = 0
 
         method = MethodBuilder()
@@ -62,14 +76,14 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         method!!.descriptor = "()V"
         method!!.name = stmt.name.lexeme
 
-        compStmt(stmt.statements)
+        comp(stmt.statements)
 
         method!!.maxStack = maxStack
         method!!.maxLocals = stmt.amountLocals
 
-        if (method!!.name == "main") { //TODO: fix when adding parameters
+        if (method!!.name == "main") {
             method!!.descriptor = "([Ljava/lang/String;)V"
-//            method!!.maxLocals += 1
+            if (method!!.maxLocals < 1) method!!.maxLocals = 1 //TODO: fix when adding parameters
         }
 
         file!!.addMethod(method!!)
@@ -84,7 +98,7 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         file!!.isPublic = true
         curFile = file!!.thisClass
 
-        for (func in stmt.funcs) compStmt(func)
+        for (func in stmt.funcs) comp(func)
 
         file!!.build("$outdir/$curFile.class")
     }
@@ -98,8 +112,8 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
                 file!!.utf8Info("Ljava/io/PrintStream;")
             )
         )))
-        incStack()
-        compExpr(stmt.toPrint)
+        incStack(getObjVerificationType("java/io/PrintStream"))
+        comp(stmt.toPrint)
         emit(invokevirtual)
 
         val dataTypeToPrint = when (stmt.toPrint.type) {
@@ -122,26 +136,36 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
 
     override fun visit(exp: Expression.Variable) {
         when (exp.type) {
-            Datatype.INT -> emitIntVarLoad(exp.index)
-            Datatype.STRING -> emitObjectVarLoad(exp.index)
+            Datatype.INT -> {
+                emitIntVarLoad(exp.index)
+                incStack(VerificationTypeInfo.INTEGER)
+            }
+            Datatype.STRING -> {
+                emitObjectVarLoad(exp.index)
+                incStack(getObjVerificationType("java/lang/String"))
+            }
             else -> TODO("not yet implemented")
         }
-        incStack()
     }
 
     override fun visit(stmt: Statement.VariableDeclaration) {
-        compExpr(stmt.initializer)
+        comp(stmt.initializer)
         when (stmt.type) {
-            Datatype.INT -> emitIntVarStore(stmt.index)
-            Datatype.STRING -> emitObjectVarStore(stmt.index)
+            Datatype.INT -> {
+                locals[stmt.index] = VerificationTypeInfo.INTEGER
+                emitIntVarStore(stmt.index)
+            }
+            Datatype.STRING -> {
+                locals[stmt.index] = getObjVerificationType("java/lang/String")
+                emitObjectVarStore(stmt.index)
+            }
             else -> TODO("not yet implemented")
         }
         decStack()
-        //TODO: something?
     }
 
     override fun visit(stmt: Statement.VariableAssignment) {
-        compExpr(stmt.expr)
+        comp(stmt.expr)
         when (stmt.type) {
             Datatype.INT -> emitIntVarStore(stmt.index)
             Datatype.STRING -> emitObjectVarStore(stmt.index)
@@ -150,8 +174,42 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         decStack()
     }
 
+    override fun visit(stmt: Statement.Loop) {
+        emitStackMapFrame()
+        val before = method!!.curCodeOffset
+        comp(stmt.stmt)
+        val absOffset = (before - method!!.curCodeOffset)
+        emitGoto(absOffset)
+        emitStackMapFrame()
+    }
+
     override fun visit(stmt: Statement.Block) {
-        for (s in stmt.statements) compStmt(s)
+        val before = locals.toMutableList()
+        for (s in stmt.statements) comp(s)
+        locals = before
+    }
+
+    private fun emitGoto(offset: Int) {
+        if (offset !in Short.MIN_VALUE..Short.MAX_VALUE) emit(goto_w, *Utils.getIntAsBytes(offset))
+        else emit(_goto, *Utils.getShortAsBytes(offset.toShort()))
+    }
+
+    private fun emitStackMapFrame() {
+
+        //TODO: instead of always emitting FullStackMapFrames also use other types of StackMapFrames
+
+        val offsetDelta = if (lastStackMapFrameOffset == 0) method!!.curCodeOffset
+                            else (method!!.curCodeOffset - lastStackMapFrameOffset) - 1
+
+        val frame = StackMapTableAttribute.FullStackMapFrame(offsetDelta)
+
+        val newLocals = mutableListOf<VerificationTypeInfo>()
+        for (local in locals) if (local != null) newLocals.add(local)
+
+        frame.locals = newLocals
+        frame.stack = stack.toMutableList()
+        lastStackMapFrameOffset = method!!.curCodeOffset
+        method!!.addStackMapFrame(frame)
     }
 
     private fun emitIntLoad(i: Int) = when (i) {
@@ -163,7 +221,7 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         4 -> emit(iconst_4)
         5 -> emit(iconst_5)
         in Byte.MIN_VALUE..Byte.MAX_VALUE -> emit(bipush, (i and 0xFF).toByte())
-        in Short.MIN_VALUE..Short.MAX_VALUE -> emit(sipush, ((i and 0xFF00) shr 8).toByte(), (i and 0xFF).toByte())
+        in Short.MIN_VALUE..Short.MAX_VALUE -> emit(sipush, *Utils.getLastTwoBytes(i))
         else -> emitLdc(file!!.integerInfo(i))
     }
 
@@ -201,31 +259,42 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
 
     private fun emitLdc(index: Int) {
         if (index <= 255) emit(ldc, (index and 0xFF).toByte())
-        else emit(ldc_w, ((index and 0xFF00) shr 8).toByte(), (index and 0xFF).toByte())
+        else emit(ldc_w, *Utils.getLastTwoBytes(index))
     }
 
     private fun emitStringLoad(s: String) = emitLdc(file!!.stringInfo(file!!.utf8Info(s)))
 
 
-    private fun compExpr(exp: Expression){
+    private fun comp(exp: Expression){
         exp.accept(this)
-        assert(curStack == 1)
+        assert(stack.size == 1)
+//        assert(curStack == 1)
     }
 
-    private fun compStmt(stmt: Statement) {
+    private fun comp(stmt: Statement) {
         stmt.accept(this)
-        assert(curStack == 0)
+        assert(stack.size == 0)
+//        assert(curStack == 0)
+    }
+
+    private fun getObjVerificationType(clazz: String): VerificationTypeInfo {
+        val type = VerificationTypeInfo.OBJECT_VARIABLE
+        type.classIndex = file!!.classInfo(file!!.utf8Info(clazz))
+        return type
     }
 
     private fun emit(vararg bytes: Byte) = method!!.emitByteCode(*bytes)
 
-    private fun incStack() {
-        curStack++
-        if (curStack > maxStack) maxStack = curStack
+    private fun incStack(type: VerificationTypeInfo) {
+        stack.push(type)
+        if (stack.size > maxStack) maxStack = stack.size
+//        curStack++
+//        if (curStack > maxStack) maxStack = curStack
     }
 
     private fun decStack() {
-        curStack--
+//        curStack--
+        stack.pop()
     }
 
 
@@ -279,6 +348,9 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
 
         const val pop: Byte = 0x57.toByte()
         const val pop2: Byte = 0x58.toByte()
+
+        const val _goto: Byte = 0xA7.toByte()
+        const val goto_w: Byte = 0xC8.toByte()
 
         const val getStatic: Byte = 0xB2.toByte()
 

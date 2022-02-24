@@ -1,12 +1,13 @@
 fn main() {
-
-    let x = "Test";
-    x = "Hello World!";
+    let test = "hi";
+    let x = 3;
     print x;
 
-    let y = 2;
-    y = y + y;
-    y = y * 2;
-    print y;
+    loop {
+        let y = 1;
+        print "hi";
+    }
 
+    let test2 = "Hello World";
+    print test2;
 }

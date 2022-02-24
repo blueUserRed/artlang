@@ -32,4 +32,9 @@ object Utils {
         ((i shr 0) and 0xFF).toByte(),
     ).toByteArray()
 
+    fun getShortAsBytes(s: Short): ByteArray = arrayOf(
+        ((s.toInt() shr 8) and 0xFF).toByte(),
+        ((s.toInt() shr 0) and 0xFF).toByte(),
+    ).toByteArray()
+
 }

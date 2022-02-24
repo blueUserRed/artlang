@@ -64,6 +64,10 @@ class VariableResolver : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         stmt.index = index
     }
 
+    override fun visit(stmt: Statement.Loop) {
+        resolve(stmt.stmt)
+    }
+
     private fun resolve(expr: Expression) = expr.accept(this)
     private fun resolve(stmt: Statement) = stmt.accept(this)
 

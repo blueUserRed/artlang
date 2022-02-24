@@ -55,4 +55,7 @@ class ASTPrinter : ExpressionVisitor<String>, StatementVisitor<String> {
         return "(${stmt.name.lexeme} = ${stmt.expr.accept(this)})\n"
     }
 
+    override fun visit(stmt: Statement.Loop): String {
+        return "loop {\n${stmt.stmt.accept(this)}}\n"
+    }
 }

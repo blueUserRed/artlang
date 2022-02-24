@@ -65,8 +65,6 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
         return Datatype.VOID
     }
 
-    private fun check(exp: Expression): Datatype = exp.accept(this)
-
     override fun visit(exp: Expression.Variable): Datatype {
         val datatype = vars[exp.index] ?: throw RuntimeException("unreachable")
         exp.type = datatype
@@ -87,6 +85,13 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
         stmt.type = type
         return Datatype.VOID
     }
+
+    override fun visit(stmt: Statement.Loop): Datatype {
+        stmt.stmt.accept(this)
+        return Datatype.VOID
+    }
+
+    private fun check(exp: Expression): Datatype = exp.accept(this)
 
     enum class Datatype {
         INT, FLOAT, STRING, VOID //TODO: more types
