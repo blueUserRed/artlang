@@ -9,7 +9,7 @@ import classFile.MethodBuilder
 import tokenizer.TokenType
 import passes.TypeChecker.Datatype
 
-class Compiler : StatementVisitor<Void?>, ExpressionVisitor<Void?> {
+class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
 
     private var outdir: String = ""
     private var name: String = ""
@@ -27,9 +27,9 @@ class Compiler : StatementVisitor<Void?>, ExpressionVisitor<Void?> {
         program.accept(this)
     }
 
-    override fun visit(exp: Expression.Binary): Void? {
-        compExp(exp.left)
-        compExp(exp.right)
+    override fun visit(exp: Expression.Binary) {
+        compExpr(exp.left)
+        compExpr(exp.right)
         when (exp.operator.tokenType) {
             TokenType.PLUS -> emit(iadd)
             TokenType.MINUS -> emit(isub)
@@ -38,24 +38,21 @@ class Compiler : StatementVisitor<Void?>, ExpressionVisitor<Void?> {
             else -> TODO("not yet implemented")
         }
         decStack()
-        return null
     }
 
-    override fun visit(exp: Expression.Literal): Void? {
+    override fun visit(exp: Expression.Literal) {
         if (exp.type == Datatype.INT) emitIntLoad(exp.literal.literal as Int)
         else if (exp.type == Datatype.STRING) emitStringLoad(exp.literal.literal as String)
         incStack()
-        return null
     }
 
-    override fun visit(stmt: Statement.ExpressionStatement): Void? {
-        compExp(stmt.exp)
+    override fun visit(stmt: Statement.ExpressionStatement) {
+        compExpr(stmt.exp)
         emit(pop)
         decStack()
-        return null
     }
 
-    override fun visit(stmt: Statement.Function): Void? {
+    override fun visit(stmt: Statement.Function) {
         curStack = 0
         maxStack = 0
 
@@ -68,19 +65,18 @@ class Compiler : StatementVisitor<Void?>, ExpressionVisitor<Void?> {
         compStmt(stmt.statements)
 
         method!!.maxStack = maxStack
+        method!!.maxLocals = stmt.amountLocals
 
-        if (method!!.name == "main") {
+        if (method!!.name == "main") { //TODO: fix when adding parameters
             method!!.descriptor = "([Ljava/lang/String;)V"
-            method!!.maxLocals = 1
+//            method!!.maxLocals += 1
         }
 
         file!!.addMethod(method!!)
         emit(_return)
-
-        return null
     }
 
-    override fun visit(stmt: Statement.Program): Void? {
+    override fun visit(stmt: Statement.Program) {
         file = ClassFileBuilder()
         file!!.thisClass = "$name\$\$ArtTopLevel"
         file!!.superClass = "java/lang/Object"
@@ -91,11 +87,9 @@ class Compiler : StatementVisitor<Void?>, ExpressionVisitor<Void?> {
         for (func in stmt.funcs) compStmt(func)
 
         file!!.build("$outdir/$curFile.class")
-
-        return null
     }
 
-    override fun visit(stmt: Statement.Print): Void? {
+    override fun visit(stmt: Statement.Print) {
         emit(getStatic)
         emit(*Utils.getLastTwoBytes(file!!.fieldRefInfo(
             file!!.classInfo(file!!.utf8Info("java/lang/System")),
@@ -105,7 +99,7 @@ class Compiler : StatementVisitor<Void?>, ExpressionVisitor<Void?> {
             )
         )))
         incStack()
-        compExp(stmt.toPrint)
+        compExpr(stmt.toPrint)
         emit(invokevirtual)
 
         val dataTypeToPrint = when (stmt.toPrint.type) {
@@ -124,12 +118,40 @@ class Compiler : StatementVisitor<Void?>, ExpressionVisitor<Void?> {
         )))
         decStack()
         decStack()
-        return null
     }
 
-    override fun visit(stmt: Statement.Block): Void? {
+    override fun visit(exp: Expression.Variable) {
+        when (exp.type) {
+            Datatype.INT -> emitIntVarLoad(exp.index)
+            Datatype.STRING -> emitObjectVarLoad(exp.index)
+            else -> TODO("not yet implemented")
+        }
+        incStack()
+    }
+
+    override fun visit(stmt: Statement.VariableDeclaration) {
+        compExpr(stmt.initializer)
+        when (stmt.type) {
+            Datatype.INT -> emitIntVarStore(stmt.index)
+            Datatype.STRING -> emitObjectVarStore(stmt.index)
+            else -> TODO("not yet implemented")
+        }
+        decStack()
+        //TODO: something?
+    }
+
+    override fun visit(stmt: Statement.VariableAssignment) {
+        compExpr(stmt.expr)
+        when (stmt.type) {
+            Datatype.INT -> emitIntVarStore(stmt.index)
+            Datatype.STRING -> emitObjectVarStore(stmt.index)
+            else -> TODO("not yet implemented")
+        }
+        decStack()
+    }
+
+    override fun visit(stmt: Statement.Block) {
         for (s in stmt.statements) compStmt(s)
-        return null
     }
 
     private fun emitIntLoad(i: Int) = when (i) {
@@ -145,6 +167,38 @@ class Compiler : StatementVisitor<Void?>, ExpressionVisitor<Void?> {
         else -> emitLdc(file!!.integerInfo(i))
     }
 
+    private fun emitIntVarLoad(index: Int) = when (index) {
+        0 -> emit(iload_0)
+        1 -> emit(iload_1)
+        2 -> emit(iload_2)
+        3 -> emit(iload_3)
+        else -> emit(iload, (index and 0xFF).toByte()) //TODO: wide
+    }
+
+    private fun emitIntVarStore(index: Int) = when (index) {
+        0 -> emit(istore_0)
+        1 -> emit(istore_1)
+        2 -> emit(istore_2)
+        3 -> emit(istore_3)
+        else -> emit(istore, (index and 0xFF).toByte()) //TODO: wide
+    }
+
+    private fun emitObjectVarLoad(index: Int) = when (index) {
+        0 -> emit(aload_0)
+        1 -> emit(aload_1)
+        2 -> emit(aload_2)
+        3 -> emit(aload_3)
+        else -> emit(aload, (index and 0xFF).toByte()) //TODO: wide
+    }
+
+    private fun emitObjectVarStore(index: Int) = when (index) {
+        0 -> emit(astore_0)
+        1 -> emit(astore_1)
+        2 -> emit(astore_2)
+        3 -> emit(astore_3)
+        else -> emit(astore, (index and 0xFF).toByte()) //TODO: wide
+    }
+
     private fun emitLdc(index: Int) {
         if (index <= 255) emit(ldc, (index and 0xFF).toByte())
         else emit(ldc_w, ((index and 0xFF00) shr 8).toByte(), (index and 0xFF).toByte())
@@ -153,7 +207,7 @@ class Compiler : StatementVisitor<Void?>, ExpressionVisitor<Void?> {
     private fun emitStringLoad(s: String) = emitLdc(file!!.stringInfo(file!!.utf8Info(s)))
 
 
-    private fun compExp(exp: Expression){
+    private fun compExpr(exp: Expression){
         exp.accept(this)
         assert(curStack == 1)
     }
@@ -199,6 +253,30 @@ class Compiler : StatementVisitor<Void?>, ExpressionVisitor<Void?> {
         const val ldc_w: Byte = 0x13.toByte()
         const val ldc2_w: Byte = 0x14.toByte()
 
+        const val iload: Byte = 0x15.toByte()
+        const val iload_0: Byte = 0x1a.toByte()
+        const val iload_1: Byte = 0x1b.toByte()
+        const val iload_2: Byte = 0x1c.toByte()
+        const val iload_3: Byte = 0x1d.toByte()
+
+        const val istore: Byte = 0x36.toByte()
+        const val istore_0: Byte = 0x3b.toByte()
+        const val istore_1: Byte = 0x3c.toByte()
+        const val istore_2: Byte = 0x3d.toByte()
+        const val istore_3: Byte = 0x3e.toByte()
+
+        const val aload: Byte = 0x19.toByte()
+        const val aload_0: Byte = 0x2a.toByte()
+        const val aload_1: Byte = 0x2b.toByte()
+        const val aload_2: Byte = 0x2c.toByte()
+        const val aload_3: Byte = 0x2d.toByte()
+
+        const val astore: Byte = 0x3a.toByte()
+        const val astore_0: Byte = 0x4b.toByte()
+        const val astore_1: Byte = 0x4c.toByte()
+        const val astore_2: Byte = 0x4d.toByte()
+        const val astore_3: Byte = 0x4e.toByte()
+
         const val pop: Byte = 0x57.toByte()
         const val pop2: Byte = 0x58.toByte()
 
@@ -206,19 +284,8 @@ class Compiler : StatementVisitor<Void?>, ExpressionVisitor<Void?> {
 
         const val invokevirtual: Byte = 0xB6.toByte()
 
+        const val wide: Byte = 0xC4.toByte()
+
         const val _return: Byte = 0xB1.toByte()
     }
-
-    override fun visit(exp: Expression.Variable): Void? {
-        TODO("Not yet implemented")
-    }
-
-    override fun visit(stmt: Statement.VariableDeclaration): Void? {
-        TODO("Not yet implemented")
-    }
-
-    override fun visit(stmt: Statement.VariableAssignment): Void? {
-        TODO("Not yet implemented")
-    }
-
 }

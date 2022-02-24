@@ -2,6 +2,7 @@ import ast.ASTPrinter
 import compiler.Compiler
 import parser.Parser
 import passes.TypeChecker
+import passes.VariableResolver
 import tokenizer.Tokenizer
 
 fun main() {
@@ -25,6 +26,10 @@ fun main() {
     println("----------------AST-----------------")
     println(program.accept(ASTPrinter()))
     println("------------------------------------\n\n")
+
+    println("running variable resolver")
+    program.accept(VariableResolver())
+    println("done\n")
 
     println("running type checker")
     program.accept(TypeChecker())

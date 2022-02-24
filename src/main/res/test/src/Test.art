@@ -1,3 +1,12 @@
 fn main() {
-    print "Hello World!";
+
+    let x = "Test";
+    x = "Hello World!";
+    print x;
+
+    let y = 2;
+    y = y + y;
+    y = y * 2;
+    print y;
+
 }

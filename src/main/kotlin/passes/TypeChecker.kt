@@ -9,6 +9,8 @@ import java.lang.RuntimeException
 
 class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<TypeChecker.Datatype> {
 
+    private val vars: MutableMap<Int, Datatype> = mutableMapOf()
+
     override fun visit(exp: Expression.Binary): Datatype {
         val type1 = check(exp.left)
         val type2 = check(exp.right)
@@ -66,15 +68,24 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
     private fun check(exp: Expression): Datatype = exp.accept(this)
 
     override fun visit(exp: Expression.Variable): Datatype {
-        TODO("Not yet implemented")
+        val datatype = vars[exp.index] ?: throw RuntimeException("unreachable")
+        exp.type = datatype
+        return datatype
     }
 
     override fun visit(stmt: Statement.VariableDeclaration): Datatype {
-        TODO("Not yet implemented")
+        val type = check(stmt.initializer)
+        vars[stmt.index] = type
+        stmt.type = type
+        return Datatype.VOID
     }
 
     override fun visit(stmt: Statement.VariableAssignment): Datatype {
-        TODO("Not yet implemented")
+        val type = check(stmt.expr)
+        val varType = vars[stmt.index] ?: throw RuntimeException("unreachable")
+        if (type != varType) throw RuntimeException("tried to assign $type to $varType")
+        stmt.type = type
+        return Datatype.VOID
     }
 
     enum class Datatype {

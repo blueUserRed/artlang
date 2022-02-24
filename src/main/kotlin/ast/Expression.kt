@@ -21,6 +21,8 @@ abstract class Expression {
 
     class Variable(val name: Token) : Expression() {
 
+        var index: Int = 0
+
         override fun <T> accept(visitor: ExpressionVisitor<T>): T = visitor.visit(this)
     }
 
