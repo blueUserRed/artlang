@@ -35,6 +35,7 @@ object Parser {
         if (match(TokenType.K_PRINT)) return parsePrint()
         if (match(TokenType.K_LET)) return parseVariableDeclaration()
         if (match(TokenType.K_LOOP)) return parseLoop()
+        if (match(TokenType.K_IF)) return parseIf()
 
         val start = cur
         try {
@@ -46,7 +47,31 @@ object Parser {
         return parseExpressionStatement()
     }
 
-    private fun parseLoop(): Statement = Statement.Loop(parseStatement())
+    private fun parseIf(): Statement {
+
+        consumeOrError(TokenType.L_PAREN, "Expected Parenthesis after if")
+        val condition = parseExpression()
+        consumeOrError(TokenType.R_PAREN, "Expected closing Parenthesis after condition")
+
+        val ifStmt = parseStatement()
+        if (ifStmt is Statement.VariableDeclaration) throw RuntimeException("Cant declare variable in if unless it " +
+                "is wrapped in a block")
+
+        if (!match(TokenType.K_ELSE)) return Statement.If(ifStmt, null, condition)
+
+        val elseStmt = parseStatement()
+        if (elseStmt is Statement.VariableDeclaration) throw RuntimeException("Cant declare variable in else unless it " +
+                "is wrapped in a block")
+
+        return Statement.If(ifStmt, elseStmt, condition)
+    }
+
+    private fun parseLoop(): Statement {
+        val stmt = parseStatement()
+        if (stmt is Statement.VariableDeclaration) throw RuntimeException("Cant declare variable in loop unless it " +
+                "is wrapped in a block")
+        return Statement.Loop(stmt)
+    }
 
     private fun parseVariableAssignment(): Statement {
         consumeOrError(TokenType.IDENTIFIER, "")
@@ -74,7 +99,17 @@ object Parser {
     }
 
     private fun parseExpression(): Expression {
-        return parseTermExpression()
+        return parseComparison()
+    }
+
+    private fun parseComparison(): Expression {
+        var left = parseTermExpression()
+        while (match(TokenType.D_EQ, TokenType.LT, TokenType.LT_EQ, TokenType.GT, TokenType.GT_EQ, TokenType.NOT_EQ)) {
+            val operator = last()
+            val right = parseTermExpression()
+            left = Expression.Binary(left, operator, right)
+        }
+        return left
     }
 
     private fun parseTermExpression(): Expression {
@@ -88,19 +123,40 @@ object Parser {
     }
 
     private fun parseFactorExpression(): Expression {
-        var left = parseLiteralExpression()
+        var left = parseUnaryExpression()
         while (match(TokenType.STAR, TokenType.SLASH)) {
             val operator = last()
-            val right = parseLiteralExpression()
+            val right = parseUnaryExpression()
             left = Expression.Binary(left, operator, right)
         }
         return left
     }
 
+    private fun parseUnaryExpression(): Expression {
+        var cur: Expression? = null
+        if (match(TokenType.MINUS, TokenType.NOT)) {
+            val operator = last()
+            val exp = parseUnaryExpression()
+            cur = Expression.Unary(exp, operator)
+        }
+        return cur ?: parseLiteralExpression()
+    }
+
     private fun parseLiteralExpression(): Expression {
         if (match(TokenType.IDENTIFIER)) return Expression.Variable(last())
-        if (!match(TokenType.INT, TokenType.FLOAT, TokenType.STRING)) throw RuntimeException("Not a expression")
+        if (match(TokenType.L_PAREN)) return groupExpression()
+
+        if (!match(TokenType.INT, TokenType.FLOAT, TokenType.STRING, TokenType.BOOLEAN)) {
+            throw RuntimeException("Not a expression")
+        }
+
         return Expression.Literal(last())
+    }
+
+    private fun groupExpression(): Expression {
+        val exp = parseExpression()
+        if (!match(TokenType.R_PAREN)) throw RuntimeException("Expected closing Parenthesis")
+        return Expression.Group(exp)
     }
 
     private fun parseBlock(): Statement.Block {

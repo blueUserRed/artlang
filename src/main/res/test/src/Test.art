@@ -1,13 +1,7 @@
 fn main() {
-    let test = "hi";
-    let x = 3;
-    print x;
-
-    loop {
-        let y = 1;
-        print "hi";
-    }
-
-    let test2 = "Hello World";
-    print test2;
+   if (2 * (2 + 2) >= 20) {
+        print "Hello";
+   } else if (1 + 1 != 2) {
+        print "World";
+   }
 }

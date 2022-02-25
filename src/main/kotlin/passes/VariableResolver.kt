@@ -68,6 +68,20 @@ class VariableResolver : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         resolve(stmt.stmt)
     }
 
+    override fun visit(stmt: Statement.If) {
+        resolve(stmt.condition)
+        resolve(stmt.ifStmt)
+        stmt.elseStmt?.let { resolve(it) }
+    }
+
+    override fun visit(exp: Expression.Group) {
+        resolve(exp.grouped)
+    }
+
+    override fun visit(exp: Expression.Unary) {
+        resolve(exp.exp)
+    }
+
     private fun resolve(expr: Expression) = expr.accept(this)
     private fun resolve(stmt: Statement) = stmt.accept(this)
 

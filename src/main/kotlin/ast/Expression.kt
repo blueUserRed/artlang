@@ -26,4 +26,14 @@ abstract class Expression {
         override fun <T> accept(visitor: ExpressionVisitor<T>): T = visitor.visit(this)
     }
 
+    class Group(val grouped: Expression) : Expression() {
+
+        override fun <T> accept(visitor: ExpressionVisitor<T>): T = visitor.visit(this)
+    }
+
+    class Unary(val exp: Expression, val operator: Token) : Expression() {
+
+        override fun <T> accept(visitor: ExpressionVisitor<T>): T = visitor.visit(this)
+    }
+
 }

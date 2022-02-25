@@ -38,6 +38,18 @@ object Tokenizer {
                     continue
                 }
 
+                if (current == '&' && canPeek() && peek() == '&') {
+                    consume(); consume()
+                    emit(TokenType.D_AND, "&&", null, cur - 2)
+                    continue
+                }
+
+                if (current == '|' && canPeek() && peek() == '|') {
+                    consume(); consume()
+                    emit(TokenType.D_OR, "||", null, cur - 2)
+                    continue
+                }
+
                 if (current == '+') {
                     if (canPeek() && peek() == '+') {
                         consume(); consume()
@@ -166,14 +178,17 @@ object Tokenizer {
             "class" -> emit(TokenType.K_CLASS, "class", null, start)
             "let" -> emit(TokenType.K_LET, "let", null, start)
             "const" -> emit(TokenType.K_CONST, "const", null, start)
-            "priv" -> emit(TokenType.K_PRIV, "priv", null, start)
-            "pub" -> emit(TokenType.K_PUB, "pub", null, start)
+            "private" -> emit(TokenType.K_PRIVATE, "private", null, start)
+            "public" -> emit(TokenType.K_PUBLIC, "public", null, start)
             "abstract" -> emit(TokenType.K_ABSTRACT, "abstract", null, start)
             "static" -> emit(TokenType.K_STATIC, "static", null, start)
             "for" -> emit(TokenType.K_FOR, "for", null, start)
             "loop" -> emit(TokenType.K_LOOP, "loop", null, start)
+            "if" -> emit(TokenType.K_IF, "if", null, start)
             "else" -> emit(TokenType.K_ELSE, "else", null, start)
             "while" -> emit(TokenType.K_WHILE, "while", null, start)
+            "true" -> emit(TokenType.BOOLEAN, "true", true, start)
+            "false" -> emit(TokenType.BOOLEAN, "false", false, start)
             else -> emit(TokenType.IDENTIFIER, identifier, identifier, start)
         }
     }
@@ -266,5 +281,4 @@ object Tokenizer {
     private fun emit(type: TokenType, lexeme: String, literal: Any?, position: Int = cur) {
         tokens.add(Token(type, lexeme, literal, path, position))
     }
-
 }

@@ -58,4 +58,18 @@ class ASTPrinter : ExpressionVisitor<String>, StatementVisitor<String> {
     override fun visit(stmt: Statement.Loop): String {
         return "loop {\n${stmt.stmt.accept(this)}}\n"
     }
+
+    override fun visit(stmt: Statement.If): String {
+        val ifPart = "if (${stmt.condition.accept(this)}) ${stmt.ifStmt.accept(this)}\n"
+        val elseStmt = stmt.elseStmt ?: return ifPart
+        return "${ifPart}else ${elseStmt.accept(this)}"
+    }
+
+    override fun visit(exp: Expression.Group): String {
+        return "(${exp.grouped.accept(this)})"
+    }
+
+    override fun visit(exp: Expression.Unary): String {
+        return "(${exp.operator.lexeme} ${exp.exp.accept(this)})"
+    }
 }

@@ -189,6 +189,18 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         locals = before
     }
 
+    override fun visit(stmt: Statement.If) {
+        TODO("not yet implemented")
+    }
+
+    override fun visit(exp: Expression.Group) {
+        TODO("Not yet implemented")
+    }
+
+    override fun visit(exp: Expression.Unary) {
+        TODO("Not yet implemented")
+    }
+
     private fun emitGoto(offset: Int) {
         if (offset !in Short.MIN_VALUE..Short.MAX_VALUE) emit(goto_w, *Utils.getIntAsBytes(offset))
         else emit(_goto, *Utils.getShortAsBytes(offset.toShort()))

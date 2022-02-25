@@ -55,4 +55,9 @@ abstract class Statement {
         override fun <T> accept(visitor: StatementVisitor<T>): T = visitor.visit(this)
     }
 
+    class If(val ifStmt: Statement, val elseStmt: Statement?, val condition: Expression) : Statement() {
+
+        override fun <T> accept(visitor: StatementVisitor<T>): T = visitor.visit(this)
+    }
+
 }

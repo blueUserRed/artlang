@@ -14,19 +14,48 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
     override fun visit(exp: Expression.Binary): Datatype {
         val type1 = check(exp.left)
         val type2 = check(exp.right)
+        val resultType: Datatype
 
-        if (type1 != type2) throw RuntimeException("incopatible types in binary operation: $type1 and $type2")
-
-        if (type1 !in arrayOf(Datatype.INT, Datatype.FLOAT, Datatype.STRING)) {
-            throw RuntimeException("incompatible type in binary operation: $type1")
+        when (exp.operator.tokenType) {
+            TokenType.PLUS -> {
+                if (type1 != type2 || type1 !in arrayOf(Datatype.INT, Datatype.STRING)) {
+                    throw RuntimeException("Illegal types in addition: $type1 and $type2")
+                }
+                resultType = type1
+            }
+            TokenType.MINUS -> {
+                if (type1 != type2 || type1 != Datatype.INT) {
+                    throw RuntimeException("Illegal types in subtraction: $type1 and $type2")
+                }
+                resultType = type1
+            }
+            TokenType.STAR -> {
+                if (type1 != type2 || type1 != Datatype.INT) {
+                    throw RuntimeException("Illegal types in multiplication: $type1 and $type2")
+                }
+                resultType = type1
+            }
+            TokenType.SLASH -> {
+                if (type1 != type2 || type1 != Datatype.INT) {
+                    throw RuntimeException("Illegal types in division: $type1 and $type2")
+                }
+                resultType = type1
+            }
+            TokenType.D_EQ, TokenType.NOT_EQ -> {
+                if (type1 != type2) throw RuntimeException("Illegal types in equals: $type1 and $type2")
+                resultType = Datatype.BOOLEAN
+            }
+            TokenType.GT, TokenType.GT_EQ, TokenType.LT, TokenType.LT_EQ -> {
+                if (type1 != type2 || type1 != Datatype.INT) {
+                    throw RuntimeException("Illegal types in comparison: $type1 and $type2")
+                }
+                resultType = Datatype.BOOLEAN
+            }
+            else -> throw RuntimeException("unreachable")
         }
 
-        if (type1 == Datatype.STRING && exp.operator.tokenType != TokenType.PLUS) {
-            throw RuntimeException("Strings can only be added")
-        }
-
-        exp.type = type1
-        return type1
+        exp.type = resultType
+        return resultType
     }
 
     override fun visit(exp: Expression.Literal): Datatype {
@@ -34,6 +63,7 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
             TokenType.INT -> Datatype.INT
             TokenType.STRING -> Datatype.STRING
             TokenType.FLOAT -> Datatype.FLOAT
+            TokenType.BOOLEAN -> Datatype.BOOLEAN
             else -> throw RuntimeException("unreachable")
         }
         exp.type = type
@@ -91,9 +121,32 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
         return Datatype.VOID
     }
 
+    override fun visit(stmt: Statement.If): Datatype {
+        val type = check(stmt.condition)
+        if (type != Datatype.BOOLEAN) throw RuntimeException("Expected Boolean value")
+        stmt.ifStmt.accept(this)
+        stmt.elseStmt?.accept(this)
+        return Datatype.VOID
+    }
+
+    override fun visit(exp: Expression.Unary): Datatype {
+        val type = check(exp.exp)
+        if (exp.operator.tokenType == TokenType.MINUS) {
+            if (type != Datatype.INT) throw RuntimeException("cant negate $type")
+        } else {
+            if (type != Datatype.BOOLEAN) throw RuntimeException("cant invert $type")
+        }
+        exp.type = type
+        return type
+    }
+
+    override fun visit(exp: Expression.Group): Datatype {
+        return check(exp.grouped)
+    }
+
     private fun check(exp: Expression): Datatype = exp.accept(this)
 
     enum class Datatype {
-        INT, FLOAT, STRING, VOID //TODO: more types
+        INT, FLOAT, STRING, VOID, BOOLEAN //TODO: more types
     }
 }
