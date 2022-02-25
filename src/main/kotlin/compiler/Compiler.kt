@@ -10,7 +10,6 @@ import classFile.StackMapTableAttribute
 import tokenizer.TokenType
 import passes.TypeChecker.Datatype
 import classFile.StackMapTableAttribute.VerificationTypeInfo
-import java.lang.RuntimeException
 import java.util.*
 
 class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
@@ -19,7 +18,6 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
     private var name: String = ""
     private var curFile: String = ""
 
-//    private var curStack: Int = 0
     private var stack: Stack<VerificationTypeInfo> = Stack()
     private var maxStack: Int = 0
     private var locals: MutableList<VerificationTypeInfo?> = mutableListOf()
@@ -36,8 +34,61 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
     }
 
     override fun visit(exp: Expression.Binary) {
+        if (exp.type == Datatype.STRING) {
+
+            //TODO: Extract in own function
+            //TODO: this can be a lot more efficient
+
+            val stringBuilderIndex = file!!.classInfo(file!!.utf8Info("java/lang/StringBuilder"))
+
+            emit(new, *Utils.getLastTwoBytes(stringBuilderIndex))
+            incStack(getObjVerificationType("java/lang/StringBuilder"))
+
+            val initMethodInfo = file!!.methodRefInfo(
+                stringBuilderIndex,
+                file!!.nameAndTypeInfo(
+                    file!!.utf8Info("<init>"),
+                    file!!.utf8Info("()V")
+                )
+            )
+
+            val appendMethodInfo = file!!.methodRefInfo(
+                stringBuilderIndex,
+                file!!.nameAndTypeInfo(
+                    file!!.utf8Info("append"),
+                    file!!.utf8Info("(Ljava/lang/String;)Ljava/lang/StringBuilder;")
+                )
+            )
+
+            val toStringMethodInfo = file!!.methodRefInfo(
+                stringBuilderIndex,
+                file!!.nameAndTypeInfo(
+                    file!!.utf8Info("toString"),
+                    file!!.utf8Info("()Ljava/lang/String;")
+                )
+            )
+
+            emit(dup)
+            incStack(getObjVerificationType("java/lang/StringBuilder"))
+            emit(invokespecial, *Utils.getLastTwoBytes(initMethodInfo))
+            decStack()
+
+            comp(exp.left)
+            emitStackMapFrame()
+            emit(invokevirtual, *Utils.getLastTwoBytes(appendMethodInfo))
+            decStack()
+            comp(exp.right)
+            emit(invokevirtual, *Utils.getLastTwoBytes(appendMethodInfo))
+            decStack()
+            emit(invokevirtual, *Utils.getLastTwoBytes(toStringMethodInfo))
+            decStack()
+            incStack(getObjVerificationType("java/lang/String"))
+            return
+        }
+
         comp(exp.left)
         comp(exp.right)
+
         when (exp.operator.tokenType) {
             TokenType.PLUS -> {
                 emit(iadd)
@@ -69,7 +120,7 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         when (exp.type) {
             Datatype.INT -> {
                 emitIntLoad(exp.literal.literal as Int)
-                incStack(VerificationTypeInfo.INTEGER)
+                incStack(VerificationTypeInfo.Integer())
             }
             Datatype.STRING -> {
                 emitStringLoad(exp.literal.literal as String)
@@ -78,7 +129,7 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
             Datatype.BOOLEAN -> {
                 if (exp.literal.literal as Boolean) emit(iconst_1)
                 else emit(iconst_0)
-                incStack(VerificationTypeInfo.INTEGER)
+                incStack(VerificationTypeInfo.Integer())
             }
             else -> TODO("not yet implemented")
         }
@@ -165,7 +216,7 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         when (exp.type) {
             Datatype.INT, Datatype.BOOLEAN -> {
                 emitIntVarLoad(exp.index)
-                incStack(VerificationTypeInfo.INTEGER)
+                incStack(VerificationTypeInfo.Integer())
             }
             Datatype.STRING -> {
                 emitObjectVarLoad(exp.index)
@@ -179,7 +230,7 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         comp(stmt.initializer)
         when (stmt.type) {
             Datatype.INT , Datatype.BOOLEAN -> {
-                locals[stmt.index] = VerificationTypeInfo.INTEGER
+                locals[stmt.index] = VerificationTypeInfo.Integer()
                 emitIntVarStore(stmt.index)
             }
             Datatype.STRING -> {
@@ -250,11 +301,25 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
                 emit(iconst_0, _goto, *Utils.getShortAsBytes(4.toShort()))
                 emitStackMapFrame()
                 emit(iconst_1)
-                incStack(VerificationTypeInfo.INTEGER)
+                incStack(VerificationTypeInfo.Integer())
                 emitStackMapFrame()
             }
             else -> TODO("not implemented")
         }
+    }
+
+    override fun visit(stmt: Statement.While) {
+        val startOffset = method!!.curCodeOffset
+        emitStackMapFrame()
+        comp(stmt.condition)
+        emit(ifeq, 0x00.toByte(), 0x00.toByte())
+        decStack()
+        val jmpAddrOffset = method!!.curCodeOffset - 2
+        comp(stmt.body)
+        emit(_goto, *Utils.getShortAsBytes((startOffset - method!!.curCodeOffset).toShort()))
+        val jmpAddr = method!!.curCodeOffset - (jmpAddrOffset - 1)
+        method!!.overwriteByteCode(jmpAddrOffset, *Utils.getLastTwoBytes(jmpAddr))
+        emitStackMapFrame()
     }
 
     private fun doCompare(compareInstruction: Byte) {
@@ -264,7 +329,7 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         emit(iconst_0, _goto, *Utils.getShortAsBytes(4.toShort()))
         emitStackMapFrame()
         emit(iconst_1)
-        incStack(VerificationTypeInfo.INTEGER)
+        incStack(VerificationTypeInfo.Integer())
         emitStackMapFrame()
     }
 
@@ -346,22 +411,16 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
     private fun emitStringLoad(s: String) = emitLdc(file!!.stringInfo(file!!.utf8Info(s)))
 
 
-    private fun comp(exp: Expression){
+    private fun comp(exp: Expression) {
         exp.accept(this)
-        assert(stack.size == 1)
-//        assert(curStack == 1)
     }
 
     private fun comp(stmt: Statement) {
         stmt.accept(this)
-        assert(stack.size == 0)
-//        assert(curStack == 0)
     }
 
     private fun getObjVerificationType(clazz: String): VerificationTypeInfo {
-        val type = VerificationTypeInfo.OBJECT_VARIABLE
-        type.classIndex = file!!.classInfo(file!!.utf8Info(clazz))
-        return type
+        return VerificationTypeInfo.ObjectVariable(file!!.classInfo(file!!.utf8Info(clazz)))
     }
 
     private fun emit(vararg bytes: Byte) = method!!.emitByteCode(*bytes)
@@ -431,13 +490,17 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
 
         const val pop: Byte = 0x57.toByte()
         const val pop2: Byte = 0x58.toByte()
+        const val dup: Byte = 0x59.toByte()
 
         const val _goto: Byte = 0xA7.toByte()
         const val goto_w: Byte = 0xC8.toByte()
 
         const val getStatic: Byte = 0xB2.toByte()
 
+        const val new: Byte = 0xBB.toByte()
+
         const val invokevirtual: Byte = 0xB6.toByte()
+        const val invokespecial: Byte = 0xB7.toByte()
 
         const val wide: Byte = 0xC4.toByte()
 

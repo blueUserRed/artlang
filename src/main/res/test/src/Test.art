@@ -1,9 +1,5 @@
 fn main() {
-   if (2 * 2 < 4) {
-        print "hi";
-   } else if (false) {
-        print "other hi";
-   } else {
-        print "hi2";
-   }
+    let a = "Hello ";
+    let b = "World";
+    print a + b + "!";
 }

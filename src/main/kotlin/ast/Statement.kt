@@ -60,4 +60,9 @@ abstract class Statement {
         override fun <T> accept(visitor: StatementVisitor<T>): T = visitor.visit(this)
     }
 
+    class While(val body: Statement, val condition: Expression) : Statement() {
+
+        override fun <T> accept(visitor: StatementVisitor<T>): T = visitor.visit(this)
+    }
+
 }

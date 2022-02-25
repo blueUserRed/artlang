@@ -60,7 +60,7 @@ class ASTPrinter : ExpressionVisitor<String>, StatementVisitor<String> {
     }
 
     override fun visit(stmt: Statement.If): String {
-        val ifPart = "if (${stmt.condition.accept(this)}) ${stmt.ifStmt.accept(this)}\n"
+        val ifPart = "if ${stmt.condition.accept(this)} ${stmt.ifStmt.accept(this)}\n"
         val elseStmt = stmt.elseStmt ?: return ifPart
         return "${ifPart}else ${elseStmt.accept(this)}"
     }
@@ -71,5 +71,9 @@ class ASTPrinter : ExpressionVisitor<String>, StatementVisitor<String> {
 
     override fun visit(exp: Expression.Unary): String {
         return "(${exp.operator.lexeme} ${exp.exp.accept(this)})"
+    }
+
+    override fun visit(stmt: Statement.While): String {
+        return "while ${stmt.condition.accept(this)} ${stmt.body.accept(this)}\n"
     }
 }

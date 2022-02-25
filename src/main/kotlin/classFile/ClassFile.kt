@@ -423,31 +423,29 @@ class StackMapTableAttribute(val nameIndex: Int) : Attribute() {
         )
     }
 
-    enum class VerificationTypeInfo(val tag: Byte) {
-        TOP(0), INTEGER(1), FLOAT(2), DOUBLE(3), LONG(4), NULL(5), UNINITIALIZED_THIS(6),
+    abstract class VerificationTypeInfo(val tag: Byte) {
+        open fun toBytes(): ByteArray = arrayOf(tag).toByteArray()
 
-        OBJECT_VARIABLE(7) {
+        class Top : VerificationTypeInfo(0)
+        class Integer : VerificationTypeInfo(1)
+        class Float : VerificationTypeInfo(2)
+        class Double : VerificationTypeInfo(3)
+        class Long : VerificationTypeInfo(4)
+        class Null : VerificationTypeInfo(5)
+        class UninitializedThis : VerificationTypeInfo(6)
 
+        class ObjectVariable(val classIndex: Int) : VerificationTypeInfo(7) {
             override fun toBytes(): ByteArray = Utils.arrayConcat(
                 arrayOf(tag).toByteArray(),
                 Utils.getLastTwoBytes(classIndex)
             )
-        },
+        }
 
-        UNINITIALIZED_VARIABLE(8) {
-
+        class UninitializedVariable(val newOffset: Int) : VerificationTypeInfo(8) {
             override fun toBytes(): ByteArray = Utils.arrayConcat(
                 arrayOf(tag).toByteArray(),
-                Utils.getLastTwoBytes(offset)
+                Utils.getLastTwoBytes(newOffset)
             )
-        },
-
-        ;
-
-        var classIndex: Int = 0
-        var offset: Int = 0
-
-        open fun toBytes(): ByteArray = arrayOf(tag).toByteArray()
+        }
     }
-
 }

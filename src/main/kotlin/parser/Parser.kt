@@ -5,6 +5,8 @@ import ast.Statement
 import tokenizer.Token
 import tokenizer.TokenType
 import java.lang.RuntimeException
+import java.lang.StringBuilder
+import java.util.*
 
 object Parser {
 
@@ -36,6 +38,7 @@ object Parser {
         if (match(TokenType.K_LET)) return parseVariableDeclaration()
         if (match(TokenType.K_LOOP)) return parseLoop()
         if (match(TokenType.K_IF)) return parseIf()
+        if (match(TokenType.K_WHILE)) return parseWhileLoop()
 
         val start = cur
         try {
@@ -45,6 +48,18 @@ object Parser {
         }
 
         return parseExpressionStatement()
+    }
+
+    private fun parseWhileLoop(): Statement {
+        consumeOrError(TokenType.L_PAREN, "Expected Parenthesis after while")
+        val condition = parseExpression()
+        consumeOrError(TokenType.R_PAREN, "Expected closing Parenthesis after condition")
+
+        val body = parseStatement()
+        if (body is Statement.VariableDeclaration) throw RuntimeException("Cant declare variable in while unless it " +
+                "is wrapped in a block")
+
+        return Statement.While(body, condition)
     }
 
     private fun parseIf(): Statement {

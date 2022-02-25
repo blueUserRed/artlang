@@ -144,6 +144,12 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
         return check(exp.grouped)
     }
 
+    override fun visit(stmt: Statement.While): Datatype {
+        if (check(stmt.condition) != Datatype.BOOLEAN) throw RuntimeException("Expected Boolean value")
+        stmt.body.accept(this)
+        return Datatype.VOID
+    }
+
     private fun check(exp: Expression): Datatype = exp.accept(this)
 
     enum class Datatype {
