@@ -35,9 +35,9 @@ fun main() {
     program.accept(TypeChecker())
     println("done\n")
 
-//    println("Compiling into dir: $outdir")
-//    Compiler().compile(program, outdir, "Test")
-//    println("done")
+    println("Compiling into dir: $outdir")
+    Compiler().compile(program, outdir, "Test")
+    println("done")
 
 
 

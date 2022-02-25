@@ -320,6 +320,10 @@ class MethodBuilder {
         for (byte in bytes) code.add(byte)
     }
 
+    fun overwriteByteCode(insertPos: Int, vararg bytes: Byte) {
+        for (i in bytes.indices) code[insertPos + i] = bytes[i]
+    }
+
     private inline fun <reified T> removeAttrib() where T : Attribute {
         val iter = attributes.iterator()
         while (iter.hasNext()) if (iter.next() is T) iter.remove()

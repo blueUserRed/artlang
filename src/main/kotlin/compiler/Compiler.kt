@@ -10,6 +10,7 @@ import classFile.StackMapTableAttribute
 import tokenizer.TokenType
 import passes.TypeChecker.Datatype
 import classFile.StackMapTableAttribute.VerificationTypeInfo
+import java.lang.RuntimeException
 import java.util.*
 
 class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
@@ -38,23 +39,48 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         comp(exp.left)
         comp(exp.right)
         when (exp.operator.tokenType) {
-            TokenType.PLUS -> emit(iadd)
-            TokenType.MINUS -> emit(isub)
-            TokenType.STAR -> emit(imul)
-            TokenType.SLASH -> emit(idiv)
+            TokenType.PLUS -> {
+                emit(iadd)
+                decStack()
+            }
+            TokenType.MINUS -> {
+                emit(isub)
+                decStack()
+            }
+            TokenType.STAR -> {
+                emit(imul)
+                decStack()
+            }
+            TokenType.SLASH -> {
+                emit(idiv)
+                decStack()
+            }
+            TokenType.GT -> doCompare(if_icmpgt)
+            TokenType.GT_EQ -> doCompare(if_icmpge)
+            TokenType.LT -> doCompare(if_icmplt)
+            TokenType.LT_EQ -> doCompare(if_icmple)
+            TokenType.D_EQ -> doCompare(if_icmpeq)
+            TokenType.NOT_EQ -> doCompare(if_icmpne)
             else -> TODO("not yet implemented")
         }
-        decStack()
     }
 
     override fun visit(exp: Expression.Literal) {
-        if (exp.type == Datatype.INT) {
-            emitIntLoad(exp.literal.literal as Int)
-            incStack(VerificationTypeInfo.INTEGER)
-        }
-        else if (exp.type == Datatype.STRING) {
-            emitStringLoad(exp.literal.literal as String)
-            incStack(getObjVerificationType("java/lang/String"))
+        when (exp.type) {
+            Datatype.INT -> {
+                emitIntLoad(exp.literal.literal as Int)
+                incStack(VerificationTypeInfo.INTEGER)
+            }
+            Datatype.STRING -> {
+                emitStringLoad(exp.literal.literal as String)
+                incStack(getObjVerificationType("java/lang/String"))
+            }
+            Datatype.BOOLEAN -> {
+                if (exp.literal.literal as Boolean) emit(iconst_1)
+                else emit(iconst_0)
+                incStack(VerificationTypeInfo.INTEGER)
+            }
+            else -> TODO("not yet implemented")
         }
     }
 
@@ -119,6 +145,7 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         val dataTypeToPrint = when (stmt.toPrint.type) {
             Datatype.INT -> "I"
             Datatype.FLOAT -> "F"
+            Datatype.BOOLEAN -> "Z"
             Datatype.STRING -> "Ljava/lang/String;"
             else -> TODO("not yet implemented")
         }
@@ -136,7 +163,7 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
 
     override fun visit(exp: Expression.Variable) {
         when (exp.type) {
-            Datatype.INT -> {
+            Datatype.INT, Datatype.BOOLEAN -> {
                 emitIntVarLoad(exp.index)
                 incStack(VerificationTypeInfo.INTEGER)
             }
@@ -151,7 +178,7 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
     override fun visit(stmt: Statement.VariableDeclaration) {
         comp(stmt.initializer)
         when (stmt.type) {
-            Datatype.INT -> {
+            Datatype.INT , Datatype.BOOLEAN -> {
                 locals[stmt.index] = VerificationTypeInfo.INTEGER
                 emitIntVarStore(stmt.index)
             }
@@ -190,15 +217,55 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
     }
 
     override fun visit(stmt: Statement.If) {
-        TODO("not yet implemented")
+        val hasElse = stmt.elseStmt != null
+
+        comp(stmt.condition)
+        emit(ifeq, 0x00.toByte(), 0x00.toByte())
+        decStack()
+        val jmpAddrOffset = method!!.curCodeOffset - 2
+        comp(stmt.ifStmt)
+        if (hasElse) emit(_goto, 0x00.toByte(), 0x00.toByte())
+        val elseJmpAddrOffset = method!!.curCodeOffset - 2
+        val jmpAddr = method!!.curCodeOffset - (jmpAddrOffset - 1)
+        method!!.overwriteByteCode(jmpAddrOffset, *Utils.getLastTwoBytes(jmpAddr))
+        if (hasElse) emitStackMapFrame()
+        if (hasElse) comp(stmt.elseStmt!!)
+        val elseJmpAddr = method!!.curCodeOffset - (elseJmpAddrOffset - 1)
+        if (hasElse) method!!.overwriteByteCode(elseJmpAddrOffset, *Utils.getLastTwoBytes(elseJmpAddr))
+        emitStackMapFrame()
     }
 
     override fun visit(exp: Expression.Group) {
-        TODO("Not yet implemented")
+        comp(exp.grouped)
     }
 
     override fun visit(exp: Expression.Unary) {
-        TODO("Not yet implemented")
+        comp(exp.exp)
+        when (exp.operator.tokenType) {
+            TokenType.MINUS -> emit(ineg)
+            TokenType.NOT -> {
+                emitStackMapFrame()
+                emit(ifeq, *Utils.getShortAsBytes(7.toShort()))
+                decStack()
+                emit(iconst_0, _goto, *Utils.getShortAsBytes(4.toShort()))
+                emitStackMapFrame()
+                emit(iconst_1)
+                incStack(VerificationTypeInfo.INTEGER)
+                emitStackMapFrame()
+            }
+            else -> TODO("not implemented")
+        }
+    }
+
+    private fun doCompare(compareInstruction: Byte) {
+        emitStackMapFrame()
+        emit(compareInstruction, *Utils.getShortAsBytes(7.toShort()))
+        decStack(); decStack()
+        emit(iconst_0, _goto, *Utils.getShortAsBytes(4.toShort()))
+        emitStackMapFrame()
+        emit(iconst_1)
+        incStack(VerificationTypeInfo.INTEGER)
+        emitStackMapFrame()
     }
 
     private fun emitGoto(offset: Int) {
@@ -212,6 +279,8 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
 
         val offsetDelta = if (lastStackMapFrameOffset == 0) method!!.curCodeOffset
                             else (method!!.curCodeOffset - lastStackMapFrameOffset) - 1
+
+        if (offsetDelta < 0) return //frame already exists at this offset
 
         val frame = StackMapTableAttribute.FullStackMapFrame(offsetDelta)
 
@@ -319,6 +388,8 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         const val imul: Byte = 0x68.toByte()
         const val idiv: Byte = 0x6C.toByte()
 
+        const val ineg: Byte = 0x74.toByte()
+
         const val iconst_m1: Byte = 0x02.toByte()
         const val iconst_0: Byte = 0x03.toByte()
         const val iconst_1: Byte = 0x04.toByte()
@@ -371,5 +442,19 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         const val wide: Byte = 0xC4.toByte()
 
         const val _return: Byte = 0xB1.toByte()
+
+        const val if_icmpeq: Byte = 0x9F.toByte()
+        const val if_icmpge: Byte = 0xA2.toByte()
+        const val if_icmpgt: Byte = 0xA3.toByte()
+        const val if_icmple: Byte = 0xA4.toByte()
+        const val if_icmplt: Byte = 0xA1.toByte()
+        const val if_icmpne: Byte = 0xA0.toByte()
+
+        const val ifeq: Byte = 0x99.toByte()
+        const val ifge: Byte = 0x9C.toByte()
+        const val ifgt: Byte = 0x9D.toByte()
+        const val ifle: Byte = 0x9E.toByte()
+        const val iflt: Byte = 0x9B.toByte()
+        const val ifne: Byte = 0x9A.toByte()
     }
 }
