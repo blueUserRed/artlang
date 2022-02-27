@@ -22,6 +22,7 @@ object Tokenizer {
             '{' -> { emit(TokenType.L_BRACE, "{", null); consume() }
             '}' -> { emit(TokenType.R_BRACE, "}", null); consume() }
             ';' -> { emit(TokenType.SEMICOLON, ";", null); consume() }
+            '%' -> { emit(TokenType.MOD, "%", null); consume() }
             '"' -> string('"')
             '\'' -> string('\'')
             ' ', '\t', '\n', '\r' -> consume()

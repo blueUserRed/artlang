@@ -35,54 +35,12 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
 
     override fun visit(exp: Expression.Binary) {
         if (exp.type == Datatype.STRING) {
+            doStringConcat(exp)
+            return
+        }
 
-            //TODO: Extract in own function
-            //TODO: this can be a lot more efficient
-
-            val stringBuilderIndex = file!!.classInfo(file!!.utf8Info("java/lang/StringBuilder"))
-
-            emit(new, *Utils.getLastTwoBytes(stringBuilderIndex))
-            incStack(getObjVerificationType("java/lang/StringBuilder"))
-
-            val initMethodInfo = file!!.methodRefInfo(
-                stringBuilderIndex,
-                file!!.nameAndTypeInfo(
-                    file!!.utf8Info("<init>"),
-                    file!!.utf8Info("()V")
-                )
-            )
-
-            val appendMethodInfo = file!!.methodRefInfo(
-                stringBuilderIndex,
-                file!!.nameAndTypeInfo(
-                    file!!.utf8Info("append"),
-                    file!!.utf8Info("(Ljava/lang/String;)Ljava/lang/StringBuilder;")
-                )
-            )
-
-            val toStringMethodInfo = file!!.methodRefInfo(
-                stringBuilderIndex,
-                file!!.nameAndTypeInfo(
-                    file!!.utf8Info("toString"),
-                    file!!.utf8Info("()Ljava/lang/String;")
-                )
-            )
-
-            emit(dup)
-            incStack(getObjVerificationType("java/lang/StringBuilder"))
-            emit(invokespecial, *Utils.getLastTwoBytes(initMethodInfo))
-            decStack()
-
-            comp(exp.left)
-            emitStackMapFrame()
-            emit(invokevirtual, *Utils.getLastTwoBytes(appendMethodInfo))
-            decStack()
-            comp(exp.right)
-            emit(invokevirtual, *Utils.getLastTwoBytes(appendMethodInfo))
-            decStack()
-            emit(invokevirtual, *Utils.getLastTwoBytes(toStringMethodInfo))
-            decStack()
-            incStack(getObjVerificationType("java/lang/String"))
+        if (exp.operator.tokenType == TokenType.D_AND || exp.operator.tokenType == TokenType.D_OR) {
+            doBooleanComparison(exp)
             return
         }
 
@@ -106,6 +64,10 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
                 emit(idiv)
                 decStack()
             }
+            TokenType.MOD -> {
+                emit(irem)
+                decStack()
+            }
             TokenType.GT -> doCompare(if_icmpgt)
             TokenType.GT_EQ -> doCompare(if_icmpge)
             TokenType.LT -> doCompare(if_icmplt)
@@ -114,6 +76,71 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
             TokenType.NOT_EQ -> doCompare(if_icmpne)
             else -> TODO("not yet implemented")
         }
+    }
+
+    private fun doStringConcat(exp: Expression.Binary) {
+        //TODO: this can be a lot more efficient
+        val stringBuilderIndex = file!!.classInfo(file!!.utf8Info("java/lang/StringBuilder"))
+
+        emit(new, *Utils.getLastTwoBytes(stringBuilderIndex))
+        incStack(getObjVerificationType("java/lang/StringBuilder"))
+
+        val initMethodInfo = file!!.methodRefInfo(
+            stringBuilderIndex,
+            file!!.nameAndTypeInfo(
+                file!!.utf8Info("<init>"),
+                file!!.utf8Info("()V")
+            )
+        )
+
+        val appendMethodInfo = file!!.methodRefInfo(
+            stringBuilderIndex,
+            file!!.nameAndTypeInfo(
+                file!!.utf8Info("append"),
+                file!!.utf8Info("(Ljava/lang/String;)Ljava/lang/StringBuilder;")
+            )
+        )
+
+        val toStringMethodInfo = file!!.methodRefInfo(
+            stringBuilderIndex,
+            file!!.nameAndTypeInfo(
+                file!!.utf8Info("toString"),
+                file!!.utf8Info("()Ljava/lang/String;")
+            )
+        )
+
+        emit(dup)
+        incStack(getObjVerificationType("java/lang/StringBuilder"))
+        emit(invokespecial, *Utils.getLastTwoBytes(initMethodInfo))
+        decStack()
+
+        comp(exp.left)
+        emit(invokevirtual, *Utils.getLastTwoBytes(appendMethodInfo))
+        decStack()
+        comp(exp.right)
+        emit(invokevirtual, *Utils.getLastTwoBytes(appendMethodInfo))
+        decStack()
+        emit(invokevirtual, *Utils.getLastTwoBytes(toStringMethodInfo))
+        decStack()
+        incStack(getObjVerificationType("java/lang/String"))
+    }
+
+    private fun doBooleanComparison(exp: Expression.Binary) {
+        val isAnd = exp.operator.tokenType == TokenType.D_AND
+        comp(exp.left)
+        emit(dup)
+        incStack(VerificationTypeInfo.Integer())
+        if (isAnd) emit(ifeq) else emit(ifne)
+        decStack()
+        emit(0x00.toByte(), 0x00.toByte())
+        val jmpAddrPos = method!!.curCodeOffset - 2
+//        if (isAnd) emit(iconst_1) else emit(iconst_0)
+        comp(exp.right)
+        if (isAnd) emit(iand) else emit(ior)
+        decStack()
+        emitStackMapFrame()
+        val jmpAddr = method!!.curCodeOffset - (jmpAddrPos - 1)
+        method!!.overwriteByteCode(jmpAddrPos, *Utils.getLastTwoBytes(jmpAddr))
     }
 
     override fun visit(exp: Expression.Literal) {
@@ -446,8 +473,10 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         const val isub: Byte = 0x64.toByte()
         const val imul: Byte = 0x68.toByte()
         const val idiv: Byte = 0x6C.toByte()
-
         const val ineg: Byte = 0x74.toByte()
+        const val irem: Byte = 0x70.toByte()
+        const val iand: Byte = 0x7E.toByte()
+        const val ior: Byte = 0x80.toByte()
 
         const val iconst_m1: Byte = 0x02.toByte()
         const val iconst_0: Byte = 0x03.toByte()

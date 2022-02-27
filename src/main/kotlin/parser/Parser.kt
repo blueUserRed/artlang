@@ -114,7 +114,17 @@ object Parser {
     }
 
     private fun parseExpression(): Expression {
-        return parseComparison()
+        return parseBooleanComparison()
+    }
+
+    private fun parseBooleanComparison(): Expression {
+        var left = parseComparison()
+        while (match(TokenType.D_AND, TokenType.D_OR)) {
+            val operator = last()
+            val right = parseComparison()
+            left = Expression.Binary(left, operator, right)
+        }
+        return left
     }
 
     private fun parseComparison(): Expression {
@@ -139,7 +149,7 @@ object Parser {
 
     private fun parseFactorExpression(): Expression {
         var left = parseUnaryExpression()
-        while (match(TokenType.STAR, TokenType.SLASH)) {
+        while (match(TokenType.STAR, TokenType.SLASH, TokenType.MOD)) {
             val operator = last()
             val right = parseUnaryExpression()
             left = Expression.Binary(left, operator, right)

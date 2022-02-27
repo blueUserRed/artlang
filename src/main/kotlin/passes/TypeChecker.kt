@@ -41,8 +41,20 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
                 }
                 resultType = type1
             }
+            TokenType.MOD -> {
+                if (type1 != type2 || type1 != Datatype.INT) {
+                    throw RuntimeException("Illegal types in modulo: $type1 and $type2")
+                }
+                resultType = type1
+            }
             TokenType.D_EQ, TokenType.NOT_EQ -> {
                 if (type1 != type2) throw RuntimeException("Illegal types in equals: $type1 and $type2")
+                resultType = Datatype.BOOLEAN
+            }
+            TokenType.D_AND, TokenType.D_OR -> {
+                if (type1 != type2 || type1 != Datatype.BOOLEAN) {
+                    throw RuntimeException("Illegal types in boolean comparison: $type1 and $type2")
+                }
                 resultType = Datatype.BOOLEAN
             }
             TokenType.GT, TokenType.GT_EQ, TokenType.LT, TokenType.LT_EQ -> {

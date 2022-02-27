@@ -1,5 +1,3 @@
 fn main() {
-    let a = "Hello ";
-    let b = "World";
-    print a + b + "!";
+    print true || true && false;
 }
