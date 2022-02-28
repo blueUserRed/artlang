@@ -76,4 +76,8 @@ class ASTPrinter : ExpressionVisitor<String>, StatementVisitor<String> {
     override fun visit(stmt: Statement.While): String {
         return "while ${stmt.condition.accept(this)} ${stmt.body.accept(this)}\n"
     }
+
+    override fun visit(exp: Expression.FunctionCall): String {
+        return "(i ${exp.name.lexeme})"
+    }
 }

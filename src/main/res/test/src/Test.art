@@ -1,3 +1,33 @@
 fn main() {
-    print true || true && false;
+//    fizzBuzz();
+    repeat("Hello ", 5);
 }
+
+fn repeat(string: str, times: int) {
+    let i = 0;
+    while (i < times) {
+        print string;
+        i = i + 1;
+    }
+}
+
+//fn fizzBuzz() {
+//    let i = 0;
+//    while (i <= 100) {
+//        let output = "";
+//        let isEmpty = true;
+//
+//        if (i % 3 == 0) {
+//            output = "Fizz";
+//            isEmpty = false;
+//        }
+//        if (i % 5 == 0) {
+//            output = output + "Buzz";
+//            isEmpty = false;
+//        }
+//
+//        if (isEmpty) print i; else print output;
+//
+//        i = i + 1;
+//    }
+//}

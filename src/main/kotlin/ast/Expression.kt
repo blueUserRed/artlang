@@ -36,4 +36,11 @@ abstract class Expression {
         override fun <T> accept(visitor: ExpressionVisitor<T>): T = visitor.visit(this)
     }
 
+    class FunctionCall(val name: Token, val arguments: List<Expression>) : Expression() {
+
+        var funcIndex: Int = 0
+
+        override fun <T> accept(visitor: ExpressionVisitor<T>): T = visitor.visit(this)
+    }
+
 }

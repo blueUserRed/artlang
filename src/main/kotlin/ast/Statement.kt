@@ -15,13 +15,29 @@ abstract class Statement {
     class Function(val statements: Block, val name: Token) : Statement() {
 
         var amountLocals: Int = 0
+        var argTokens: MutableList<Pair<Token, Token>> = mutableListOf()
+        var args: MutableList<Pair<String, Datatype>> = mutableListOf()
+
+        fun getDiscriptor(): String {
+            val builder = StringBuilder()
+            builder.append("(")
+            for (arg in args) builder.append(when (arg.second) {
+                Datatype.INT -> "I"
+                Datatype.BOOLEAN -> "Z"
+                Datatype.FLOAT -> "F"
+                Datatype.STRING -> "Ljava/lang/String;"
+                else -> TODO("not yet implemented")
+            })
+            builder.append(")V")
+            return builder.toString()
+        }
 
         override fun <T> accept(visitor: StatementVisitor<T>): T = visitor.visit(this)
     }
 
     class Program(val funcs: Array<Function>) : Statement() {
-        override fun <T> accept(visitor: StatementVisitor<T>): T = visitor.visit(this)
 
+        override fun <T> accept(visitor: StatementVisitor<T>): T = visitor.visit(this)
     }
 
     class Print(val toPrint: Expression) : Statement() {
@@ -38,6 +54,7 @@ abstract class Statement {
 
         var index: Int = 0
         var type: Datatype = Datatype.VOID
+        var typeToken: Token? = null
 
         override fun <T> accept(visitor: StatementVisitor<T>): T = visitor.visit(this)
     }

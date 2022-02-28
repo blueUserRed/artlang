@@ -9,7 +9,8 @@ import java.lang.RuntimeException
 
 class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<TypeChecker.Datatype> {
 
-    private val vars: MutableMap<Int, Datatype> = mutableMapOf()
+    private var vars: MutableMap<Int, Datatype> = mutableMapOf()
+    private lateinit var curProgram: Statement.Program
 
     override fun visit(exp: Expression.Binary): Datatype {
         val type1 = check(exp.left)
@@ -88,11 +89,20 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
     }
 
     override fun visit(stmt: Statement.Function): Datatype {
+        val args = mutableListOf<Pair<String, Datatype>>()
+        for (arg in stmt.argTokens) args.add(Pair(arg.first.lexeme, tokenToDataType(arg.second.tokenType)))
+        stmt.args = args
+
+        val newVars = mutableMapOf<Int, Datatype>()
+        for (i in stmt.args.indices) newVars[i] = stmt.args[i].second
+        vars = newVars
+
         stmt.statements.accept(this)
         return Datatype.VOID
     }
 
     override fun visit(stmt: Statement.Program): Datatype {
+        curProgram = stmt
         for (func in stmt.funcs) func.accept(this)
         return Datatype.VOID
     }
@@ -115,14 +125,20 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
 
     override fun visit(stmt: Statement.VariableDeclaration): Datatype {
         val type = check(stmt.initializer)
+        if (stmt.typeToken != null) {
+            val type2 = tokenToDataType(stmt.typeToken!!.tokenType)
+            if (type2 != type) throw RuntimeException("Incompatible types in declaration: $type2 and $type")
+        }
         vars[stmt.index] = type
         stmt.type = type
+
         return Datatype.VOID
     }
 
     override fun visit(stmt: Statement.VariableAssignment): Datatype {
         val type = check(stmt.expr)
-        val varType = vars[stmt.index] ?: throw RuntimeException("unreachable")
+        val varType = vars[stmt.index] ?:
+            throw RuntimeException("unreachable")
         if (type != varType) throw RuntimeException("tried to assign $type to $varType")
         stmt.type = type
         return Datatype.VOID
@@ -162,7 +178,19 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
         return Datatype.VOID
     }
 
+    override fun visit(exp: Expression.FunctionCall): Datatype {
+        for (arg in exp.arguments) check(arg)
+        return Datatype.VOID
+    }
+
     private fun check(exp: Expression): Datatype = exp.accept(this)
+
+    private fun tokenToDataType(token: TokenType): Datatype = when (token) {
+        TokenType.T_BOOLEAN -> Datatype.BOOLEAN
+        TokenType.T_INT -> Datatype.INT
+        TokenType.T_STRING -> Datatype.STRING
+        else -> throw RuntimeException("invalid type")
+    }
 
     enum class Datatype {
         INT, FLOAT, STRING, VOID, BOOLEAN //TODO: more types

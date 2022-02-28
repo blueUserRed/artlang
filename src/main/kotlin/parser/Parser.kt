@@ -5,8 +5,6 @@ import ast.Statement
 import tokenizer.Token
 import tokenizer.TokenType
 import java.lang.RuntimeException
-import java.lang.StringBuilder
-import java.util.*
 
 object Parser {
 
@@ -27,9 +25,19 @@ object Parser {
         consumeOrError(TokenType.IDENTIFIER, "Expected function name")
         val funcName = last()
         consumeOrError(TokenType.L_PAREN, "Expected () after function name")
+        val args = mutableListOf<Pair<Token, Token>>()
+        while (match(TokenType.IDENTIFIER)) {
+            val name = last()
+            consumeOrError(TokenType.COLON, "Expected type-declaration after argument")
+            val type = parseType()
+            args.add(Pair(name, type))
+            if (!match(TokenType.COMMA)) break
+        }
         consumeOrError(TokenType.R_PAREN, "Expected () after function name")
         consumeOrError(TokenType.L_BRACE, "Expected code block after function declaration")
-        return Statement.Function(parseBlock(), funcName)
+        val function = Statement.Function(parseBlock(), funcName)
+        function.argTokens = args
+        return function
     }
 
     private fun parseStatement(): Statement {
@@ -100,11 +108,14 @@ object Parser {
     private fun parseVariableDeclaration(): Statement {
         consumeOrError(TokenType.IDENTIFIER, "expected identifier after let")
         val name = last()
-        //TODO: datatype
+        var type: Token? = null
+        if (match(TokenType.COLON)) type = parseType()
         consumeOrError(TokenType.EQ, "initializer expected")
         val initializer = parseExpression()
         consumeOrError(TokenType.SEMICOLON, "Expected a Semicolon after variable Declaration")
-        return Statement.VariableDeclaration(name, initializer)
+        val stmt = Statement.VariableDeclaration(name, initializer)
+        stmt.typeToken = type
+        return stmt
     }
 
     private fun parseExpressionStatement(): Statement {
@@ -119,7 +130,7 @@ object Parser {
 
     private fun parseBooleanComparison(): Expression {
         var left = parseComparison()
-        while (match(TokenType.D_AND, TokenType.D_OR)) {
+        while (match(TokenType.D_AND, TokenType.D_OR)) { //TODO: fix priority
             val operator = last()
             val right = parseComparison()
             left = Expression.Binary(left, operator, right)
@@ -168,7 +179,10 @@ object Parser {
     }
 
     private fun parseLiteralExpression(): Expression {
-        if (match(TokenType.IDENTIFIER)) return Expression.Variable(last())
+        if (match(TokenType.IDENTIFIER)){
+            if (peek()?.tokenType == TokenType.L_PAREN) return parseFunctionCall()
+            return Expression.Variable(last())
+        }
         if (match(TokenType.L_PAREN)) return groupExpression()
 
         if (!match(TokenType.INT, TokenType.FLOAT, TokenType.STRING, TokenType.BOOLEAN)) {
@@ -176,6 +190,20 @@ object Parser {
         }
 
         return Expression.Literal(last())
+    }
+
+    private fun parseFunctionCall(): Expression {
+        val name = last()
+        match(TokenType.L_PAREN)
+        val args = mutableListOf<Expression>()
+        while (!match(TokenType.R_PAREN)) {
+            args.add(parseExpression())
+            if (!match(TokenType.COMMA)) {
+                consumeOrError(TokenType.R_PAREN, "expected closing paren")
+                break
+            }
+        }
+        return Expression.FunctionCall(name, args)
     }
 
     private fun groupExpression(): Expression {
@@ -198,6 +226,13 @@ object Parser {
         return Statement.Print(exp)
     }
 
+    private fun parseType(): Token {
+        if (!match(TokenType.T_INT, TokenType.T_STRING, TokenType.T_BOOLEAN)) {
+            throw RuntimeException("Expected Datatype")
+        }
+        return last()
+    }
+
     private fun match(vararg types: TokenType): Boolean {
         for (type in types) if (tokens[cur].tokenType == type) {
             cur++
@@ -213,6 +248,11 @@ object Parser {
 
     private fun last(): Token {
         return tokens[cur - 1]
+    }
+
+    private fun peek(): Token? {
+        return tokens[cur]
+//        return if (cur + 1 < tokens.size) tokens[cur + 1] else null
     }
 
 }

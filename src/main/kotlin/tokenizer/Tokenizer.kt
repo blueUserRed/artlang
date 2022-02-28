@@ -22,7 +22,9 @@ object Tokenizer {
             '{' -> { emit(TokenType.L_BRACE, "{", null); consume() }
             '}' -> { emit(TokenType.R_BRACE, "}", null); consume() }
             ';' -> { emit(TokenType.SEMICOLON, ";", null); consume() }
+            ':' -> { emit(TokenType.COLON, ":", null); consume() }
             '%' -> { emit(TokenType.MOD, "%", null); consume() }
+            ',' -> { emit(TokenType.COMMA, ",", null); consume() }
             '"' -> string('"')
             '\'' -> string('\'')
             ' ', '\t', '\n', '\r' -> consume()
@@ -190,6 +192,9 @@ object Tokenizer {
             "while" -> emit(TokenType.K_WHILE, "while", null, start)
             "true" -> emit(TokenType.BOOLEAN, "true", true, start)
             "false" -> emit(TokenType.BOOLEAN, "false", false, start)
+            "int" -> emit(TokenType.T_INT, "int", null, start)
+            "str" -> emit(TokenType.T_STRING, "str", null, start)
+            "bool" -> emit(TokenType.T_BOOLEAN, "bool", null, start)
             else -> emit(TokenType.IDENTIFIER, identifier, identifier, start)
         }
     }

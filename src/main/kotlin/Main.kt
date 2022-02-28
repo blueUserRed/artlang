@@ -1,6 +1,7 @@
 import ast.ASTPrinter
 import compiler.Compiler
 import parser.Parser
+import passes.FunctionResolver
 import passes.TypeChecker
 import passes.VariableResolver
 import tokenizer.Tokenizer
@@ -33,6 +34,10 @@ fun main() {
 
     println("running type checker")
     program.accept(TypeChecker())
+    println("done\n")
+
+    println("running function resolver")
+    program.accept(FunctionResolver())
     println("done\n")
 
     println("Compiling into dir: $outdir")

@@ -27,6 +27,8 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
     private var method: MethodBuilder? = null
     private var file: ClassFileBuilder? = null
 
+    private lateinit var curProgram: Statement.Program
+
     fun compile(program: Statement.Program, outdir: String, name: String) {
         this.outdir = outdir
         this.name = name
@@ -134,7 +136,6 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         decStack()
         emit(0x00.toByte(), 0x00.toByte())
         val jmpAddrPos = method!!.curCodeOffset - 2
-//        if (isAnd) emit(iconst_1) else emit(iconst_0)
         comp(exp.right)
         if (isAnd) emit(iand) else emit(ior)
         decStack()
@@ -143,41 +144,48 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         method!!.overwriteByteCode(jmpAddrPos, *Utils.getLastTwoBytes(jmpAddr))
     }
 
-    override fun visit(exp: Expression.Literal) {
-        when (exp.type) {
-            Datatype.INT -> {
-                emitIntLoad(exp.literal.literal as Int)
-                incStack(VerificationTypeInfo.Integer())
-            }
-            Datatype.STRING -> {
-                emitStringLoad(exp.literal.literal as String)
-                incStack(getObjVerificationType("java/lang/String"))
-            }
-            Datatype.BOOLEAN -> {
-                if (exp.literal.literal as Boolean) emit(iconst_1)
-                else emit(iconst_0)
-                incStack(VerificationTypeInfo.Integer())
-            }
-            else -> TODO("not yet implemented")
+    override fun visit(exp: Expression.Literal) = when (exp.type) {
+        Datatype.INT -> {
+            emitIntLoad(exp.literal.literal as Int)
+            incStack(VerificationTypeInfo.Integer())
         }
+        Datatype.STRING -> {
+            emitStringLoad(exp.literal.literal as String)
+            incStack(getObjVerificationType("java/lang/String"))
+        }
+        Datatype.BOOLEAN -> {
+            if (exp.literal.literal as Boolean) emit(iconst_1)
+            else emit(iconst_0)
+            incStack(VerificationTypeInfo.Integer())
+        }
+        else -> TODO("not yet implemented")
     }
 
     override fun visit(stmt: Statement.ExpressionStatement) {
         comp(stmt.exp)
-        emit(pop)
-        decStack()
+        if (!(stmt.exp is Expression.FunctionCall && stmt.exp.type == Datatype.VOID)) {
+            emit(pop)
+            decStack()
+        }
     }
 
     override fun visit(stmt: Statement.Function) {
-//        curStack = 0
         stack = Stack()
         locals = MutableList(stmt.amountLocals) { null }
+        for (i in stmt.args.indices) {
+            locals[i] = when (stmt.args[i].second) {
+                Datatype.INT, Datatype.BOOLEAN -> VerificationTypeInfo.Integer()
+                Datatype.FLOAT -> VerificationTypeInfo.Float()
+                Datatype.STRING -> getObjVerificationType("java/lang/String")
+                else -> TODO("not yet implemented")
+            }
+        }
         maxStack = 0
 
         method = MethodBuilder()
         method!!.isPublic = true
         method!!.isStatic = true
-        method!!.descriptor = "()V"
+        method!!.descriptor = stmt.getDiscriptor()
         method!!.name = stmt.name.lexeme
 
         comp(stmt.statements)
@@ -195,6 +203,8 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
     }
 
     override fun visit(stmt: Statement.Program) {
+        curProgram = stmt
+
         file = ClassFileBuilder()
         file!!.thisClass = "$name\$\$ArtTopLevel"
         file!!.superClass = "java/lang/Object"
@@ -274,6 +284,7 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         when (stmt.type) {
             Datatype.INT -> emitIntVarStore(stmt.index)
             Datatype.STRING -> emitObjectVarStore(stmt.index)
+            Datatype.BOOLEAN -> emitIntVarStore(stmt.index)
             else -> TODO("not yet implemented")
         }
         decStack()
@@ -347,6 +358,20 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         val jmpAddr = method!!.curCodeOffset - (jmpAddrOffset - 1)
         method!!.overwriteByteCode(jmpAddrOffset, *Utils.getLastTwoBytes(jmpAddr))
         emitStackMapFrame()
+    }
+
+    override fun visit(exp: Expression.FunctionCall) {
+        for (arg in exp.arguments) comp(arg)
+        val methodRefIndex = file!!.methodRefInfo(
+            file!!.classInfo(file!!.utf8Info("$name\$\$ArtTopLevel")),
+            file!!.nameAndTypeInfo(
+                file!!.utf8Info(exp.name.lexeme),
+                file!!.utf8Info(curProgram.funcs[exp.funcIndex].getDiscriptor())
+            )
+        )
+        emit(invokestatic, *Utils.getLastTwoBytes(methodRefIndex))
+        repeat(exp.arguments.size) { decStack() }
+        //TODO: returntypes!!
     }
 
     private fun doCompare(compareInstruction: Byte) {
@@ -530,6 +555,7 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
 
         const val invokevirtual: Byte = 0xB6.toByte()
         const val invokespecial: Byte = 0xB7.toByte()
+        const val invokestatic: Byte = 0xB8.toByte()
 
         const val wide: Byte = 0xC4.toByte()
 
