@@ -25,7 +25,9 @@ object Parser {
         consumeOrError(TokenType.IDENTIFIER, "Expected function name")
         val funcName = last()
         consumeOrError(TokenType.L_PAREN, "Expected () after function name")
+
         val args = mutableListOf<Pair<Token, Token>>()
+
         while (match(TokenType.IDENTIFIER)) {
             val name = last()
             consumeOrError(TokenType.COLON, "Expected type-declaration after argument")
@@ -33,10 +35,18 @@ object Parser {
             args.add(Pair(name, type))
             if (!match(TokenType.COMMA)) break
         }
+
         consumeOrError(TokenType.R_PAREN, "Expected () after function name")
+
+        var returnType: Token? = null
+        if (match(TokenType.COLON)) returnType = parseType()
+
         consumeOrError(TokenType.L_BRACE, "Expected code block after function declaration")
+
         val function = Statement.Function(parseBlock(), funcName)
         function.argTokens = args
+        function.returnTypeToken = returnType
+
         return function
     }
 
@@ -47,6 +57,7 @@ object Parser {
         if (match(TokenType.K_LOOP)) return parseLoop()
         if (match(TokenType.K_IF)) return parseIf()
         if (match(TokenType.K_WHILE)) return parseWhileLoop()
+        if (match(TokenType.K_RETURN)) return parseReturn()
 
         val start = cur
         try {
@@ -56,6 +67,13 @@ object Parser {
         }
 
         return parseExpressionStatement()
+    }
+
+    private fun parseReturn(): Statement.Return {
+        if (match(TokenType.SEMICOLON)) return Statement.Return(null)
+        val returnExpr = parseExpression()
+        consumeOrError(TokenType.SEMICOLON, "Semicolon expected after return")
+        return Statement.Return(returnExpr)
     }
 
     private fun parseWhileLoop(): Statement {

@@ -1,7 +1,7 @@
 import ast.ASTPrinter
 import compiler.Compiler
 import parser.Parser
-import passes.FunctionResolver
+import passes.ControlFlowChecker
 import passes.TypeChecker
 import passes.VariableResolver
 import tokenizer.Tokenizer
@@ -36,14 +36,12 @@ fun main() {
     program.accept(TypeChecker())
     println("done\n")
 
-    println("running function resolver")
-    program.accept(FunctionResolver())
+    println("running controlFlow checker")
+    program.accept(ControlFlowChecker())
     println("done\n")
 
     println("Compiling into dir: $outdir")
     Compiler().compile(program, outdir, "Test")
     println("done")
-
-
 
 }

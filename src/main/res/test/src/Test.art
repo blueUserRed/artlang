@@ -1,6 +1,7 @@
 fn main() {
-//    fizzBuzz();
     repeat("Hello ", 5);
+//    fizzBuzz(10);
+    print calc(2, 3, true);
 }
 
 fn repeat(string: str, times: int) {
@@ -11,9 +12,13 @@ fn repeat(string: str, times: int) {
     }
 }
 
-//fn fizzBuzz() {
+fn calc(num1: int, num2: int, subtract: bool): int {
+    if (!subtract) return num1 - num2; else return num1 + num2;
+}
+
+//fn fizzBuzz(its: int) {
 //    let i = 0;
-//    while (i <= 100) {
+//    while (i <= its) {
 //        let output = "";
 //        let isEmpty = true;
 //

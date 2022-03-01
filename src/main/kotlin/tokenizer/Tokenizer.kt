@@ -177,7 +177,6 @@ object Tokenizer {
         when (val identifier = code.substring(start until cur)) {
             "fn" -> emit(TokenType.K_FN, "fn", null, start)
             "print" -> emit(TokenType.K_PRINT, "print", null, start)
-            "println" -> emit(TokenType.K_PRINTLN, "println", null, start)
             "class" -> emit(TokenType.K_CLASS, "class", null, start)
             "let" -> emit(TokenType.K_LET, "let", null, start)
             "const" -> emit(TokenType.K_CONST, "const", null, start)
@@ -195,6 +194,7 @@ object Tokenizer {
             "int" -> emit(TokenType.T_INT, "int", null, start)
             "str" -> emit(TokenType.T_STRING, "str", null, start)
             "bool" -> emit(TokenType.T_BOOLEAN, "bool", null, start)
+            "return" -> emit(TokenType.K_RETURN, "return", null, start)
             else -> emit(TokenType.IDENTIFIER, identifier, identifier, start)
         }
     }

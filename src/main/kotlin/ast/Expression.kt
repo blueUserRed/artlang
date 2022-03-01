@@ -2,6 +2,7 @@ package ast
 
 import passes.TypeChecker
 import tokenizer.Token
+import passes.TypeChecker.Datatype
 
 abstract class Expression {
 

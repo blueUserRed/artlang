@@ -36,7 +36,6 @@ class VariableResolver : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         val vars = mutableListOf<String>()
         for (entry in stmt.argTokens) vars.add(entry.first.lexeme)
         curVars = vars
-        println(curVars)
         resolve(stmt.statements)
         stmt.amountLocals = maxLocals
     }
@@ -95,7 +94,11 @@ class VariableResolver : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
     }
 
     override fun visit(exp: Expression.FunctionCall) {
+        for (arg in exp.arguments) resolve(arg)
+    }
 
+    override fun visit(stmt: Statement.Return) {
+        stmt.returnExpr?.let { resolve(it) }
     }
 
     private fun resolve(expr: Expression) = expr.accept(this)

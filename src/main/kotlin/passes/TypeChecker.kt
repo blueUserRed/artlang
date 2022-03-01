@@ -11,6 +11,7 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
 
     private var vars: MutableMap<Int, Datatype> = mutableMapOf()
     private lateinit var curProgram: Statement.Program
+    private lateinit var curFunction: Statement.Function
 
     override fun visit(exp: Expression.Binary): Datatype {
         val type1 = check(exp.left)
@@ -89,10 +90,6 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
     }
 
     override fun visit(stmt: Statement.Function): Datatype {
-        val args = mutableListOf<Pair<String, Datatype>>()
-        for (arg in stmt.argTokens) args.add(Pair(arg.first.lexeme, tokenToDataType(arg.second.tokenType)))
-        stmt.args = args
-
         val newVars = mutableMapOf<Int, Datatype>()
         for (i in stmt.args.indices) newVars[i] = stmt.args[i].second
         vars = newVars
@@ -103,8 +100,19 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
 
     override fun visit(stmt: Statement.Program): Datatype {
         curProgram = stmt
+        for (func in stmt.funcs) precCalcFuncArgs(func)
         for (func in stmt.funcs) func.accept(this)
         return Datatype.VOID
+    }
+
+    private fun precCalcFuncArgs(func: Statement.Function) {
+        curFunction = func
+
+        val args = mutableListOf<Pair<String, Datatype>>()
+        for (arg in func.argTokens) args.add(Pair(arg.first.lexeme, tokenToDataType(arg.second.tokenType)))
+        func.args = args
+
+        func.returnType = func.returnTypeToken?.let { tokenToDataType(it.tokenType) } ?: Datatype.VOID
     }
 
     override fun visit(stmt: Statement.Print): Datatype {
@@ -118,7 +126,8 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
     }
 
     override fun visit(exp: Expression.Variable): Datatype {
-        val datatype = vars[exp.index] ?: throw RuntimeException("unreachable")
+        val datatype = vars[exp.index] ?:
+            throw RuntimeException("unreachable")
         exp.type = datatype
         return datatype
     }
@@ -179,8 +188,35 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
     }
 
     override fun visit(exp: Expression.FunctionCall): Datatype {
-        for (arg in exp.arguments) check(arg)
-        return Datatype.VOID
+        val thisSig = mutableListOf<Datatype>()
+        for (arg in exp.arguments) {
+            check(arg)
+            thisSig.add(arg.type)
+        }
+        var funcIndex: Int? = null
+        for (i in curProgram.funcs.indices) {
+            if (!doFuncSigsMatch(thisSig, curProgram.funcs[i].args)) continue
+            funcIndex = i
+        }
+        if (funcIndex == null) throw RuntimeException("Function ${exp.name.lexeme} does not exist")
+        exp.funcIndex = funcIndex
+        val type = curProgram.funcs[funcIndex].returnType
+        exp.type = type
+        return type
+    }
+
+    override fun visit(stmt: Statement.Return): Datatype {
+        val type = stmt.returnExpr?.let { check(it) } ?: Datatype.VOID
+        if (curFunction.returnType != type) {
+            throw RuntimeException("incompatible return types: $type and ${curFunction.returnType}")
+        }
+        return type
+    }
+
+    private fun doFuncSigsMatch(types1: List<Datatype>, types2: List<Pair<String, Datatype>>): Boolean {
+        if (types1.size != types2.size) return false
+        for (i in types1.indices) if (types1[i] != types2[i].second) return false
+        return true
     }
 
     private fun check(exp: Expression): Datatype = exp.accept(this)

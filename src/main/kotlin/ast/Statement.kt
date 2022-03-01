@@ -17,19 +17,25 @@ abstract class Statement {
         var amountLocals: Int = 0
         var argTokens: MutableList<Pair<Token, Token>> = mutableListOf()
         var args: MutableList<Pair<String, Datatype>> = mutableListOf()
+        var returnType: Datatype = Datatype.VOID
+        var returnTypeToken: Token? = null
 
-        fun getDiscriptor(): String {
+        fun getDescriptor(): String {
             val builder = StringBuilder()
             builder.append("(")
-            for (arg in args) builder.append(when (arg.second) {
-                Datatype.INT -> "I"
-                Datatype.BOOLEAN -> "Z"
-                Datatype.FLOAT -> "F"
-                Datatype.STRING -> "Ljava/lang/String;"
-                else -> TODO("not yet implemented")
-            })
-            builder.append(")V")
+            for (arg in args) builder.append(getDescriptorFromType(arg.second))
+            builder.append(")")
+            builder.append(getDescriptorFromType(returnType))
             return builder.toString()
+        }
+
+        private fun getDescriptorFromType(arg: Datatype) = when (arg) {
+            Datatype.INT -> "I"
+            Datatype.BOOLEAN -> "Z"
+            Datatype.FLOAT -> "F"
+            Datatype.STRING -> "Ljava/lang/String;"
+            Datatype.VOID -> "V"
+            else -> TODO("not yet implemented")
         }
 
         override fun <T> accept(visitor: StatementVisitor<T>): T = visitor.visit(this)
@@ -78,6 +84,11 @@ abstract class Statement {
     }
 
     class While(val body: Statement, val condition: Expression) : Statement() {
+
+        override fun <T> accept(visitor: StatementVisitor<T>): T = visitor.visit(this)
+    }
+
+    class Return(val returnExpr: Expression?) : Statement() {
 
         override fun <T> accept(visitor: StatementVisitor<T>): T = visitor.visit(this)
     }

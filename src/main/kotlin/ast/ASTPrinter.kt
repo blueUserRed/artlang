@@ -78,6 +78,20 @@ class ASTPrinter : ExpressionVisitor<String>, StatementVisitor<String> {
     }
 
     override fun visit(exp: Expression.FunctionCall): String {
-        return "(i ${exp.name.lexeme})"
+        val builder = StringBuilder()
+        builder
+            .append("(i ")
+            .append(exp.name.lexeme)
+        for (arg in exp.arguments) {
+            builder
+                .append(" ")
+                .append(arg.accept(this))
+        }
+        builder.append(")")
+        return builder.toString()
+    }
+
+    override fun visit(stmt: Statement.Return): String {
+        return "(r ${stmt.returnExpr?.accept(this) ?: ""})"
     }
 }

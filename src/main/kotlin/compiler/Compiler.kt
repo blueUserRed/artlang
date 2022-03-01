@@ -27,6 +27,8 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
     private var method: MethodBuilder? = null
     private var file: ClassFileBuilder? = null
 
+    private var wasReturn: Boolean = false
+
     private lateinit var curProgram: Statement.Program
 
     fun compile(program: Statement.Program, outdir: String, name: String) {
@@ -181,11 +183,12 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
             }
         }
         maxStack = 0
+        lastStackMapFrameOffset = 0
 
         method = MethodBuilder()
         method!!.isPublic = true
         method!!.isStatic = true
-        method!!.descriptor = stmt.getDiscriptor()
+        method!!.descriptor = stmt.getDescriptor()
         method!!.name = stmt.name.lexeme
 
         comp(stmt.statements)
@@ -199,7 +202,9 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         }
 
         file!!.addMethod(method!!)
-        emit(_return)
+        if (stmt.returnType == Datatype.VOID) emit(_return)
+//        emit(_return)
+        if (lastStackMapFrameOffset >= method!!.curCodeOffset) method!!.popStackMapFrame() //TODO: can probably be done better
     }
 
     override fun visit(stmt: Statement.Program) {
@@ -312,15 +317,20 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         emit(ifeq, 0x00.toByte(), 0x00.toByte())
         decStack()
         val jmpAddrOffset = method!!.curCodeOffset - 2
+
+        wasReturn = false
         comp(stmt.ifStmt)
-        if (hasElse) emit(_goto, 0x00.toByte(), 0x00.toByte())
+        val skipGoto = wasReturn
+        wasReturn = false
+
+        if (hasElse && !skipGoto) emit(_goto, 0x00.toByte(), 0x00.toByte())
         val elseJmpAddrOffset = method!!.curCodeOffset - 2
         val jmpAddr = method!!.curCodeOffset - (jmpAddrOffset - 1)
         method!!.overwriteByteCode(jmpAddrOffset, *Utils.getLastTwoBytes(jmpAddr))
         if (hasElse) emitStackMapFrame()
         if (hasElse) comp(stmt.elseStmt!!)
         val elseJmpAddr = method!!.curCodeOffset - (elseJmpAddrOffset - 1)
-        if (hasElse) method!!.overwriteByteCode(elseJmpAddrOffset, *Utils.getLastTwoBytes(elseJmpAddr))
+        if (hasElse && !skipGoto) method!!.overwriteByteCode(elseJmpAddrOffset, *Utils.getLastTwoBytes(elseJmpAddr))
         emitStackMapFrame()
     }
 
@@ -366,12 +376,32 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
             file!!.classInfo(file!!.utf8Info("$name\$\$ArtTopLevel")),
             file!!.nameAndTypeInfo(
                 file!!.utf8Info(exp.name.lexeme),
-                file!!.utf8Info(curProgram.funcs[exp.funcIndex].getDiscriptor())
+                file!!.utf8Info(curProgram.funcs[exp.funcIndex].getDescriptor())
             )
         )
         emit(invokestatic, *Utils.getLastTwoBytes(methodRefIndex))
         repeat(exp.arguments.size) { decStack() }
-        //TODO: returntypes!!
+        when (exp.type) {
+            Datatype.INT, Datatype.BOOLEAN -> incStack(VerificationTypeInfo.Integer())
+            Datatype.FLOAT -> incStack(VerificationTypeInfo.Float())
+            Datatype.STRING -> incStack(getObjVerificationType("java/lang/String"))
+            else -> { }
+        }
+    }
+
+    override fun visit(stmt: Statement.Return) {
+        if (stmt.returnExpr == null) {
+            emit(_return)
+            return
+        }
+        comp(stmt.returnExpr)
+        emit(when (stmt.returnExpr.type) {
+            Datatype.STRING -> areturn
+            Datatype.INT, Datatype.BOOLEAN -> ireturn
+            else -> TODO("not yet implemented")
+        })
+        decStack()
+        wasReturn = true
     }
 
     private fun doCompare(compareInstruction: Byte) {
@@ -553,6 +583,8 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
 
         const val new: Byte = 0xBB.toByte()
 
+        const val nop: Byte = 0x00.toByte()
+
         const val invokevirtual: Byte = 0xB6.toByte()
         const val invokespecial: Byte = 0xB7.toByte()
         const val invokestatic: Byte = 0xB8.toByte()
@@ -560,6 +592,8 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         const val wide: Byte = 0xC4.toByte()
 
         const val _return: Byte = 0xB1.toByte()
+        const val areturn: Byte = 0xB0.toByte()
+        const val ireturn: Byte = 0xAC.toByte()
 
         const val if_icmpeq: Byte = 0x9F.toByte()
         const val if_icmpge: Byte = 0xA2.toByte()

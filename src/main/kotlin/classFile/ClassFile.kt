@@ -300,7 +300,6 @@ class MethodBuilder {
             )
         )
 
-
         val attribBytes = Utils.arrayConcat(*Array(attributes.size) { attributes[it].toBytes() })
 
         return Utils.arrayConcat(
@@ -315,6 +314,7 @@ class MethodBuilder {
     fun addAttribute(attrib: Attribute) = attributes.add(attrib)
     fun addCodeAttribute(attrib: Attribute) = codeAttributes.add(attrib)
     fun addStackMapFrame(stackMapFrame: StackMapTableAttribute.StackMapFrame) = stackMapFrames.add(stackMapFrame)
+    fun popStackMapFrame() = stackMapFrames.removeLast()
 
     fun emitByteCode(vararg bytes: Byte) {
         for (byte in bytes) code.add(byte)
