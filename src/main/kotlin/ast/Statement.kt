@@ -93,4 +93,12 @@ abstract class Statement {
         override fun <T> accept(visitor: StatementVisitor<T>): T = visitor.visit(this)
     }
 
+    class VarIncrement(val name: Token, val toAdd: Byte) : Statement() {
+
+        var index: Int = 0
+        var type: Datatype = Datatype.VOID
+
+        override fun <T> accept(visitor: StatementVisitor<T>): T = visitor.visit(this)
+    }
+
 }

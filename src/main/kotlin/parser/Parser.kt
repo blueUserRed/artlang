@@ -59,14 +59,84 @@ object Parser {
         if (match(TokenType.K_WHILE)) return parseWhileLoop()
         if (match(TokenType.K_RETURN)) return parseReturn()
 
+        if (peekNext()?.tokenType in arrayOf(TokenType.D_PLUS, TokenType.D_MINUS)) return parseVarIncrement()
+
+        if (peekNext()?.tokenType in
+            arrayOf(TokenType.PLUS_EQ, TokenType.MINUS_EQ, TokenType.STAR_EQ, TokenType.SLASH_EQ)) {
+            return parseVarAssignShorthand()
+        }
+
         val start = cur
         try {
-            return parseVariableAssignment()
+            return parseVariableAssignment() //TODO: make better, maybe peek()
         } catch (e: RuntimeException) {
             cur = start
         }
 
         return parseExpressionStatement()
+    }
+
+    private fun parseVarAssignShorthand(): Statement {
+        consumeOrError(TokenType.IDENTIFIER, "Expected variable before shorthand operator")
+        val variable = last()
+        match(TokenType.PLUS_EQ, TokenType.MINUS_EQ, TokenType.STAR_EQ, TokenType.SLASH_EQ)
+        val op = last()
+        val num = parseExpression()
+        consumeOrError(TokenType.SEMICOLON, "Expected semicolon after shorthand operator")
+        when (op.tokenType) {
+            TokenType.STAR_EQ -> return Statement.VariableAssignment(
+                variable,
+                Expression.Binary(
+                    Expression.Variable(variable),
+                    Token(TokenType.STAR, "*=", null, op.file, op.pos),
+                    num
+                )
+            )
+            TokenType.SLASH_EQ -> return Statement.VariableAssignment(
+                variable,
+                Expression.Binary(
+                    Expression.Variable(variable),
+                    Token(TokenType.SLASH, "/=", null, op.file, op.pos),
+                    num
+                )
+            )
+            TokenType.PLUS_EQ -> {
+                if (num is Expression.Literal && num.literal.literal as Int in Byte.MIN_VALUE..Byte.MAX_VALUE) {
+                    return Statement.VarIncrement(variable, num.literal.literal.toByte())
+                }
+                return Statement.VariableAssignment(
+                    variable,
+                    Expression.Binary(
+                        Expression.Variable(variable),
+                        Token(TokenType.PLUS, "+=", null, op.file, op.pos),
+                        num
+                    )
+                )
+            }
+            TokenType.MINUS_EQ -> {
+                if (num is Expression.Literal && num.literal.literal as Int in Byte.MIN_VALUE..Byte.MAX_VALUE) {
+                    return Statement.VarIncrement(variable, (-num.literal.literal).toByte())
+                }
+                return Statement.VariableAssignment(
+                    variable,
+                    Expression.Binary(
+                        Expression.Variable(variable),
+                        Token(TokenType.MINUS, "-=", null, op.file, op.pos),
+                        num
+                    )
+                )
+            }
+            else -> throw RuntimeException("unreachable")
+        }
+    }
+
+    private fun parseVarIncrement(): Statement {
+        consumeOrError(TokenType.IDENTIFIER, "expected variable before inc/dec operator")
+        val toInc = last()
+        match(TokenType.D_MINUS, TokenType.D_PLUS)
+        val op = last()
+        consumeOrError(TokenType.SEMICOLON, "Expected semicolon after inc/dec")
+        return Statement.VarIncrement(toInc, if (op.tokenType == TokenType.D_PLUS) 1 else -1)
     }
 
     private fun parseReturn(): Statement.Return {
@@ -271,6 +341,10 @@ object Parser {
     private fun peek(): Token? {
         return tokens[cur]
 //        return if (cur + 1 < tokens.size) tokens[cur + 1] else null
+    }
+
+    private fun peekNext(): Token? {
+        return if (cur + 1 < tokens.size) tokens[cur + 1] else null
     }
 
 }

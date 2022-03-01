@@ -404,6 +404,10 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         wasReturn = true
     }
 
+    override fun visit(stmt: Statement.VarIncrement) {
+        emit(iinc, (stmt.index and 0xFF).toByte(), stmt.toAdd)
+    }
+
     private fun doCompare(compareInstruction: Byte) {
         emitStackMapFrame()
         emit(compareInstruction, *Utils.getShortAsBytes(7.toShort()))
@@ -449,7 +453,7 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         4 -> emit(iconst_4)
         5 -> emit(iconst_5)
         in Byte.MIN_VALUE..Byte.MAX_VALUE -> emit(bipush, (i and 0xFF).toByte())
-        in Short.MIN_VALUE..Short.MAX_VALUE -> emit(sipush, *Utils.getLastTwoBytes(i))
+        in Short.MIN_VALUE..Short.MAX_VALUE -> emit(sipush, *Utils.getShortAsBytes(i.toShort()))
         else -> emitLdc(file!!.integerInfo(i))
     }
 
@@ -532,6 +536,7 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         const val irem: Byte = 0x70.toByte()
         const val iand: Byte = 0x7E.toByte()
         const val ior: Byte = 0x80.toByte()
+        const val iinc: Byte = 0x84.toByte()
 
         const val iconst_m1: Byte = 0x02.toByte()
         const val iconst_0: Byte = 0x03.toByte()

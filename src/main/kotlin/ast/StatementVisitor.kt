@@ -12,4 +12,5 @@ interface StatementVisitor<T> {
     fun visit(stmt: Statement.If): T
     fun visit(stmt: Statement.While): T
     fun visit(stmt: Statement.Return): T
+    fun visit(stmt: Statement.VarIncrement): T
 }

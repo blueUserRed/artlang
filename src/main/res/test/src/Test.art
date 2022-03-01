@@ -1,38 +1,24 @@
 fn main() {
-    repeat("Hello ", 5);
-//    fizzBuzz(10);
-    print calc(2, 3, true);
+    fizzBuzz(20);
 }
 
-fn repeat(string: str, times: int) {
+fn fizzBuzz(its: int) {
     let i = 0;
-    while (i < times) {
-        print string;
-        i = i + 1;
+    while (i <= its) {
+        let output = "";
+        let isEmpty = true;
+
+        if (i % 3 == 0) {
+            output = "Fizz";
+            isEmpty = false;
+        }
+        if (i % 5 == 0) {
+            output = output + "Buzz";
+            isEmpty = false;
+        }
+
+        if (isEmpty) print i; else print output;
+
+        i++;
     }
 }
-
-fn calc(num1: int, num2: int, subtract: bool): int {
-    if (!subtract) return num1 - num2; else return num1 + num2;
-}
-
-//fn fizzBuzz(its: int) {
-//    let i = 0;
-//    while (i <= its) {
-//        let output = "";
-//        let isEmpty = true;
-//
-//        if (i % 3 == 0) {
-//            output = "Fizz";
-//            isEmpty = false;
-//        }
-//        if (i % 5 == 0) {
-//            output = output + "Buzz";
-//            isEmpty = false;
-//        }
-//
-//        if (isEmpty) print i; else print output;
-//
-//        i = i + 1;
-//    }
-//}

@@ -90,6 +90,8 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
     }
 
     override fun visit(stmt: Statement.Function): Datatype {
+        curFunction = stmt
+
         val newVars = mutableMapOf<Int, Datatype>()
         for (i in stmt.args.indices) newVars[i] = stmt.args[i].second
         vars = newVars
@@ -126,8 +128,7 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
     }
 
     override fun visit(exp: Expression.Variable): Datatype {
-        val datatype = vars[exp.index] ?:
-            throw RuntimeException("unreachable")
+        val datatype = vars[exp.index] ?: throw RuntimeException("unreachable")
         exp.type = datatype
         return datatype
     }
@@ -146,8 +147,7 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
 
     override fun visit(stmt: Statement.VariableAssignment): Datatype {
         val type = check(stmt.expr)
-        val varType = vars[stmt.index] ?:
-            throw RuntimeException("unreachable")
+        val varType = vars[stmt.index] ?: throw RuntimeException("unreachable")
         if (type != varType) throw RuntimeException("tried to assign $type to $varType")
         stmt.type = type
         return Datatype.VOID
@@ -211,6 +211,13 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
             throw RuntimeException("incompatible return types: $type and ${curFunction.returnType}")
         }
         return type
+    }
+
+    override fun visit(stmt: Statement.VarIncrement): Datatype {
+        val varType = vars[stmt.index] ?: throw RuntimeException("unreachable")
+        if (varType != Datatype.INT) TODO("not yet implemented")
+        stmt.type = varType
+        return Datatype.VOID
     }
 
     private fun doFuncSigsMatch(types1: List<Datatype>, types2: List<Pair<String, Datatype>>): Boolean {

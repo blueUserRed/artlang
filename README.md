@@ -36,7 +36,7 @@ fn fizzBuzz() {
 
         if (isEmpty) print i; else print output;
 
-        i = i + 1;
+        i++;
     }
 }
 ```

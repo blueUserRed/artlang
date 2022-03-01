@@ -5,7 +5,6 @@ import ast.ExpressionVisitor
 import ast.Statement
 import ast.StatementVisitor
 import java.lang.RuntimeException
-import passes.TypeChecker.Datatype
 
 class VariableResolver : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
 
@@ -99,6 +98,12 @@ class VariableResolver : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
 
     override fun visit(stmt: Statement.Return) {
         stmt.returnExpr?.let { resolve(it) }
+    }
+
+    override fun visit(stmt: Statement.VarIncrement) {
+        val index = curVars.indexOf(stmt.name.lexeme)
+        if (index == -1) throw RuntimeException("Unknown variable ${stmt.name.lexeme}")
+        stmt.index = index
     }
 
     private fun resolve(expr: Expression) = expr.accept(this)

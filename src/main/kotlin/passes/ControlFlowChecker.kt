@@ -84,6 +84,10 @@ class ControlFlowChecker : StatementVisitor<Boolean>, ExpressionVisitor<Boolean>
         return true
     }
 
+    override fun visit(stmt: Statement.VarIncrement): Boolean {
+        return false
+    }
+
     private fun check(stmt: Statement): Boolean = stmt.accept(this)
     private fun check(expr: Expression): Boolean = expr.accept(this)
 }

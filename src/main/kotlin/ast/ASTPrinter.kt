@@ -92,6 +92,10 @@ class ASTPrinter : ExpressionVisitor<String>, StatementVisitor<String> {
     }
 
     override fun visit(stmt: Statement.Return): String {
-        return "(r ${stmt.returnExpr?.accept(this) ?: ""})"
+        return "(r ${stmt.returnExpr?.accept(this) ?: ""})\n"
+    }
+
+    override fun visit(stmt: Statement.VarIncrement): String {
+        return "(${stmt.name.lexeme} ${stmt.toAdd} ++)\n"
     }
 }

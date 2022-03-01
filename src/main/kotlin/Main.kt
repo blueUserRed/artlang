@@ -43,5 +43,4 @@ fun main() {
     println("Compiling into dir: $outdir")
     Compiler().compile(program, outdir, "Test")
     println("done")
-
 }
