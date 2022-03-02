@@ -1,10 +1,15 @@
 import ast.ASTPrinter
+import compiler.Compiler
 import parser.Parser
+import passes.ControlFlowChecker
+import passes.TypeChecker
+import passes.VariableResolver
 import tokenizer.Tokenizer
 
 fun main() {
 
     val file = "test/src/Test.art"
+    val outdir = "src/main/res/test/out"
 
     val code = Utils.readFile(file)
     println("----------------code----------------")
@@ -17,9 +22,25 @@ fun main() {
     tokens.forEach(::println)
     println("------------------------------------\n\n")
 
-    val statements = Parser.parse(tokens)
+    val program = Parser.parse(tokens)
 
     println("----------------AST-----------------")
-    statements.forEach { println(it.accept(ASTPrinter())) }
+    println(program.accept(ASTPrinter()))
     println("------------------------------------\n\n")
+
+    println("running variable resolver")
+    program.accept(VariableResolver())
+    println("done\n")
+
+    println("running type checker")
+    program.accept(TypeChecker())
+    println("done\n")
+
+    println("running controlFlow checker")
+    program.accept(ControlFlowChecker())
+    println("done\n")
+
+    println("Compiling into dir: $outdir")
+    Compiler().compile(program, outdir, "Test")
+    println("done")
 }

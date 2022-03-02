@@ -22,6 +22,9 @@ object Tokenizer {
             '{' -> { emit(TokenType.L_BRACE, "{", null); consume() }
             '}' -> { emit(TokenType.R_BRACE, "}", null); consume() }
             ';' -> { emit(TokenType.SEMICOLON, ";", null); consume() }
+            ':' -> { emit(TokenType.COLON, ":", null); consume() }
+            '%' -> { emit(TokenType.MOD, "%", null); consume() }
+            ',' -> { emit(TokenType.COMMA, ",", null); consume() }
             '"' -> string('"')
             '\'' -> string('\'')
             ' ', '\t', '\n', '\r' -> consume()
@@ -35,6 +38,18 @@ object Tokenizer {
 
                 if (current.isDigit()) {
                     number()
+                    continue
+                }
+
+                if (current == '&' && canPeek() && peek() == '&') {
+                    consume(); consume()
+                    emit(TokenType.D_AND, "&&", null, cur - 2)
+                    continue
+                }
+
+                if (current == '|' && canPeek() && peek() == '|') {
+                    consume(); consume()
+                    emit(TokenType.D_OR, "||", null, cur - 2)
                     continue
                 }
 
@@ -162,18 +177,24 @@ object Tokenizer {
         when (val identifier = code.substring(start until cur)) {
             "fn" -> emit(TokenType.K_FN, "fn", null, start)
             "print" -> emit(TokenType.K_PRINT, "print", null, start)
-            "println" -> emit(TokenType.K_PRINTLN, "println", null, start)
             "class" -> emit(TokenType.K_CLASS, "class", null, start)
-            "var" -> emit(TokenType.K_VAR, "var", null, start)
+            "let" -> emit(TokenType.K_LET, "let", null, start)
             "const" -> emit(TokenType.K_CONST, "const", null, start)
-            "priv" -> emit(TokenType.K_PRIV, "priv", null, start)
-            "pub" -> emit(TokenType.K_PUB, "pub", null, start)
+            "private" -> emit(TokenType.K_PRIVATE, "private", null, start)
+            "public" -> emit(TokenType.K_PUBLIC, "public", null, start)
             "abstract" -> emit(TokenType.K_ABSTRACT, "abstract", null, start)
             "static" -> emit(TokenType.K_STATIC, "static", null, start)
             "for" -> emit(TokenType.K_FOR, "for", null, start)
             "loop" -> emit(TokenType.K_LOOP, "loop", null, start)
+            "if" -> emit(TokenType.K_IF, "if", null, start)
             "else" -> emit(TokenType.K_ELSE, "else", null, start)
             "while" -> emit(TokenType.K_WHILE, "while", null, start)
+            "true" -> emit(TokenType.BOOLEAN, "true", true, start)
+            "false" -> emit(TokenType.BOOLEAN, "false", false, start)
+            "int" -> emit(TokenType.T_INT, "int", null, start)
+            "str" -> emit(TokenType.T_STRING, "str", null, start)
+            "bool" -> emit(TokenType.T_BOOLEAN, "bool", null, start)
+            "return" -> emit(TokenType.K_RETURN, "return", null, start)
             else -> emit(TokenType.IDENTIFIER, identifier, identifier, start)
         }
     }
@@ -266,5 +287,4 @@ object Tokenizer {
     private fun emit(type: TokenType, lexeme: String, literal: Any?, position: Int = cur) {
         tokens.add(Token(type, lexeme, literal, path, position))
     }
-
 }

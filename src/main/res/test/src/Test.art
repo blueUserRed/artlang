@@ -1,6 +1,24 @@
+fn main() {
+    fizzBuzz(20);
+}
 
-print 1 + 2 * 2;
-{
-    print 5 * 5;
-    6 + 2 * 2;
+fn fizzBuzz(its: int) {
+    let i = 0;
+    while (i <= its) {
+        let output = "";
+        let isEmpty = true;
+
+        if (i % 3 == 0) {
+            output = "Fizz";
+            isEmpty = false;
+        }
+        if (i % 5 == 0) {
+            output = output + "Buzz";
+            isEmpty = false;
+        }
+
+        if (isEmpty) print i; else print output;
+
+        i++;
+    }
 }
