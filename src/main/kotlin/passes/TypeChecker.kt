@@ -95,7 +95,6 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
         val newVars = mutableMapOf<Int, Datatype>()
         for (i in stmt.args.indices) newVars[i] = stmt.args[i].second
         vars = newVars
-
         stmt.statements.accept(this)
         return Datatype.VOID
     }
@@ -104,10 +103,11 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
         curProgram = stmt
         for (func in stmt.funcs) precCalcFuncArgs(func)
         for (func in stmt.funcs) func.accept(this)
+        for (c in stmt.classes) c.accept(this)
         return Datatype.VOID
     }
 
-    private fun precCalcFuncArgs(func: Statement.Function) {
+    private fun precCalcFuncArgs(func: Statement.Function) { //TODO: fix for class funcs
         curFunction = func
 
         val args = mutableListOf<Pair<String, Datatype>>()
@@ -217,6 +217,11 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
         val varType = vars[stmt.index] ?: throw RuntimeException("unreachable")
         if (varType != Datatype.INT) TODO("not yet implemented")
         stmt.type = varType
+        return Datatype.VOID
+    }
+
+    override fun visit(stmt: Statement.ArtClass): Datatype {
+        for (func in stmt.funcs) func.accept(this)
         return Datatype.VOID
     }
 

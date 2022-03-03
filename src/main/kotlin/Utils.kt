@@ -1,4 +1,7 @@
+import java.nio.file.Files
 import java.nio.file.Paths
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 object Utils {
 
@@ -21,7 +24,7 @@ object Utils {
     }
 
     fun getLastTwoBytes(i: Int): ByteArray = arrayOf(
-        (i and 0xFF00).toByte(),
+        ((i shr 8) and 0x00FF).toByte(),
         (i and 0x00FF).toByte()
     ).toByteArray()
 
@@ -37,4 +40,19 @@ object Utils {
         ((s.toInt() shr 0) and 0xFF).toByte(),
     ).toByteArray()
 
+    fun zipDirectory(directory: String, target: String) {
+        val src = Paths.get(directory).toFile()
+        val zipOutput = ZipOutputStream(Files.newOutputStream(Paths.get(target)))
+        Files
+            .walk(src.toPath())
+            .filter { file -> !Files.isDirectory(file) }
+            .filter { file -> !file.fileName.startsWith(".")}
+            .forEach { path ->
+                val zipEntry = ZipEntry("${src.toPath().relativize(path)}")
+                zipOutput.putNextEntry(zipEntry)
+                Files.copy(path, zipOutput)
+                zipOutput.closeEntry()
+            }
+        zipOutput.close()
+    }
 }

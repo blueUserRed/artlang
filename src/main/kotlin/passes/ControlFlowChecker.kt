@@ -46,6 +46,7 @@ class ControlFlowChecker : StatementVisitor<Boolean>, ExpressionVisitor<Boolean>
 
     override fun visit(stmt: Statement.Program): Boolean {
         for (func in stmt.funcs) check(func)
+        for (c in stmt.classes) check(c)
         return false
     }
 
@@ -85,6 +86,10 @@ class ControlFlowChecker : StatementVisitor<Boolean>, ExpressionVisitor<Boolean>
     }
 
     override fun visit(stmt: Statement.VarIncrement): Boolean {
+        return false
+    }
+
+    override fun visit(stmt: Statement.ArtClass): Boolean {
         return false
     }
 

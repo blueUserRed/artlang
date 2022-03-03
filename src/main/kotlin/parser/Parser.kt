@@ -16,12 +16,22 @@ object Parser {
         this.tokens = tokens
 
         val functions = mutableListOf<Statement.Function>()
-        while (!match(TokenType.EOF)) functions.add(parseFunc())
-        return Statement.Program(functions.toTypedArray())
+        val classes = mutableListOf<Statement.ArtClass>()
+        while (!match(TokenType.EOF)) {
+            if (match(TokenType.K_FN)) {
+                functions.add(parseFunc())
+                continue
+            }
+            if (match(TokenType.K_CLASS)) {
+                classes.add(parseClass())
+                continue
+            }
+            throw RuntimeException("Expected function or class in global scope")
+        }
+        return Statement.Program(functions.toTypedArray(), classes.toTypedArray())
     }
 
     private fun parseFunc(): Statement.Function {
-        consumeOrError(TokenType.K_FN, "Expected function")
         consumeOrError(TokenType.IDENTIFIER, "Expected function name")
         val funcName = last()
         consumeOrError(TokenType.L_PAREN, "Expected () after function name")
@@ -48,6 +58,18 @@ object Parser {
         function.returnTypeToken = returnType
 
         return function
+    }
+
+    private fun parseClass(): Statement.ArtClass {
+        consumeOrError(TokenType.IDENTIFIER, "Expected class name")
+        val name = last()
+        consumeOrError(TokenType.L_BRACE, "Expected opening brace after class definition")
+        val funcs = mutableListOf<Statement.Function>()
+        while (!match(TokenType.R_BRACE)) {
+            consumeOrError(TokenType.K_FN, "Expected ")
+            funcs.add(parseFunc())
+        }
+        return Statement.ArtClass(name, funcs.toTypedArray())
     }
 
     private fun parseStatement(): Statement {
@@ -101,7 +123,7 @@ object Parser {
                 )
             )
             TokenType.PLUS_EQ -> {
-                if (num is Expression.Literal && num.literal.literal as Int in Byte.MIN_VALUE..Byte.MAX_VALUE) {
+                if (num is Expression.Literal && num.literal.literal is Int && num.literal.literal in Byte.MIN_VALUE..Byte.MAX_VALUE) {
                     return Statement.VarIncrement(variable, num.literal.literal.toByte())
                 }
                 return Statement.VariableAssignment(
@@ -114,7 +136,7 @@ object Parser {
                 )
             }
             TokenType.MINUS_EQ -> {
-                if (num is Expression.Literal && num.literal.literal as Int in Byte.MIN_VALUE..Byte.MAX_VALUE) {
+                if (num is Expression.Literal && num.literal.literal is Int && num.literal.literal in Byte.MIN_VALUE..Byte.MAX_VALUE) {
                     return Statement.VarIncrement(variable, (-num.literal.literal).toByte())
                 }
                 return Statement.VariableAssignment(

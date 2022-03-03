@@ -41,7 +41,12 @@ abstract class Statement {
         override fun <T> accept(visitor: StatementVisitor<T>): T = visitor.visit(this)
     }
 
-    class Program(val funcs: Array<Function>) : Statement() {
+    class Program(val funcs: Array<Function>, val classes: Array<ArtClass>) : Statement() {
+
+        override fun <T> accept(visitor: StatementVisitor<T>): T = visitor.visit(this)
+    }
+
+    class ArtClass(val name: Token, val funcs: Array<Function>) : Statement() {
 
         override fun <T> accept(visitor: StatementVisitor<T>): T = visitor.visit(this)
     }

@@ -4,6 +4,7 @@ interface StatementVisitor<T> {
     fun visit(stmt: Statement.ExpressionStatement): T
     fun visit(stmt: Statement.Function): T
     fun visit(stmt: Statement.Program): T
+    fun visit(stmt: Statement.ArtClass): T
     fun visit(stmt: Statement.Print): T
     fun visit(stmt: Statement.Block): T
     fun visit(stmt: Statement.VariableDeclaration): T

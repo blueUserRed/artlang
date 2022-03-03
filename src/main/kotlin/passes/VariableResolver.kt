@@ -42,6 +42,7 @@ class VariableResolver : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
     override fun visit(stmt: Statement.Program) {
         curProgram = stmt
         for (func in stmt.funcs) resolve(func)
+        for (c in stmt.classes) resolve(c)
     }
 
     override fun visit(stmt: Statement.Print) {
@@ -104,6 +105,10 @@ class VariableResolver : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         val index = curVars.indexOf(stmt.name.lexeme)
         if (index == -1) throw RuntimeException("Unknown variable ${stmt.name.lexeme}")
         stmt.index = index
+    }
+
+    override fun visit(stmt: Statement.ArtClass) {
+        for (func in stmt.funcs) resolve(func)
     }
 
     private fun resolve(expr: Expression) = expr.accept(this)

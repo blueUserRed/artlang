@@ -28,6 +28,7 @@ class ASTPrinter : ExpressionVisitor<String>, StatementVisitor<String> {
     override fun visit(stmt: Statement.Program): String {
         val builder = StringBuilder()
         for (func in stmt.funcs) builder.append(func.accept(this))
+        for (c in stmt.classes) builder.append(c.accept(this))
         return builder.toString()
     }
 
@@ -97,5 +98,13 @@ class ASTPrinter : ExpressionVisitor<String>, StatementVisitor<String> {
 
     override fun visit(stmt: Statement.VarIncrement): String {
         return "(${stmt.name.lexeme} ${stmt.toAdd} ++)\n"
+    }
+
+    override fun visit(stmt: Statement.ArtClass): String {
+        val builder = StringBuilder()
+        builder.append("class ${stmt.name.lexeme} {\n")
+        for (func in stmt.funcs) builder.append(func.accept(this))
+        builder.append("}\n")
+        return builder.toString()
     }
 }

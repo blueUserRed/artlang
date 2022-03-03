@@ -10,12 +10,14 @@ import classFile.StackMapTableAttribute
 import tokenizer.TokenType
 import passes.TypeChecker.Datatype
 import classFile.StackMapTableAttribute.VerificationTypeInfo
+import java.io.File
 import java.util.*
 
 class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
 
     private var outdir: String = ""
-    private var name: String = ""
+    private var topLevelName: String = ""
+    private var originFileName: String = ""
     private var curFile: String = ""
 
     private var stack: Stack<VerificationTypeInfo> = Stack()
@@ -33,7 +35,9 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
 
     fun compile(program: Statement.Program, outdir: String, name: String) {
         this.outdir = outdir
-        this.name = name
+        this.topLevelName = "$name\$\$ArtTopLevel"
+        originFileName = name
+        File(outdir).mkdirs() //create folders if they dont exist
         program.accept(this)
     }
 
@@ -211,7 +215,7 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         curProgram = stmt
 
         file = ClassFileBuilder()
-        file!!.thisClass = "$name\$\$ArtTopLevel"
+        file!!.thisClass = topLevelName
         file!!.superClass = "java/lang/Object"
         file!!.isSuper = true
         file!!.isPublic = true
@@ -220,6 +224,18 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         for (func in stmt.funcs) comp(func)
 
         file!!.build("$outdir/$curFile.class")
+
+        for (clazz in stmt.classes) {
+            file = ClassFileBuilder()
+            file!!.thisClass = clazz.name.lexeme
+            file!!.superClass = "java/lang/Object"
+            file!!.isSuper = true
+            file!!.isPublic = true
+            curFile = file!!.thisClass
+            for (func in clazz.funcs) comp(func)
+            file!!.build("$outdir/$curFile.class")
+        }
+
     }
 
     override fun visit(stmt: Statement.Print) {
@@ -252,6 +268,10 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         )))
         decStack()
         decStack()
+    }
+
+    override fun visit(stmt: Statement.ArtClass) {
+        TODO("Not yet implemented")
     }
 
     override fun visit(exp: Expression.Variable) {
@@ -373,7 +393,7 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
     override fun visit(exp: Expression.FunctionCall) {
         for (arg in exp.arguments) comp(arg)
         val methodRefIndex = file!!.methodRefInfo(
-            file!!.classInfo(file!!.utf8Info("$name\$\$ArtTopLevel")),
+            file!!.classInfo(file!!.utf8Info(topLevelName)),
             file!!.nameAndTypeInfo(
                 file!!.utf8Info(exp.name.lexeme),
                 file!!.utf8Info(curProgram.funcs[exp.funcIndex].getDescriptor())
