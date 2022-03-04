@@ -1,5 +1,5 @@
 fn main() {
-    fizzBuzz()
+    const a = 3
 }
 
 //

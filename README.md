@@ -11,7 +11,7 @@ java bytecode. It is object-oriented has a static weak typesystem.
 ###### Hello World
 ```rust
 fn main() {
-    print "Hello World!";
+    print "Hello World!"
 }
 ```
 

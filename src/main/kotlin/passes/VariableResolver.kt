@@ -7,6 +7,7 @@ import java.lang.RuntimeException
 class VariableResolver : AstNodeVisitor<Unit> {
 
     private var curVars: MutableList<String> = mutableListOf()
+    private var varDeclarations: MutableList<AstNode.VariableDeclaration> = mutableListOf()
     private var maxLocals: Int = 0
 
     private lateinit var curProgram: AstNode.Program
@@ -49,15 +50,18 @@ class VariableResolver : AstNodeVisitor<Unit> {
 
     override fun visit(stmt: AstNode.Block) {
         val before = curVars.toMutableList()
+        val beforeDecs = varDeclarations.toMutableList()
         for (s in stmt.statements) resolve(s)
         if (curVars.size > maxLocals) maxLocals = curVars.size
         curVars = before
+        varDeclarations = beforeDecs
     }
 
     override fun visit(stmt: AstNode.VariableDeclaration) {
         if (stmt.name.lexeme in curVars) throw RuntimeException("Redeclaration of variable ${stmt.name.lexeme}")
         resolve(stmt.initializer)
         curVars.add(stmt.name.lexeme)
+        varDeclarations.add(stmt)
         stmt.index = curVars.size - 1
     }
 
@@ -65,6 +69,7 @@ class VariableResolver : AstNodeVisitor<Unit> {
         resolve(stmt.toAssign)
         val index = curVars.indexOf(stmt.name.lexeme)
         if (index == -1) throw RuntimeException("Unknown variable ${stmt.name.lexeme}")
+        if (varDeclarations[index].isConst) throw RuntimeException("Tried to assign to const ${stmt.name.lexeme}")
         stmt.index = index
     }
 

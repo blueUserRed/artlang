@@ -87,7 +87,8 @@ object Parser {
     private fun parseStatement(): AstNode {
         if (match(TokenType.L_BRACE)) return parseBlock()
         if (match(TokenType.K_PRINT)) return parsePrint()
-        if (match(TokenType.K_LET)) return parseVariableDeclaration()
+        if (match(TokenType.K_LET)) return parseVariableDeclaration(false)
+        if (match(TokenType.K_CONST)) return parseVariableDeclaration(true)
         if (match(TokenType.K_LOOP)) return parseLoop()
         if (match(TokenType.K_IF)) return parseIf()
         if (match(TokenType.K_WHILE)) return parseWhileLoop()
@@ -227,7 +228,7 @@ object Parser {
         return AstNode.VariableAssignment(name, exp)
     }
 
-    private fun parseVariableDeclaration(): AstNode {
+    private fun parseVariableDeclaration(isConst: Boolean): AstNode {
         consumeOrError(TokenType.IDENTIFIER, "expected identifier after let")
         val name = last()
         var type: Token? = null
@@ -236,7 +237,7 @@ object Parser {
         val initializer = parseStatement()
 //        consumeOrError(TokenType.SEMICOLON, "Expected a Semicolon after variable Declaration")
 //        consumeSoftBreaks()
-        val stmt = AstNode.VariableDeclaration(name, initializer)
+        val stmt = AstNode.VariableDeclaration(name, initializer, isConst)
         stmt.typeToken = type
         return stmt
     }

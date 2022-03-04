@@ -62,7 +62,7 @@ abstract class AstNode {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
-    class VariableDeclaration(val name: Token, val initializer: AstNode) : AstNode() {
+    class VariableDeclaration(val name: Token, val initializer: AstNode, val isConst: Boolean) : AstNode() {
 
         var index: Int = 0
         var typeToken: Token? = null
