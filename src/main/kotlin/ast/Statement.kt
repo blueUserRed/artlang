@@ -12,7 +12,7 @@ abstract class Statement {
         override fun <T> accept(visitor: StatementVisitor<T>): T = visitor.visit(this)
     }
 
-    class Function(val statements: Block, val name: Token) : Statement() {
+    class Function(val statements: Block, val name: Token, val modifiers: List<Token>) : Statement() {
 
         var amountLocals: Int = 0
         var argTokens: MutableList<Pair<Token, Token>> = mutableListOf()

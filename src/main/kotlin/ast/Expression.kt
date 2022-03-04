@@ -44,4 +44,11 @@ abstract class Expression {
         override fun <T> accept(visitor: ExpressionVisitor<T>): T = visitor.visit(this)
     }
 
+    class WalrusAssign(val name: Token, val assign: Expression) : Expression() {
+
+        var index: Int = 0
+
+        override fun <T> accept(visitor: ExpressionVisitor<T>): T = visitor.visit(this)
+    }
+
 }

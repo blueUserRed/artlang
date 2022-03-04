@@ -111,6 +111,13 @@ class VariableResolver : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         for (func in stmt.funcs) resolve(func)
     }
 
+    override fun visit(exp: Expression.WalrusAssign) {
+        resolve(exp.assign)
+        val index = curVars.indexOf(exp.name.lexeme)
+        if (index == -1) throw RuntimeException("Unknown variable ${exp.name.lexeme}")
+        exp.index = index
+    }
+
     private fun resolve(expr: Expression) = expr.accept(this)
     private fun resolve(stmt: Statement) = stmt.accept(this)
 

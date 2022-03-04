@@ -203,11 +203,20 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         if (method!!.name == "main") {
             method!!.descriptor = "([Ljava/lang/String;)V"
             if (method!!.maxLocals < 1) method!!.maxLocals = 1 //TODO: fix when adding parameters
+            method!!.isPrivate = false
+            method!!.isStatic = true
         }
+
+        for (modifier in stmt.modifiers) when (modifier.tokenType) {
+            TokenType.K_PUBLIC -> method!!.isPublic = true
+            TokenType.K_STATIC -> method!!.isStatic = true
+            TokenType.K_ABSTRACT -> method!!.isAbstract = true
+            else -> TODO("not yet implemented")
+        }
+        method!!.isPrivate = !method!!.isPublic
 
         file!!.addMethod(method!!)
         if (stmt.returnType == Datatype.VOID) emit(_return)
-//        emit(_return)
         if (lastStackMapFrameOffset >= method!!.curCodeOffset) method!!.popStackMapFrame() //TODO: can probably be done better
     }
 
@@ -426,6 +435,19 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
 
     override fun visit(stmt: Statement.VarIncrement) {
         emit(iinc, (stmt.index and 0xFF).toByte(), stmt.toAdd)
+    }
+
+    override fun visit(exp: Expression.WalrusAssign) {
+        comp(exp.assign)
+        emit(dup)
+        incStack(stack.peek())
+        when (exp.type) {
+            Datatype.INT -> emitIntVarStore(exp.index)
+            Datatype.STRING -> emitObjectVarStore(exp.index)
+            Datatype.BOOLEAN -> emitIntVarStore(exp.index)
+            else -> TODO("not yet implemented")
+        }
+        decStack()
     }
 
     private fun doCompare(compareInstruction: Byte) {

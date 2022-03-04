@@ -7,4 +7,5 @@ interface ExpressionVisitor<T> {
     fun visit(exp: Expression.Group): T
     fun visit(exp: Expression.Unary): T
     fun visit(exp: Expression.FunctionCall): T
+    fun visit(exp: Expression.WalrusAssign): T
 }

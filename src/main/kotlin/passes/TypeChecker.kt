@@ -225,6 +225,12 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
         return Datatype.VOID
     }
 
+    override fun visit(exp: Expression.WalrusAssign): Datatype {
+        val type = check(exp.assign)
+        exp.type = type
+        return type
+    }
+
     private fun doFuncSigsMatch(types1: List<Datatype>, types2: List<Pair<String, Datatype>>): Boolean {
         if (types1.size != types2.size) return false
         for (i in types1.indices) if (types1[i] != types2[i].second) return false

@@ -22,7 +22,6 @@ object Tokenizer {
             '{' -> { emit(TokenType.L_BRACE, "{", null); consume() }
             '}' -> { emit(TokenType.R_BRACE, "}", null); consume() }
             ';' -> { emit(TokenType.SEMICOLON, ";", null); consume() }
-            ':' -> { emit(TokenType.COLON, ":", null); consume() }
             '%' -> { emit(TokenType.MOD, "%", null); consume() }
             ',' -> { emit(TokenType.COMMA, ",", null); consume() }
             '"' -> string('"')
@@ -159,6 +158,17 @@ object Tokenizer {
                     continue
                 }
 
+                if (current == ':') {
+                    if (canPeek() && peek() == '=') {
+                        consume(); consume()
+                        emit(TokenType.WALRUS, ":=", null, cur - 2)
+                        continue
+                    }
+                    emit(TokenType.COLON, ":", null)
+                    consume()
+                    continue
+                }
+
                 throw RuntimeException("Unknown char '$current'") //TODO: replace with other Exception, do error reporting
             }
         }
@@ -180,7 +190,7 @@ object Tokenizer {
             "class" -> emit(TokenType.K_CLASS, "class", null, start)
             "let" -> emit(TokenType.K_LET, "let", null, start)
             "const" -> emit(TokenType.K_CONST, "const", null, start)
-            "private" -> emit(TokenType.K_PRIVATE, "private", null, start)
+//            "private" -> emit(TokenType.K_PRIVATE, "private", null, start)
             "public" -> emit(TokenType.K_PUBLIC, "public", null, start)
             "abstract" -> emit(TokenType.K_ABSTRACT, "abstract", null, start)
             "static" -> emit(TokenType.K_STATIC, "static", null, start)

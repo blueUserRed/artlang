@@ -1,11 +1,10 @@
 fn main() {
-    print "Main";
     fizzBuzz();
 }
 
 fn fizzBuzz() {
     let i = 0;
-    while (i < 100) {
+    while ((i := i + 1) <= 100) {
         let output = "";
         let isEmpty = true;
         if (i % 3 == 0) {
@@ -17,7 +16,7 @@ fn fizzBuzz() {
             isEmpty = false;
         }
         if (isEmpty) print i; else print output;
-        i++;
+//        i++;
     }
 }
 

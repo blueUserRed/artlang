@@ -19,11 +19,11 @@ object Parser {
         val classes = mutableListOf<Statement.ArtClass>()
         while (!match(TokenType.EOF)) {
             if (match(TokenType.K_FN)) {
-                functions.add(parseFunc())
+                functions.add(parseFunc(listOf()))
                 continue
             }
             if (match(TokenType.K_CLASS)) {
-                classes.add(parseClass())
+                classes.add(parseClass(listOf()))
                 continue
             }
             throw RuntimeException("Expected function or class in global scope")
@@ -31,10 +31,13 @@ object Parser {
         return Statement.Program(functions.toTypedArray(), classes.toTypedArray())
     }
 
-    private fun parseFunc(): Statement.Function {
+    private fun parseFunc(modifiers: List<Token>): Statement.Function {
         consumeOrError(TokenType.IDENTIFIER, "Expected function name")
         val funcName = last()
         consumeOrError(TokenType.L_PAREN, "Expected () after function name")
+
+        if (funcName.lexeme == "main" && modifiers.isNotEmpty())
+            throw RuntimeException("function main must not have access modifiers")
 
         val args = mutableListOf<Pair<Token, Token>>()
 
@@ -53,23 +56,32 @@ object Parser {
 
         consumeOrError(TokenType.L_BRACE, "Expected code block after function declaration")
 
-        val function = Statement.Function(parseBlock(), funcName)
+        val function = Statement.Function(parseBlock(), funcName, modifiers)
         function.argTokens = args
         function.returnTypeToken = returnType
 
         return function
     }
 
-    private fun parseClass(): Statement.ArtClass {
+    private fun parseClass(modifier: List<Token>): Statement.ArtClass {
         consumeOrError(TokenType.IDENTIFIER, "Expected class name")
         val name = last()
         consumeOrError(TokenType.L_BRACE, "Expected opening brace after class definition")
         val funcs = mutableListOf<Statement.Function>()
         while (!match(TokenType.R_BRACE)) {
+            val modifiers = parseModifiers()
             consumeOrError(TokenType.K_FN, "Expected ")
-            funcs.add(parseFunc())
+            funcs.add(parseFunc(modifiers))
         }
         return Statement.ArtClass(name, funcs.toTypedArray())
+    }
+
+    private fun parseModifiers(): List<Token> {
+        val modifiers = mutableListOf<Token>()
+        while (match(TokenType.K_PUBLIC, TokenType.K_PRIVATE, TokenType.K_STATIC, TokenType.K_ABSTRACT)) {
+            modifiers.add(last())
+        }
+        return modifiers
     }
 
     private fun parseStatement(): Statement {
@@ -235,7 +247,15 @@ object Parser {
     }
 
     private fun parseExpression(): Expression {
-        return parseBooleanComparison()
+        return parseWalrusAssignment()
+    }
+
+    private fun parseWalrusAssignment(): Expression {
+        val left = parseBooleanComparison()
+        if (!match(TokenType.WALRUS)) return left
+        if (left !is Expression.Variable) throw RuntimeException("Expected Variable before :=")
+        val right = parseExpression()
+        return Expression.WalrusAssign(left.name, right)
     }
 
     private fun parseBooleanComparison(): Expression {

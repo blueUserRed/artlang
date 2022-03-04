@@ -107,4 +107,8 @@ class ASTPrinter : ExpressionVisitor<String>, StatementVisitor<String> {
         builder.append("}\n")
         return builder.toString()
     }
+
+    override fun visit(exp: Expression.WalrusAssign): String {
+        return "(${exp.name.lexeme} ${exp.assign.accept(this)} :=)"
+    }
 }
