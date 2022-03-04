@@ -24,9 +24,10 @@ object Tokenizer {
             ';' -> { emit(TokenType.SEMICOLON, ";", null); consume() }
             '%' -> { emit(TokenType.MOD, "%", null); consume() }
             ',' -> { emit(TokenType.COMMA, ",", null); consume() }
+            '\n' -> { emit(TokenType.SOFT_BREAK, "\n", null); consume() }
             '"' -> string('"')
             '\'' -> string('\'')
-            ' ', '\t', '\n', '\r' -> consume()
+            ' ', '\t', '\r' -> consume()
 
             else -> {
 

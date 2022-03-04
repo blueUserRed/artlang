@@ -1,9 +1,7 @@
 package compiler
 
-import ast.Expression
-import ast.ExpressionVisitor
-import ast.Statement
-import ast.StatementVisitor
+import ast.AstNode
+import ast.AstNodeVisitor
 import classFile.ClassFileBuilder
 import classFile.MethodBuilder
 import classFile.StackMapTableAttribute
@@ -13,7 +11,7 @@ import classFile.StackMapTableAttribute.VerificationTypeInfo
 import java.io.File
 import java.util.*
 
-class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
+class Compiler : AstNodeVisitor<Unit> {
 
     private var outdir: String = ""
     private var topLevelName: String = ""
@@ -31,9 +29,9 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
 
     private var wasReturn: Boolean = false
 
-    private lateinit var curProgram: Statement.Program
+    private lateinit var curProgram: AstNode.Program
 
-    fun compile(program: Statement.Program, outdir: String, name: String) {
+    fun compile(program: AstNode.Program, outdir: String, name: String) {
         this.outdir = outdir
         this.topLevelName = "$name\$\$ArtTopLevel"
         originFileName = name
@@ -41,7 +39,7 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         program.accept(this)
     }
 
-    override fun visit(exp: Expression.Binary) {
+    override fun visit(exp: AstNode.Binary) {
         if (exp.type == Datatype.STRING) {
             doStringConcat(exp)
             return
@@ -86,7 +84,7 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         }
     }
 
-    private fun doStringConcat(exp: Expression.Binary) {
+    private fun doStringConcat(exp: AstNode.Binary) {
         //TODO: this can be a lot more efficient
         val stringBuilderIndex = file!!.classInfo(file!!.utf8Info("java/lang/StringBuilder"))
 
@@ -133,7 +131,7 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         incStack(getObjVerificationType("java/lang/String"))
     }
 
-    private fun doBooleanComparison(exp: Expression.Binary) {
+    private fun doBooleanComparison(exp: AstNode.Binary) {
         val isAnd = exp.operator.tokenType == TokenType.D_AND
         comp(exp.left)
         emit(dup)
@@ -150,7 +148,7 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         method!!.overwriteByteCode(jmpAddrPos, *Utils.getLastTwoBytes(jmpAddr))
     }
 
-    override fun visit(exp: Expression.Literal) = when (exp.type) {
+    override fun visit(exp: AstNode.Literal) = when (exp.type) {
         Datatype.INT -> {
             emitIntLoad(exp.literal.literal as Int)
             incStack(VerificationTypeInfo.Integer())
@@ -167,15 +165,15 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         else -> TODO("not yet implemented")
     }
 
-    override fun visit(stmt: Statement.ExpressionStatement) {
+    override fun visit(stmt: AstNode.ExpressionStatement) {
         comp(stmt.exp)
-        if (!(stmt.exp is Expression.FunctionCall && stmt.exp.type == Datatype.VOID)) {
+        if (!(stmt.exp is AstNode.FunctionCall && stmt.exp.type == Datatype.VOID)) {
             emit(pop)
             decStack()
         }
     }
 
-    override fun visit(stmt: Statement.Function) {
+    override fun visit(stmt: AstNode.Function) {
         stack = Stack()
         locals = MutableList(stmt.amountLocals) { null }
         for (i in stmt.args.indices) {
@@ -220,7 +218,7 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         if (lastStackMapFrameOffset >= method!!.curCodeOffset) method!!.popStackMapFrame() //TODO: can probably be done better
     }
 
-    override fun visit(stmt: Statement.Program) {
+    override fun visit(stmt: AstNode.Program) {
         curProgram = stmt
 
         file = ClassFileBuilder()
@@ -247,7 +245,7 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
 
     }
 
-    override fun visit(stmt: Statement.Print) {
+    override fun visit(stmt: AstNode.Print) {
         emit(getStatic)
         emit(*Utils.getLastTwoBytes(file!!.fieldRefInfo(
             file!!.classInfo(file!!.utf8Info("java/lang/System")),
@@ -279,11 +277,11 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         decStack()
     }
 
-    override fun visit(stmt: Statement.ArtClass) {
+    override fun visit(stmt: AstNode.ArtClass) {
         TODO("Not yet implemented")
     }
 
-    override fun visit(exp: Expression.Variable) {
+    override fun visit(exp: AstNode.Variable) {
         when (exp.type) {
             Datatype.INT, Datatype.BOOLEAN -> {
                 emitIntVarLoad(exp.index)
@@ -297,9 +295,9 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         }
     }
 
-    override fun visit(stmt: Statement.VariableDeclaration) {
+    override fun visit(stmt: AstNode.VariableDeclaration) {
         comp(stmt.initializer)
-        when (stmt.type) {
+        when (stmt.initializer.type) {
             Datatype.INT , Datatype.BOOLEAN -> {
                 locals[stmt.index] = VerificationTypeInfo.Integer()
                 emitIntVarStore(stmt.index)
@@ -313,9 +311,9 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         decStack()
     }
 
-    override fun visit(stmt: Statement.VariableAssignment) {
-        comp(stmt.expr)
-        when (stmt.type) {
+    override fun visit(stmt: AstNode.VariableAssignment) {
+        comp(stmt.toAssign)
+        when (stmt.toAssign.type) {
             Datatype.INT -> emitIntVarStore(stmt.index)
             Datatype.STRING -> emitObjectVarStore(stmt.index)
             Datatype.BOOLEAN -> emitIntVarStore(stmt.index)
@@ -324,22 +322,29 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         decStack()
     }
 
-    override fun visit(stmt: Statement.Loop) {
+    override fun visit(stmt: AstNode.Loop) {
         emitStackMapFrame()
         val before = method!!.curCodeOffset
-        comp(stmt.stmt)
+        comp(stmt.body)
         val absOffset = (before - method!!.curCodeOffset)
         emitGoto(absOffset)
         emitStackMapFrame()
     }
 
-    override fun visit(stmt: Statement.Block) {
+    override fun visit(stmt: AstNode.Block) {
         val before = locals.toMutableList()
-        for (s in stmt.statements) comp(s)
+        for (s in stmt.statements) {
+            comp(s)
+            if (stack.size != 0) {
+                println(stack.size)
+                emit(pop)
+                decStack()
+            }
+        }
         locals = before
     }
 
-    override fun visit(stmt: Statement.If) {
+    override fun visit(stmt: AstNode.If) {
         val hasElse = stmt.elseStmt != null
 
         comp(stmt.condition)
@@ -363,12 +368,12 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         emitStackMapFrame()
     }
 
-    override fun visit(exp: Expression.Group) {
+    override fun visit(exp: AstNode.Group) {
         comp(exp.grouped)
     }
 
-    override fun visit(exp: Expression.Unary) {
-        comp(exp.exp)
+    override fun visit(exp: AstNode.Unary) {
+        comp(exp.on)
         when (exp.operator.tokenType) {
             TokenType.MINUS -> emit(ineg)
             TokenType.NOT -> {
@@ -385,7 +390,7 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         }
     }
 
-    override fun visit(stmt: Statement.While) {
+    override fun visit(stmt: AstNode.While) {
         val startOffset = method!!.curCodeOffset
         emitStackMapFrame()
         comp(stmt.condition)
@@ -399,7 +404,7 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         emitStackMapFrame()
     }
 
-    override fun visit(exp: Expression.FunctionCall) {
+    override fun visit(exp: AstNode.FunctionCall) {
         for (arg in exp.arguments) comp(arg)
         val methodRefIndex = file!!.methodRefInfo(
             file!!.classInfo(file!!.utf8Info(topLevelName)),
@@ -418,13 +423,13 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         }
     }
 
-    override fun visit(stmt: Statement.Return) {
-        if (stmt.returnExpr == null) {
+    override fun visit(stmt: AstNode.Return) {
+        if (stmt.toReturn == null) {
             emit(_return)
             return
         }
-        comp(stmt.returnExpr)
-        emit(when (stmt.returnExpr.type) {
+        comp(stmt.toReturn)
+        emit(when (stmt.toReturn.type) {
             Datatype.STRING -> areturn
             Datatype.INT, Datatype.BOOLEAN -> ireturn
             else -> TODO("not yet implemented")
@@ -433,12 +438,12 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
         wasReturn = true
     }
 
-    override fun visit(stmt: Statement.VarIncrement) {
+    override fun visit(stmt: AstNode.VarIncrement) {
         emit(iinc, (stmt.index and 0xFF).toByte(), stmt.toAdd)
     }
 
-    override fun visit(exp: Expression.WalrusAssign) {
-        comp(exp.assign)
+    override fun visit(exp: AstNode.WalrusAssign) {
+        comp(exp.toAssign)
         emit(dup)
         incStack(stack.peek())
         when (exp.type) {
@@ -539,12 +544,8 @@ class Compiler : StatementVisitor<Unit>, ExpressionVisitor<Unit> {
     private fun emitStringLoad(s: String) = emitLdc(file!!.stringInfo(file!!.utf8Info(s)))
 
 
-    private fun comp(exp: Expression) {
-        exp.accept(this)
-    }
-
-    private fun comp(stmt: Statement) {
-        stmt.accept(this)
+    private fun comp(node: AstNode) {
+        node.accept(this)
     }
 
     private fun getObjVerificationType(clazz: String): VerificationTypeInfo {

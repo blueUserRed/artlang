@@ -23,6 +23,8 @@ enum class TokenType {
     EQ, GT, LT, GT_EQ, LT_EQ, D_EQ, NOT_EQ, NOT, D_AND, D_OR,
     PLUS_EQ, MINUS_EQ, STAR_EQ, SLASH_EQ, WALRUS,
 
+    SOFT_BREAK,
+
     T_INT, T_STRING, T_BOOLEAN,
 
     EOF

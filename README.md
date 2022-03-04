@@ -20,23 +20,19 @@ fn main() {
 ###### FizzBuzz (this going to get simpler)
 ```rust
 fn fizzBuzz() {
-    let i = 0;
-    while (i <= 100) {
-        let output = "";
-        let isEmpty = true;
-
+    let i = 0
+    while ((i := i + 1) <= 100) {
+        let output = ""
+        let isEmpty = true
         if (i % 3 == 0) {
-            output = "Fizz";
-            isEmpty = false;
+            output = "Fizz"
+            isEmpty = false
         }
         if (i % 5 == 0) {
-            output = output + "Buzz";
-            isEmpty = false;
+            output += "Buzz"
+            isEmpty = false
         }
-
-        if (isEmpty) print i; else print output;
-
-        i++;
+        if (isEmpty) print i else print output
     }
 }
 ```

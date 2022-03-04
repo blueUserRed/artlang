@@ -1,19 +1,18 @@
 package passes
 
-import ast.Expression
-import ast.ExpressionVisitor
-import ast.Statement
-import ast.StatementVisitor
+import ast.AstNode
+import ast.AstNodeVisitor
 import tokenizer.TokenType
 import java.lang.RuntimeException
+import passes.TypeChecker.Datatype
 
-class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<TypeChecker.Datatype> {
+class TypeChecker : AstNodeVisitor<Datatype> {
 
     private var vars: MutableMap<Int, Datatype> = mutableMapOf()
-    private lateinit var curProgram: Statement.Program
-    private lateinit var curFunction: Statement.Function
+    private lateinit var curProgram: AstNode.Program
+    private lateinit var curFunction: AstNode.Function
 
-    override fun visit(exp: Expression.Binary): Datatype {
+    override fun visit(exp: AstNode.Binary): Datatype {
         val type1 = check(exp.left)
         val type2 = check(exp.right)
         val resultType: Datatype
@@ -72,7 +71,7 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
         return resultType
     }
 
-    override fun visit(exp: Expression.Literal): Datatype {
+    override fun visit(exp: AstNode.Literal): Datatype {
         val type = when (exp.literal.tokenType) {
             TokenType.INT -> Datatype.INT
             TokenType.STRING -> Datatype.STRING
@@ -84,12 +83,12 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
         return type
     }
 
-    override fun visit(stmt: Statement.ExpressionStatement): Datatype {
+    override fun visit(stmt: AstNode.ExpressionStatement): Datatype {
         check(stmt.exp)
         return Datatype.VOID
     }
 
-    override fun visit(stmt: Statement.Function): Datatype {
+    override fun visit(stmt: AstNode.Function): Datatype {
         curFunction = stmt
 
         val newVars = mutableMapOf<Int, Datatype>()
@@ -99,7 +98,7 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
         return Datatype.VOID
     }
 
-    override fun visit(stmt: Statement.Program): Datatype {
+    override fun visit(stmt: AstNode.Program): Datatype {
         curProgram = stmt
         for (func in stmt.funcs) precCalcFuncArgs(func)
         for (func in stmt.funcs) func.accept(this)
@@ -107,7 +106,7 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
         return Datatype.VOID
     }
 
-    private fun precCalcFuncArgs(func: Statement.Function) { //TODO: fix for class funcs
+    private fun precCalcFuncArgs(func: AstNode.Function) { //TODO: fix for class funcs
         curFunction = func
 
         val args = mutableListOf<Pair<String, Datatype>>()
@@ -117,48 +116,47 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
         func.returnType = func.returnTypeToken?.let { tokenToDataType(it.tokenType) } ?: Datatype.VOID
     }
 
-    override fun visit(stmt: Statement.Print): Datatype {
+    override fun visit(stmt: AstNode.Print): Datatype {
         check(stmt.toPrint)
         return Datatype.VOID
     }
 
-    override fun visit(stmt: Statement.Block): Datatype {
+    override fun visit(stmt: AstNode.Block): Datatype {
         for (s in stmt.statements) s.accept(this)
         return Datatype.VOID
     }
 
-    override fun visit(exp: Expression.Variable): Datatype {
+    override fun visit(exp: AstNode.Variable): Datatype {
         val datatype = vars[exp.index] ?: throw RuntimeException("unreachable")
         exp.type = datatype
         return datatype
     }
 
-    override fun visit(stmt: Statement.VariableDeclaration): Datatype {
+    override fun visit(stmt: AstNode.VariableDeclaration): Datatype {
         val type = check(stmt.initializer)
+        if (type == Datatype.VOID) throw RuntimeException("Expected Expression in var initializer")
         if (stmt.typeToken != null) {
             val type2 = tokenToDataType(stmt.typeToken!!.tokenType)
             if (type2 != type) throw RuntimeException("Incompatible types in declaration: $type2 and $type")
         }
         vars[stmt.index] = type
-        stmt.type = type
 
         return Datatype.VOID
     }
 
-    override fun visit(stmt: Statement.VariableAssignment): Datatype {
-        val type = check(stmt.expr)
+    override fun visit(stmt: AstNode.VariableAssignment): Datatype {
+        val type = check(stmt.toAssign)
         val varType = vars[stmt.index] ?: throw RuntimeException("unreachable")
         if (type != varType) throw RuntimeException("tried to assign $type to $varType")
-        stmt.type = type
         return Datatype.VOID
     }
 
-    override fun visit(stmt: Statement.Loop): Datatype {
-        stmt.stmt.accept(this)
+    override fun visit(stmt: AstNode.Loop): Datatype {
+        stmt.body.accept(this)
         return Datatype.VOID
     }
 
-    override fun visit(stmt: Statement.If): Datatype {
+    override fun visit(stmt: AstNode.If): Datatype {
         val type = check(stmt.condition)
         if (type != Datatype.BOOLEAN) throw RuntimeException("Expected Boolean value")
         stmt.ifStmt.accept(this)
@@ -166,8 +164,8 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
         return Datatype.VOID
     }
 
-    override fun visit(exp: Expression.Unary): Datatype {
-        val type = check(exp.exp)
+    override fun visit(exp: AstNode.Unary): Datatype {
+        val type = check(exp.on)
         if (exp.operator.tokenType == TokenType.MINUS) {
             if (type != Datatype.INT) throw RuntimeException("cant negate $type")
         } else {
@@ -177,17 +175,17 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
         return type
     }
 
-    override fun visit(exp: Expression.Group): Datatype {
+    override fun visit(exp: AstNode.Group): Datatype {
         return check(exp.grouped)
     }
 
-    override fun visit(stmt: Statement.While): Datatype {
+    override fun visit(stmt: AstNode.While): Datatype {
         if (check(stmt.condition) != Datatype.BOOLEAN) throw RuntimeException("Expected Boolean value")
         stmt.body.accept(this)
         return Datatype.VOID
     }
 
-    override fun visit(exp: Expression.FunctionCall): Datatype {
+    override fun visit(exp: AstNode.FunctionCall): Datatype {
         val thisSig = mutableListOf<Datatype>()
         for (arg in exp.arguments) {
             check(arg)
@@ -205,28 +203,27 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
         return type
     }
 
-    override fun visit(stmt: Statement.Return): Datatype {
-        val type = stmt.returnExpr?.let { check(it) } ?: Datatype.VOID
+    override fun visit(stmt: AstNode.Return): Datatype {
+        val type = stmt.toReturn?.let { check(it) } ?: Datatype.VOID
         if (curFunction.returnType != type) {
             throw RuntimeException("incompatible return types: $type and ${curFunction.returnType}")
         }
         return type
     }
 
-    override fun visit(stmt: Statement.VarIncrement): Datatype {
+    override fun visit(stmt: AstNode.VarIncrement): Datatype {
         val varType = vars[stmt.index] ?: throw RuntimeException("unreachable")
         if (varType != Datatype.INT) TODO("not yet implemented")
-        stmt.type = varType
         return Datatype.VOID
     }
 
-    override fun visit(stmt: Statement.ArtClass): Datatype {
+    override fun visit(stmt: AstNode.ArtClass): Datatype {
         for (func in stmt.funcs) func.accept(this)
         return Datatype.VOID
     }
 
-    override fun visit(exp: Expression.WalrusAssign): Datatype {
-        val type = check(exp.assign)
+    override fun visit(exp: AstNode.WalrusAssign): Datatype {
+        val type = check(exp.toAssign)
         exp.type = type
         return type
     }
@@ -237,7 +234,7 @@ class TypeChecker : ExpressionVisitor<TypeChecker.Datatype>, StatementVisitor<Ty
         return true
     }
 
-    private fun check(exp: Expression): Datatype = exp.accept(this)
+    private fun check(node: AstNode): Datatype = node.accept(this)
 
     private fun tokenToDataType(token: TokenType): Datatype = when (token) {
         TokenType.T_BOOLEAN -> Datatype.BOOLEAN

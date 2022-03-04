@@ -1,22 +1,22 @@
 package parser
 
-import ast.Expression
-import ast.Statement
+import ast.AstNode
 import tokenizer.Token
 import tokenizer.TokenType
 import java.lang.RuntimeException
+import kotlin.reflect.jvm.internal.impl.util.ReturnsCheck
 
 object Parser {
 
     private var cur: Int = 0
     private var tokens: List<Token> = listOf()
 
-    fun parse(tokens: List<Token>): Statement.Program {
+    fun parse(tokens: List<Token>): AstNode.Program {
         cur = 0
         this.tokens = tokens
 
-        val functions = mutableListOf<Statement.Function>()
-        val classes = mutableListOf<Statement.ArtClass>()
+        val functions = mutableListOf<AstNode.Function>()
+        val classes = mutableListOf<AstNode.ArtClass>()
         while (!match(TokenType.EOF)) {
             if (match(TokenType.K_FN)) {
                 functions.add(parseFunc(listOf()))
@@ -28,10 +28,10 @@ object Parser {
             }
             throw RuntimeException("Expected function or class in global scope")
         }
-        return Statement.Program(functions.toTypedArray(), classes.toTypedArray())
+        return AstNode.Program(functions.toTypedArray(), classes.toTypedArray())
     }
 
-    private fun parseFunc(modifiers: List<Token>): Statement.Function {
+    private fun parseFunc(modifiers: List<Token>): AstNode.Function {
         consumeOrError(TokenType.IDENTIFIER, "Expected function name")
         val funcName = last()
         consumeOrError(TokenType.L_PAREN, "Expected () after function name")
@@ -56,24 +56,24 @@ object Parser {
 
         consumeOrError(TokenType.L_BRACE, "Expected code block after function declaration")
 
-        val function = Statement.Function(parseBlock(), funcName, modifiers)
+        val function = AstNode.Function(parseBlock(), funcName, modifiers)
         function.argTokens = args
         function.returnTypeToken = returnType
 
         return function
     }
 
-    private fun parseClass(modifier: List<Token>): Statement.ArtClass {
+    private fun parseClass(modifier: List<Token>): AstNode.ArtClass {
         consumeOrError(TokenType.IDENTIFIER, "Expected class name")
         val name = last()
         consumeOrError(TokenType.L_BRACE, "Expected opening brace after class definition")
-        val funcs = mutableListOf<Statement.Function>()
+        val funcs = mutableListOf<AstNode.Function>()
         while (!match(TokenType.R_BRACE)) {
             val modifiers = parseModifiers()
             consumeOrError(TokenType.K_FN, "Expected ")
             funcs.add(parseFunc(modifiers))
         }
-        return Statement.ArtClass(name, funcs.toTypedArray())
+        return AstNode.ArtClass(name, funcs.toTypedArray())
     }
 
     private fun parseModifiers(): List<Token> {
@@ -84,7 +84,7 @@ object Parser {
         return modifiers
     }
 
-    private fun parseStatement(): Statement {
+    private fun parseStatement(): AstNode {
         if (match(TokenType.L_BRACE)) return parseBlock()
         if (match(TokenType.K_PRINT)) return parsePrint()
         if (match(TokenType.K_LET)) return parseVariableDeclaration()
@@ -107,54 +107,54 @@ object Parser {
             cur = start
         }
 
-        return parseExpressionStatement()
+        return parseWalrusAssignment()
     }
 
-    private fun parseVarAssignShorthand(): Statement {
+    private fun parseVarAssignShorthand(): AstNode {
         consumeOrError(TokenType.IDENTIFIER, "Expected variable before shorthand operator")
         val variable = last()
         match(TokenType.PLUS_EQ, TokenType.MINUS_EQ, TokenType.STAR_EQ, TokenType.SLASH_EQ)
         val op = last()
-        val num = parseExpression()
-        consumeOrError(TokenType.SEMICOLON, "Expected semicolon after shorthand operator")
+        val num = parseStatement()
+//        consumeOrError(TokenType.SEMICOLON, "Expected semicolon after shorthand operator")
         when (op.tokenType) {
-            TokenType.STAR_EQ -> return Statement.VariableAssignment(
+            TokenType.STAR_EQ -> return AstNode.VariableAssignment(
                 variable,
-                Expression.Binary(
-                    Expression.Variable(variable),
+                AstNode.Binary(
+                    AstNode.Variable(variable),
                     Token(TokenType.STAR, "*=", null, op.file, op.pos),
                     num
                 )
             )
-            TokenType.SLASH_EQ -> return Statement.VariableAssignment(
+            TokenType.SLASH_EQ -> return AstNode.VariableAssignment(
                 variable,
-                Expression.Binary(
-                    Expression.Variable(variable),
+                AstNode.Binary(
+                    AstNode.Variable(variable),
                     Token(TokenType.SLASH, "/=", null, op.file, op.pos),
                     num
                 )
             )
             TokenType.PLUS_EQ -> {
-                if (num is Expression.Literal && num.literal.literal is Int && num.literal.literal in Byte.MIN_VALUE..Byte.MAX_VALUE) {
-                    return Statement.VarIncrement(variable, num.literal.literal.toByte())
+                if (num is AstNode.Literal && num.literal.literal is Int && num.literal.literal in Byte.MIN_VALUE..Byte.MAX_VALUE) {
+                    return AstNode.VarIncrement(variable, num.literal.literal.toByte())
                 }
-                return Statement.VariableAssignment(
+                return AstNode.VariableAssignment(
                     variable,
-                    Expression.Binary(
-                        Expression.Variable(variable),
+                    AstNode.Binary(
+                        AstNode.Variable(variable),
                         Token(TokenType.PLUS, "+=", null, op.file, op.pos),
                         num
                     )
                 )
             }
             TokenType.MINUS_EQ -> {
-                if (num is Expression.Literal && num.literal.literal is Int && num.literal.literal in Byte.MIN_VALUE..Byte.MAX_VALUE) {
-                    return Statement.VarIncrement(variable, (-num.literal.literal).toByte())
+                if (num is AstNode.Literal && num.literal.literal is Int && num.literal.literal in Byte.MIN_VALUE..Byte.MAX_VALUE) {
+                    return AstNode.VarIncrement(variable, (-num.literal.literal).toByte())
                 }
-                return Statement.VariableAssignment(
+                return AstNode.VariableAssignment(
                     variable,
-                    Expression.Binary(
-                        Expression.Variable(variable),
+                    AstNode.Binary(
+                        AstNode.Variable(variable),
                         Token(TokenType.MINUS, "-=", null, op.file, op.pos),
                         num
                     )
@@ -164,196 +164,194 @@ object Parser {
         }
     }
 
-    private fun parseVarIncrement(): Statement {
+    private fun parseVarIncrement(): AstNode {
         consumeOrError(TokenType.IDENTIFIER, "expected variable before inc/dec operator")
         val toInc = last()
         match(TokenType.D_MINUS, TokenType.D_PLUS)
         val op = last()
         consumeOrError(TokenType.SEMICOLON, "Expected semicolon after inc/dec")
-        return Statement.VarIncrement(toInc, if (op.tokenType == TokenType.D_PLUS) 1 else -1)
+        return AstNode.VarIncrement(toInc, if (op.tokenType == TokenType.D_PLUS) 1 else -1)
     }
 
-    private fun parseReturn(): Statement.Return {
-        if (match(TokenType.SEMICOLON)) return Statement.Return(null)
-        val returnExpr = parseExpression()
-        consumeOrError(TokenType.SEMICOLON, "Semicolon expected after return")
-        return Statement.Return(returnExpr)
+    private fun parseReturn(): AstNode.Return {
+        if (matchNSFB(TokenType.SOFT_BREAK)) return AstNode.Return(null)
+        val returnExpr = parseStatement()
+//        consumeOrError(TokenType.SEMICOLON, "Semicolon expected after return")
+        return AstNode.Return(returnExpr)
     }
 
-    private fun parseWhileLoop(): Statement {
+    private fun parseWhileLoop(): AstNode {
         consumeOrError(TokenType.L_PAREN, "Expected Parenthesis after while")
-        val condition = parseExpression()
+        val condition = parseStatement()
         consumeOrError(TokenType.R_PAREN, "Expected closing Parenthesis after condition")
 
         val body = parseStatement()
-        if (body is Statement.VariableDeclaration) throw RuntimeException("Cant declare variable in while unless it " +
+        if (body is AstNode.VariableDeclaration) throw RuntimeException("Cant declare variable in while unless it " +
                 "is wrapped in a block")
 
-        return Statement.While(body, condition)
+        return AstNode.While(body, condition)
     }
 
-    private fun parseIf(): Statement {
+    private fun parseIf(): AstNode {
 
         consumeOrError(TokenType.L_PAREN, "Expected Parenthesis after if")
-        val condition = parseExpression()
+        val condition = parseStatement()
         consumeOrError(TokenType.R_PAREN, "Expected closing Parenthesis after condition")
 
         val ifStmt = parseStatement()
-        if (ifStmt is Statement.VariableDeclaration) throw RuntimeException("Cant declare variable in if unless it " +
+        if (ifStmt is AstNode.VariableDeclaration) throw RuntimeException("Cant declare variable in if unless it " +
                 "is wrapped in a block")
 
-        if (!match(TokenType.K_ELSE)) return Statement.If(ifStmt, null, condition)
+        if (!match(TokenType.K_ELSE)) return AstNode.If(ifStmt, null, condition)
 
         val elseStmt = parseStatement()
-        if (elseStmt is Statement.VariableDeclaration) throw RuntimeException("Cant declare variable in else unless it " +
+        if (elseStmt is AstNode.VariableDeclaration) throw RuntimeException("Cant declare variable in else unless it " +
                 "is wrapped in a block")
 
-        return Statement.If(ifStmt, elseStmt, condition)
+        return AstNode.If(ifStmt, elseStmt, condition)
     }
 
-    private fun parseLoop(): Statement {
+    private fun parseLoop(): AstNode {
         val stmt = parseStatement()
-        if (stmt is Statement.VariableDeclaration) throw RuntimeException("Cant declare variable in loop unless it " +
+        if (stmt is AstNode.VariableDeclaration) throw RuntimeException("Cant declare variable in loop unless it " +
                 "is wrapped in a block")
-        return Statement.Loop(stmt)
+        return AstNode.Loop(stmt)
     }
 
-    private fun parseVariableAssignment(): Statement {
+    private fun parseVariableAssignment(): AstNode {
         consumeOrError(TokenType.IDENTIFIER, "")
         val name = last()
         consumeOrError(TokenType.EQ, "")
-        val exp = parseExpression()
-        consumeOrError(TokenType.SEMICOLON, "")
-        return Statement.VariableAssignment(name, exp)
+        val exp = parseStatement()
+//        consumeOrError(TokenType.SEMICOLON, "")
+        return AstNode.VariableAssignment(name, exp)
     }
 
-    private fun parseVariableDeclaration(): Statement {
+    private fun parseVariableDeclaration(): AstNode {
         consumeOrError(TokenType.IDENTIFIER, "expected identifier after let")
         val name = last()
         var type: Token? = null
         if (match(TokenType.COLON)) type = parseType()
         consumeOrError(TokenType.EQ, "initializer expected")
-        val initializer = parseExpression()
-        consumeOrError(TokenType.SEMICOLON, "Expected a Semicolon after variable Declaration")
-        val stmt = Statement.VariableDeclaration(name, initializer)
+        val initializer = parseStatement()
+//        consumeOrError(TokenType.SEMICOLON, "Expected a Semicolon after variable Declaration")
+//        consumeSoftBreaks()
+        val stmt = AstNode.VariableDeclaration(name, initializer)
         stmt.typeToken = type
         return stmt
     }
 
-    private fun parseExpressionStatement(): Statement {
-        val exp = parseExpression()
-        consumeOrError(TokenType.SEMICOLON, "Expected Semicolon")
-        return Statement.ExpressionStatement(exp)
-    }
+//
+//    private fun parseExpression(): AstNode {
+//        return parseWalrusAssignment()
+//    }
 
-    private fun parseExpression(): Expression {
-        return parseWalrusAssignment()
-    }
-
-    private fun parseWalrusAssignment(): Expression {
+    private fun parseWalrusAssignment(): AstNode {
         val left = parseBooleanComparison()
         if (!match(TokenType.WALRUS)) return left
-        if (left !is Expression.Variable) throw RuntimeException("Expected Variable before :=")
-        val right = parseExpression()
-        return Expression.WalrusAssign(left.name, right)
+        if (left !is AstNode.Variable) throw RuntimeException("Expected Variable before :=")
+        val right = parseStatement()
+        return AstNode.WalrusAssign(left.name, right)
     }
 
-    private fun parseBooleanComparison(): Expression {
+    private fun parseBooleanComparison(): AstNode {
         var left = parseComparison()
         while (match(TokenType.D_AND, TokenType.D_OR)) { //TODO: fix priority
             val operator = last()
             val right = parseComparison()
-            left = Expression.Binary(left, operator, right)
+            left = AstNode.Binary(left, operator, right)
         }
         return left
     }
 
-    private fun parseComparison(): Expression {
+    private fun parseComparison(): AstNode {
         var left = parseTermExpression()
         while (match(TokenType.D_EQ, TokenType.LT, TokenType.LT_EQ, TokenType.GT, TokenType.GT_EQ, TokenType.NOT_EQ)) {
             val operator = last()
             val right = parseTermExpression()
-            left = Expression.Binary(left, operator, right)
+            left = AstNode.Binary(left, operator, right)
         }
         return left
     }
 
-    private fun parseTermExpression(): Expression {
+    private fun parseTermExpression(): AstNode {
         var left = parseFactorExpression()
-        while (match(TokenType.PLUS, TokenType.MINUS)) {
+        while (matchNSFB(TokenType.PLUS, TokenType.MINUS)) {
             val operator = last()
             val right = parseFactorExpression()
-            left = Expression.Binary(left, operator, right)
+            left = AstNode.Binary(left, operator, right)
         }
         return left
     }
 
-    private fun parseFactorExpression(): Expression {
+    private fun parseFactorExpression(): AstNode {
         var left = parseUnaryExpression()
-        while (match(TokenType.STAR, TokenType.SLASH, TokenType.MOD)) {
+        while (matchNSFB(TokenType.STAR, TokenType.SLASH, TokenType.MOD)) {
             val operator = last()
             val right = parseUnaryExpression()
-            left = Expression.Binary(left, operator, right)
+            left = AstNode.Binary(left, operator, right)
         }
         return left
     }
 
-    private fun parseUnaryExpression(): Expression {
-        var cur: Expression? = null
-        if (match(TokenType.MINUS, TokenType.NOT)) {
+    private fun parseUnaryExpression(): AstNode {
+        var cur: AstNode? = null
+        if (matchNSFB(TokenType.MINUS, TokenType.NOT)) {
             val operator = last()
             val exp = parseUnaryExpression()
-            cur = Expression.Unary(exp, operator)
+            cur = AstNode.Unary(exp, operator)
         }
         return cur ?: parseLiteralExpression()
     }
 
-    private fun parseLiteralExpression(): Expression {
+    private fun parseLiteralExpression(): AstNode {
         if (match(TokenType.IDENTIFIER)){
             if (peek()?.tokenType == TokenType.L_PAREN) return parseFunctionCall()
-            return Expression.Variable(last())
+            return AstNode.Variable(last())
         }
         if (match(TokenType.L_PAREN)) return groupExpression()
 
         if (!match(TokenType.INT, TokenType.FLOAT, TokenType.STRING, TokenType.BOOLEAN)) {
-            throw RuntimeException("Not a expression")
+            throw RuntimeException("Not a Statement")
         }
 
-        return Expression.Literal(last())
+        return AstNode.Literal(last())
     }
 
-    private fun parseFunctionCall(): Expression {
+    private fun parseFunctionCall(): AstNode {
         val name = last()
         match(TokenType.L_PAREN)
-        val args = mutableListOf<Expression>()
+        val args = mutableListOf<AstNode>()
         while (!match(TokenType.R_PAREN)) {
-            args.add(parseExpression())
+            args.add(parseStatement())
             if (!match(TokenType.COMMA)) {
                 consumeOrError(TokenType.R_PAREN, "expected closing paren")
                 break
             }
         }
-        return Expression.FunctionCall(name, args)
+        return AstNode.FunctionCall(name, args)
     }
 
-    private fun groupExpression(): Expression {
-        val exp = parseExpression()
+    private fun groupExpression(): AstNode {
+        val exp = parseStatement()
         if (!match(TokenType.R_PAREN)) throw RuntimeException("Expected closing Parenthesis")
-        return Expression.Group(exp)
+        return AstNode.Group(exp)
     }
 
-    private fun parseBlock(): Statement.Block {
-        val statements = mutableListOf<Statement>()
+    private fun parseBlock(): AstNode.Block {
+        val statements = mutableListOf<AstNode>()
         while (!match(TokenType.R_BRACE)) {
             statements.add(parseStatement())
+            consumeExpectingSoftBreakOrError("Expected line break or semicolon")
         }
-        return Statement.Block(statements.toTypedArray())
+        return AstNode.Block(statements.toTypedArray())
     }
 
-    private fun parsePrint(): Statement {
-        val exp = parseExpression()
-        consumeOrError(TokenType.SEMICOLON, "Expected Semicolon after print")
-        return Statement.Print(exp)
+    private fun parsePrint(): AstNode {
+        val exp = parseStatement()
+//        consumeOrError(TokenType.SEMICOLON, "Expected Semicolon after print")
+//        consumeExpectingSoftBreakOrError("expected end of line")
+        return AstNode.Print(exp)
     }
 
     private fun parseType(): Token {
@@ -364,6 +362,18 @@ object Parser {
     }
 
     private fun match(vararg types: TokenType): Boolean {
+        val start = cur
+        while (tokens[cur].tokenType == TokenType.SOFT_BREAK) cur++
+        for (type in types) if (tokens[cur].tokenType == type) {
+            cur++
+            return true
+        }
+        cur = start
+        return false
+    }
+
+    //match no soft break; TODO: come up with better name
+    private fun matchNSFB(vararg types: TokenType): Boolean {
         for (type in types) if (tokens[cur].tokenType == type) {
             cur++
             return true
@@ -371,7 +381,17 @@ object Parser {
         return false
     }
 
+    private fun consumeSoftBreaks() {
+        while (tokens[cur].tokenType == TokenType.SOFT_BREAK) cur++
+    }
+
+    private fun consumeExpectingSoftBreakOrError(message: String) {
+        if (tokens[cur].tokenType !in arrayOf(TokenType.SOFT_BREAK, TokenType.SEMICOLON)) throw RuntimeException(message)
+        while (tokens[cur].tokenType in arrayOf(TokenType.SOFT_BREAK, TokenType.SEMICOLON)) cur++
+    }
+
     private fun consumeOrError(type: TokenType, message: String) {
+        while (tokens[cur].tokenType == TokenType.SOFT_BREAK) cur++
         if (tokens[cur].tokenType == type) cur++
         else throw RuntimeException(message)
     }
@@ -386,7 +406,14 @@ object Parser {
     }
 
     private fun peekNext(): Token? {
-        return if (cur + 1 < tokens.size) tokens[cur + 1] else null
+        val start = cur
+        consumeSoftBreaks()
+        cur++
+        consumeSoftBreaks()
+        val ret = tokens[cur]
+        cur = start
+        return ret
+//        return if (cur + 1 < tokens.size) tokens[cur + 1] else null
     }
 
 }
