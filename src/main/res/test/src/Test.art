@@ -1,8 +1,13 @@
 fn main() {
-    const a = 3
+    HiSayer.sayHi()
 }
 
-//
+class HiSayer {
+    static fn sayHi() { //TODO: make sure fn is actually static lol
+        print "hi"
+    }
+}
+
 fn fizzBuzz() {
     let i = 0
     while ((i := i + 1) <= 100) {
@@ -20,15 +25,3 @@ fn fizzBuzz() {
 //        i++;
     }
 }
-
-//class MyClass {
-//    fn sayHi() {
-//        print "Hi"
-//    }
-//}
-//
-//class MySecondClass {
-//    fn sayGoodbye() {
-//        print "Goodbye";
-//    }
-//}

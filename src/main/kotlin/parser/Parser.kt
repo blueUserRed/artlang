@@ -1,10 +1,10 @@
 package parser
 
+import Either
 import ast.AstNode
 import tokenizer.Token
 import tokenizer.TokenType
 import java.lang.RuntimeException
-import kotlin.reflect.jvm.internal.impl.util.ReturnsCheck
 
 object Parser {
 
@@ -101,14 +101,7 @@ object Parser {
             return parseVarAssignShorthand()
         }
 
-        val start = cur
-        try {
-            return parseVariableAssignment() //TODO: make better, maybe peek()
-        } catch (e: RuntimeException) {
-            cur = start
-        }
-
-        return parseWalrusAssignment()
+        return parseAssignment()
     }
 
     private fun parseVarAssignShorthand(): AstNode {
@@ -219,15 +212,6 @@ object Parser {
         return AstNode.Loop(stmt)
     }
 
-    private fun parseVariableAssignment(): AstNode {
-        consumeOrError(TokenType.IDENTIFIER, "")
-        val name = last()
-        consumeOrError(TokenType.EQ, "")
-        val exp = parseStatement()
-//        consumeOrError(TokenType.SEMICOLON, "")
-        return AstNode.VariableAssignment(name, exp)
-    }
-
     private fun parseVariableDeclaration(isConst: Boolean): AstNode {
         consumeOrError(TokenType.IDENTIFIER, "expected identifier after let")
         val name = last()
@@ -242,17 +226,19 @@ object Parser {
         return stmt
     }
 
-//
-//    private fun parseExpression(): AstNode {
-//        return parseWalrusAssignment()
-//    }
-
-    private fun parseWalrusAssignment(): AstNode {
+    private fun parseAssignment(): AstNode {
         val left = parseBooleanComparison()
-        if (!match(TokenType.WALRUS)) return left
-        if (left !is AstNode.Variable) throw RuntimeException("Expected Variable before :=")
-        val right = parseStatement()
-        return AstNode.WalrusAssign(left.name, right)
+        if (match(TokenType.EQ)) {
+            if (left is AstNode.Variable) return AstNode.VariableAssignment(left.name, parseStatement())
+            else if (left is AstNode.Get) return AstNode.Set(left, parseStatement())
+            else throw RuntimeException("expected variable before Assignment")
+        }
+        if (match(TokenType.WALRUS)) {
+            if (left is AstNode.Variable) return AstNode.WalrusAssign(left.name, parseStatement())
+            else if (left is AstNode.Get) return AstNode.WalrusSet(left, parseStatement())
+            else throw RuntimeException("expected variable before Assignment")
+        }
+        return left
     }
 
     private fun parseBooleanComparison(): AstNode {
@@ -302,12 +288,24 @@ object Parser {
             val exp = parseUnaryExpression()
             cur = AstNode.Unary(exp, operator)
         }
-        return cur ?: parseLiteralExpression()
+        return cur ?: parseGetExpression()
+    }
+
+    private fun parseGetExpression(): AstNode {
+        var left = parseLiteralExpression()
+        while (true) {
+            if (match(TokenType.DOT)) {
+                consumeOrError(TokenType.IDENTIFIER, "Expected indentifier after dot")
+                left = AstNode.Get(left, last())
+            } else if (matchNSFB(TokenType.L_PAREN)) left = parseFunctionCall(left)
+            else break
+        }
+        return left
     }
 
     private fun parseLiteralExpression(): AstNode {
-        if (match(TokenType.IDENTIFIER)){
-            if (peek()?.tokenType == TokenType.L_PAREN) return parseFunctionCall()
+        if (match(TokenType.IDENTIFIER)) {
+//            if (peek()?.tokenType == TokenType.L_PAREN) return parseFunctionCall()
             return AstNode.Variable(last())
         }
         if (match(TokenType.L_PAREN)) return groupExpression()
@@ -319,9 +317,7 @@ object Parser {
         return AstNode.Literal(last())
     }
 
-    private fun parseFunctionCall(): AstNode {
-        val name = last()
-        match(TokenType.L_PAREN)
+    private fun parseFunctionCall(func: AstNode): AstNode {
         val args = mutableListOf<AstNode>()
         while (!match(TokenType.R_PAREN)) {
             args.add(parseStatement())
@@ -330,6 +326,7 @@ object Parser {
                 break
             }
         }
+        val name = if (func !is AstNode.Variable) Either.Left(func) else Either.Right(func.name)
         return AstNode.FunctionCall(name, args)
     }
 

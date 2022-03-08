@@ -2,25 +2,28 @@ package ast
 
 interface AstNodeVisitor<T> {
 
-    fun visit(exp: AstNode.Binary): T
-    fun visit(exp: AstNode.Literal): T
-    fun visit(exp: AstNode.Variable): T
-    fun visit(exp: AstNode.Group): T
-    fun visit(exp: AstNode.Unary): T
-    fun visit(exp: AstNode.FunctionCall): T
-    fun visit(exp: AstNode.WalrusAssign): T
-    fun visit(stmt: AstNode.ExpressionStatement): T
-    fun visit(stmt: AstNode.Function): T
-    fun visit(stmt: AstNode.Program): T
-    fun visit(stmt: AstNode.ArtClass): T
-    fun visit(stmt: AstNode.Print): T
-    fun visit(stmt: AstNode.Block): T
-    fun visit(stmt: AstNode.VariableDeclaration): T
-    fun visit(stmt: AstNode.VariableAssignment): T
-    fun visit(stmt: AstNode.Loop): T
-    fun visit(stmt: AstNode.If): T
-    fun visit(stmt: AstNode.While): T
-    fun visit(stmt: AstNode.Return): T
-    fun visit(stmt: AstNode.VarIncrement): T
+    fun visit(binary: AstNode.Binary): T
+    fun visit(literal: AstNode.Literal): T
+    fun visit(variable: AstNode.Variable): T
+    fun visit(group: AstNode.Group): T
+    fun visit(unary: AstNode.Unary): T
+    fun visit(funcCall: AstNode.FunctionCall): T
+    fun visit(walrus: AstNode.WalrusAssign): T
+    fun visit(exprStmt: AstNode.ExpressionStatement): T
+    fun visit(function: AstNode.Function): T
+    fun visit(program: AstNode.Program): T
+    fun visit(clazz: AstNode.ArtClass): T
+    fun visit(print: AstNode.Print): T
+    fun visit(block: AstNode.Block): T
+    fun visit(varDec: AstNode.VariableDeclaration): T
+    fun visit(varAssign: AstNode.VariableAssignment): T
+    fun visit(loop: AstNode.Loop): T
+    fun visit(ifStmt: AstNode.If): T
+    fun visit(whileStmt: AstNode.While): T
+    fun visit(returnStmt: AstNode.Return): T
+    fun visit(varInc: AstNode.VarIncrement): T
+    fun visit(get: AstNode.Get): T
+    fun visit(set: AstNode.Set): T
+    fun visit(walrus: AstNode.WalrusSet): T
 
 }

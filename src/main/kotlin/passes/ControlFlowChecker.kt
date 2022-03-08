@@ -8,47 +8,47 @@ import java.lang.RuntimeException
 //TODO: add more functionality when break and continue is introduced
 class ControlFlowChecker : AstNodeVisitor<Boolean> {
 
-    override fun visit(exp: AstNode.Binary): Boolean {
+    override fun visit(binary: AstNode.Binary): Boolean {
         return false
     }
 
-    override fun visit(exp: AstNode.Literal): Boolean {
+    override fun visit(literal: AstNode.Literal): Boolean {
         return false
     }
 
-    override fun visit(exp: AstNode.Variable): Boolean {
+    override fun visit(variable: AstNode.Variable): Boolean {
         return false
     }
 
-    override fun visit(exp: AstNode.Group): Boolean {
+    override fun visit(group: AstNode.Group): Boolean {
         return false
     }
 
-    override fun visit(exp: AstNode.Unary): Boolean {
+    override fun visit(unary: AstNode.Unary): Boolean {
         return false
     }
 
-    override fun visit(exp: AstNode.FunctionCall): Boolean {
+    override fun visit(funcCall: AstNode.FunctionCall): Boolean {
         return false
     }
 
-    override fun visit(stmt: AstNode.ExpressionStatement): Boolean {
-        return check(stmt.exp)
+    override fun visit(exprStmt: AstNode.ExpressionStatement): Boolean {
+        return check(exprStmt.exp)
     }
 
-    override fun visit(stmt: AstNode.Function): Boolean {
-        if (stmt.returnType == Datatype.VOID) return false
-        if (!check(stmt.statements)) throw RuntimeException("Function ${stmt.name.lexeme} does not always return")
+    override fun visit(function: AstNode.Function): Boolean {
+        if (function.functionDescriptor.returnType == Datatype.Void()) return false
+        if (!check(function.statements)) throw RuntimeException("Function ${function.name.lexeme} does not always return")
         return false
     }
 
-    override fun visit(stmt: AstNode.Program): Boolean {
-        for (func in stmt.funcs) check(func)
-        for (c in stmt.classes) check(c)
+    override fun visit(program: AstNode.Program): Boolean {
+        for (func in program.funcs) check(func)
+        for (c in program.classes) check(c)
         return false
     }
 
-    override fun visit(stmt: AstNode.Print): Boolean {
+    override fun visit(print: AstNode.Print): Boolean {
         return false
     }
 
@@ -57,43 +57,56 @@ class ControlFlowChecker : AstNodeVisitor<Boolean> {
         return false
     }
 
-    override fun visit(stmt: AstNode.VariableDeclaration): Boolean {
+    override fun visit(varDec: AstNode.VariableDeclaration): Boolean {
         return false
     }
 
-    override fun visit(stmt: AstNode.VariableAssignment): Boolean {
+    override fun visit(varAssign: AstNode.VariableAssignment): Boolean {
         return false
     }
 
-    override fun visit(stmt:AstNode.Loop): Boolean {
-        return check(stmt.body) //TODO: will break when 'break'-keyword is introduced
+    override fun visit(loop:AstNode.Loop): Boolean {
+        return check(loop.body) //TODO: will break when 'break'-keyword is introduced
     }
 
-    override fun visit(stmt: AstNode.If): Boolean {
-        val ifBranch = check(stmt.ifStmt)
-        val elseBranch = stmt.elseStmt?.let { check(it) } ?: false
+    override fun visit(ifStmt: AstNode.If): Boolean {
+        val ifBranch = check(ifStmt.ifStmt)
+        val elseBranch = ifStmt.elseStmt?.let { check(it) } ?: false
         return ifBranch && elseBranch
     }
 
-    override fun visit(stmt: AstNode.While): Boolean {
+    override fun visit(whileStmt: AstNode.While): Boolean {
         return false
     }
 
-    override fun visit(stmt: AstNode.Return): Boolean {
+    override fun visit(returnStmt: AstNode.Return): Boolean {
         return true
     }
 
-    override fun visit(stmt: AstNode.VarIncrement): Boolean {
+    override fun visit(varInc: AstNode.VarIncrement): Boolean {
         return false
     }
 
-    override fun visit(stmt: AstNode.ArtClass): Boolean {
+    override fun visit(clazz: AstNode.ArtClass): Boolean {
         return false
     }
 
-    override fun visit(exp: AstNode.WalrusAssign): Boolean {
+    override fun visit(walrus: AstNode.WalrusAssign): Boolean {
+        return false
+    }
+
+    override fun visit(get: AstNode.Get): Boolean {
+        return false
+    }
+
+    override fun visit(set: AstNode.Set): Boolean {
+        return false
+    }
+
+    override fun visit(walrus: AstNode.WalrusSet): Boolean {
         return false
     }
 
     private fun check(node: AstNode): Boolean = node.accept(this)
+
 }
