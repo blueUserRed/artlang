@@ -93,6 +93,8 @@ object Parser {
         if (match(TokenType.K_IF)) return parseIf()
         if (match(TokenType.K_WHILE)) return parseWhileLoop()
         if (match(TokenType.K_RETURN)) return parseReturn()
+        if (match(TokenType.K_BREAK)) return AstNode.Break()
+        if (match(TokenType.K_CONTINUE)) return AstNode.Continue()
 
         if (peekNext()?.tokenType in arrayOf(TokenType.D_PLUS, TokenType.D_MINUS)) return parseVarIncrement()
 

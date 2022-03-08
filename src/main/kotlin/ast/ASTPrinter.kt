@@ -116,7 +116,7 @@ class ASTPrinter : AstNodeVisitor<String> {
     }
 
     override fun visit(get: AstNode.Get): String {
-        return "${get.from}.${get.name}"
+        return "${get.from.accept(this)}.${get.name}"
     }
 
     override fun visit(set: AstNode.Set): String {
@@ -125,5 +125,13 @@ class ASTPrinter : AstNodeVisitor<String> {
 
     override fun visit(walrus: AstNode.WalrusSet): String {
         return "(${walrus.from.accept(this)} ${walrus.to.accept(this)} := "
+    }
+
+    override fun visit(cont: AstNode.Continue): String {
+        return "(continue)"
+    }
+
+    override fun visit(breac: AstNode.Break): String {
+        return "(break)"
     }
 }

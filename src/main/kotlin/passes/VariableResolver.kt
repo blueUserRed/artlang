@@ -136,6 +136,12 @@ class VariableResolver : AstNodeVisitor<Unit> {
         resolve(walrus.to)
     }
 
+    override fun visit(cont: AstNode.Continue) {
+    }
+
+    override fun visit(breac: AstNode.Break) {
+    }
+
     private fun resolve(node: AstNode) = node.accept(this)
 
 }

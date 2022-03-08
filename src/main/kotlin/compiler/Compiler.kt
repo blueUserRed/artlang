@@ -30,6 +30,9 @@ class Compiler : AstNodeVisitor<Unit> {
 
     private var wasReturn: Boolean = false
 
+    private var loopContinueAddress: Int = -1
+    private var loopBreakAddressesToOverwrite = mutableListOf<Int>()
+
     private lateinit var curProgram: AstNode.Program
 
     fun compile(program: AstNode.Program, outdir: String, name: String) {
@@ -319,10 +322,16 @@ class Compiler : AstNodeVisitor<Unit> {
     override fun visit(loop: AstNode.Loop) {
         emitStackMapFrame()
         val before = method!!.curCodeOffset
+        loopContinueAddress = before
+        loopBreakAddressesToOverwrite = mutableListOf()
         comp(loop.body)
         val absOffset = (before - method!!.curCodeOffset)
         emitGoto(absOffset)
         emitStackMapFrame()
+        val offset = method!!.curCodeOffset
+        for (addr in loopBreakAddressesToOverwrite) {
+            method!!.overwriteByteCode(addr, *Utils.getShortAsBytes((offset - (addr - 1)).toShort()))
+        }
     }
 
     override fun visit(stmt: AstNode.Block) {
@@ -386,6 +395,7 @@ class Compiler : AstNodeVisitor<Unit> {
 
     override fun visit(whileStmt: AstNode.While) {
         val startOffset = method!!.curCodeOffset
+        loopContinueAddress = startOffset
         emitStackMapFrame()
         comp(whileStmt.condition)
         emit(ifeq, 0x00.toByte(), 0x00.toByte())
@@ -396,6 +406,10 @@ class Compiler : AstNodeVisitor<Unit> {
         val jmpAddr = method!!.curCodeOffset - (jmpAddrOffset - 1)
         method!!.overwriteByteCode(jmpAddrOffset, *Utils.getLastTwoBytes(jmpAddr))
         emitStackMapFrame()
+        val offset = method!!.curCodeOffset
+        for (addr in loopBreakAddressesToOverwrite) {
+            method!!.overwriteByteCode(addr, *Utils.getShortAsBytes((offset - (addr - 1)).toShort()))
+        }
     }
 
     override fun visit(funcCall: AstNode.FunctionCall) {
@@ -477,6 +491,15 @@ class Compiler : AstNodeVisitor<Unit> {
 
     override fun visit(walrus: AstNode.WalrusSet) {
         TODO("Not yet implemented")
+    }
+
+    override fun visit(cont: AstNode.Continue) {
+        emitGoto(loopContinueAddress - method!!.curCodeOffset)
+    }
+
+    override fun visit(breac: AstNode.Break) {
+        emit(_goto, 0x00, 0x00)
+        loopBreakAddressesToOverwrite.add(method!!.curCodeOffset - 2)
     }
 
     private fun doCompare(compareInstruction: Byte) {

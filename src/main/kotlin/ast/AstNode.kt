@@ -148,6 +148,16 @@ abstract class AstNode {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
+    class Break : AstNode() {
+
+        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
+    }
+
+    class Continue : AstNode() {
+
+        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
+    }
+
 }
 
 data class FunctionDescriptor(val args: MutableList<Pair<String, Datatype>>, val returnType: Datatype) {
