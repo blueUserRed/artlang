@@ -17,7 +17,7 @@ object Main {
     fun main(args: Array<String>) {
 
         val file = "test/src/Test.art"
-        val outdir = "src/main/res/test/out"
+        val outDir = "src/main/res/test/out"
 
         val code = Utils.readFile(file)
         println("----------------code----------------")
@@ -48,18 +48,21 @@ object Main {
         program.accept(ControlFlowChecker())
         println("done\n")
 
-        println("Compiling into dir: $outdir/tmp")
-        Compiler().compile(program, "$outdir/tmp", "Test")
+        println("Compiling into dir: $outDir/tmp")
+        Compiler().compile(program, "$outDir/tmp", "Test")
         println("done\n")
 
         println("creating jar Test.jar")
         createJar(
-            Paths.get("$outdir/tmp").toAbsString(),
+            Paths.get("$outDir/tmp").toAbsString(),
             "Test.jar",
             "Test\$\$ArtTopLevel"
         )
         println("done")
+
         //TODO: remove tmp dir
+//        Files.walk(Paths.get("$outDir/tmp/")).skip(1).forEach(Files::delete)
+//        Files.delete(Paths.get("$outDir/tmp"))
     }
 
     private fun createJar(fromDir: String, name: String, entryPoint: String) {

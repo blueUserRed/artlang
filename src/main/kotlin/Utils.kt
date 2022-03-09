@@ -5,6 +5,14 @@ import java.util.zip.ZipOutputStream
 
 object Utils {
 
+    object Ansi {
+        val reset = "\u001B[0m"
+        val yellow = "\u001B[33m"
+        val red = "\u001B[31m"
+        val blue = "\u001B[34m"
+        val white = "\u001B[37m"
+    }
+
     fun readFile(file: String): String {
         return Paths.get("src/main/res/$file").toFile().readText(Charsets.UTF_8)
     }
