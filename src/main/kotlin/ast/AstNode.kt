@@ -2,6 +2,7 @@ package ast
 import Either
 import tokenizer.Token
 import passes.TypeChecker.Datatype
+import tokenizer.TokenType
 
 abstract class AstNode {
 
@@ -22,6 +23,20 @@ abstract class AstNode {
 
         lateinit var functionDescriptor: FunctionDescriptor
 
+        var clazz: ArtClass? = null
+
+        val isStatic: Boolean
+            get() {
+                for (modifier in modifiers) if (modifier.tokenType == TokenType.K_STATIC) return true
+                return false
+            }
+
+        val isPrivate: Boolean
+            get() {
+                for (modifier in modifiers) if (modifier.tokenType == TokenType.K_PUBLIC) return false
+                return true
+            }
+
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
@@ -30,7 +45,7 @@ abstract class AstNode {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
-    class ArtClass(val name: Token, val funcs: Array<Function>) : AstNode() {
+    class ArtClass(val name: Token, val staticFuncs: Array<Function>, val funcs: Array<Function>) : AstNode() {
 
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }

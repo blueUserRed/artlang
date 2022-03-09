@@ -112,7 +112,7 @@ class VariableResolver : AstNodeVisitor<Unit> {
     }
 
     override fun visit(clazz: AstNode.ArtClass) {
-        for (func in clazz.funcs) resolve(func)
+        for (func in clazz.staticFuncs) resolve(func)
     }
 
     override fun visit(walrus: AstNode.WalrusAssign) {

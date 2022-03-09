@@ -13,6 +13,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     private var vars: MutableMap<Int, Datatype> = mutableMapOf()
     private lateinit var curProgram: AstNode.Program
     private lateinit var curFunction: AstNode.Function
+    private var curClass: AstNode.ArtClass? = null
 
     override fun visit(binary: AstNode.Binary): Datatype {
         val type1 = check(binary.left)
@@ -79,14 +80,6 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         return type
     }
 
-    private fun getDatatypeFromToken(token: TokenType) = when (token) {
-        TokenType.INT -> Datatype.Integer()
-        TokenType.STRING -> Datatype.Str()
-        TokenType.FLOAT -> Datatype.Float()
-        TokenType.BOOLEAN -> Datatype.Bool()
-        else -> throw RuntimeException("unreachable")
-    }
-
     override fun visit(exprStmt: AstNode.ExpressionStatement): Datatype {
         check(exprStmt.exp)
         return Datatype.Void()
@@ -98,6 +91,8 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         val newVars = mutableMapOf<Int, Datatype>()
         for (i in function.functionDescriptor.args.indices) newVars[i] = function.functionDescriptor.args[i].second
         vars = newVars
+        vars = newVars
+        function.clazz = curClass
         function.statements.accept(this)
         return Datatype.Void()
     }
@@ -105,7 +100,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     override fun visit(program: AstNode.Program): Datatype {
         curProgram = program
         for (func in program.funcs) precCalcFuncSigs(func)
-        for (c in program.classes) for (func in c.funcs) precCalcFuncSigs(func)
+        for (c in program.classes) for (func in c.staticFuncs) precCalcFuncSigs(func)
         for (func in program.funcs) func.accept(this)
         for (c in program.classes) c.accept(this)
         return Datatype.Void()
@@ -233,15 +228,22 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             }
         }
 
-        var funcIndex: Int? = null
-        for (i in curProgram.funcs.indices) {
-            if (curProgram.funcs[i].name.lexeme != (funcCall.func as Either.Right).value.lexeme) continue
-            if (!doFuncSigsMatch(thisSig, curProgram.funcs[i].functionDescriptor.args)) continue
-            funcIndex = i
+        funcCall.func as Either.Right
+
+        var funcDefinition: AstNode.Function? = null
+        if (curClass != null) for (func in curClass!!.staticFuncs) {
+            if (func.name.lexeme != funcCall.func.value.lexeme) continue
+            if (!doFuncSigsMatch(thisSig, func.functionDescriptor.args)) continue
+            funcDefinition = func
         }
-        if (funcIndex == null) throw RuntimeException("Function ${funcCall.getFullName()} does not exist")
-        funcCall.definition = curProgram.funcs[funcIndex]
-        val type = curProgram.funcs[funcIndex].functionDescriptor.returnType
+        if (funcDefinition == null) for (func in curProgram.funcs) {
+            if (func.name.lexeme != funcCall.func.value.lexeme) continue
+            if (!doFuncSigsMatch(thisSig, func.functionDescriptor.args)) continue
+            funcDefinition = func
+        }
+        if (funcDefinition == null) throw RuntimeException("Function ${funcCall.getFullName()} does not exist")
+        funcCall.definition = funcDefinition
+        val type = funcDefinition.functionDescriptor.returnType
         funcCall.type = type
         return type
     }
@@ -261,7 +263,10 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     }
 
     override fun visit(clazz: AstNode.ArtClass): Datatype {
-        for (func in clazz.funcs) func.accept(this)
+        val tmp = curClass
+        curClass = clazz
+        for (func in clazz.staticFuncs) func.accept(this)
+        curClass = tmp
         return Datatype.Void()
     }
 
@@ -276,7 +281,10 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         if (!from.matches(Datakind.STAT_CLASS)) TODO("not yet implemented")
         from as Datatype.StatClass
         val possibilities = mutableListOf<Datatype.StatFuncRef>()
-        for (func in from.artClass.funcs) if (func.name.lexeme == get.name.lexeme) possibilities.add(Datatype.StatFuncRef(func))
+        for (func in from.artClass.staticFuncs) if (func.name.lexeme == get.name.lexeme) {
+            if (func.isPrivate && curClass !== from.artClass) continue
+            possibilities.add(Datatype.StatFuncRef(func))
+        }
         if (possibilities.size == 0) {
             throw RuntimeException("couldn't access ${get.name.lexeme} from ${get.from.accept(ASTPrinter())}")
         }
@@ -315,6 +323,14 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         TokenType.T_INT -> Datatype.Integer()
         TokenType.T_STRING -> Datatype.Str()
         else -> throw RuntimeException("invalid type")
+    }
+
+    private fun getDatatypeFromToken(token: TokenType) = when (token) {
+        TokenType.INT -> Datatype.Integer()
+        TokenType.STRING -> Datatype.Str()
+        TokenType.FLOAT -> Datatype.Float()
+        TokenType.BOOLEAN -> Datatype.Bool()
+        else -> throw RuntimeException("unreachable")
     }
 
     abstract class Datatype(val kind: Datakind) {

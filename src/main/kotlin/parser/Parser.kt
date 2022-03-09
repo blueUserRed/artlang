@@ -68,12 +68,14 @@ object Parser {
         val name = last()
         consumeOrError(TokenType.L_BRACE, "Expected opening brace after class definition")
         val funcs = mutableListOf<AstNode.Function>()
+        val staticFuncs = mutableListOf<AstNode.Function>()
         while (!match(TokenType.R_BRACE)) {
             val modifiers = parseModifiers()
-            consumeOrError(TokenType.K_FN, "Expected ")
-            funcs.add(parseFunc(modifiers))
+            consumeOrError(TokenType.K_FN, "Expected function")
+            val func = parseFunc(modifiers)
+            if (func.isStatic) staticFuncs.add(func) else funcs.add(func)
         }
-        return AstNode.ArtClass(name, funcs.toTypedArray())
+        return AstNode.ArtClass(name, staticFuncs.toTypedArray(), funcs.toTypedArray())
     }
 
     private fun parseModifiers(): List<Token> {

@@ -9,7 +9,6 @@ import tokenizer.TokenType
 import classFile.StackMapTableAttribute.VerificationTypeInfo
 import java.io.File
 import passes.TypeChecker.Datatype
-import java.lang.RuntimeException
 import java.util.*
 
 class Compiler : AstNodeVisitor<Unit> {
@@ -242,7 +241,7 @@ class Compiler : AstNodeVisitor<Unit> {
             file!!.isSuper = true
             file!!.isPublic = true
             curFile = file!!.thisClass
-            for (func in clazz.funcs) comp(func)
+            for (func in clazz.staticFuncs) comp(func)
             file!!.build("$outdir/$curFile.class")
         }
 
@@ -417,23 +416,19 @@ class Compiler : AstNodeVisitor<Unit> {
 
         val methodRefIndex: Int
 
-        if (funcCall.func is Either.Left) {
-            if (funcCall.func.value !is AstNode.Get) TODO("not yet implemented")
-            if (funcCall.func.value.from !is AstNode.Variable) TODO("not yet implemented")
-            val className = (funcCall.func.value.from.type as Datatype.StatClass).artClass.name.lexeme
+        if (funcCall.definition.clazz == null) {
             methodRefIndex = file!!.methodRefInfo(
-                file!!.classInfo(file!!.utf8Info(className)),
+                file!!.classInfo(file!!.utf8Info(topLevelName)),
                 file!!.nameAndTypeInfo(
-                    file!!.utf8Info(funcCall.func.value.name.lexeme),
+                    file!!.utf8Info((funcCall.func as Either.Right).value.lexeme),
                     file!!.utf8Info(funcCall.definition.functionDescriptor.getDescriptorString())
                 )
             )
         } else {
-            val name = (funcCall.func as Either.Right).value.lexeme
             methodRefIndex = file!!.methodRefInfo(
-                file!!.classInfo(file!!.utf8Info(topLevelName)),
+                file!!.classInfo(file!!.utf8Info(funcCall.definition.clazz!!.name.lexeme)),
                 file!!.nameAndTypeInfo(
-                    file!!.utf8Info(name),
+                    file!!.utf8Info(funcCall.definition.name.lexeme),
                     file!!.utf8Info(funcCall.definition.functionDescriptor.getDescriptorString())
                 )
             )

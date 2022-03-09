@@ -1,32 +1,25 @@
 fn main() {
-    let i = 0
-    while ((i := i + 1) < 100) {
-        if (i == 20) break
-        print i
-    }
-    print "hi"
+//    let i = 0
+//    while ((i := i + 1) <= 100) print recFibonacci(i)
+    HiSayer.sayHi()
 }
 
-//class HiSayer {
-//    static fn sayHi() { //TODO: make sure fn is actually static lol
-//        print "hi"
-//    }
-//}
-//
-//fn fizzBuzz() {
-//    let i = 0
-//    while ((i := i + 1) <= 100) {
-//        let output = ""
-//        let isEmpty = true
-//        if (i % 3 == 0) {
-//            output = "Fizz"
-//            isEmpty = false
-//        }
-//        if (i % 5 == 0) {
-//            output += "Buzz"
-//            isEmpty = false
-//        }
-//        if (isEmpty) print i else print output
-////        i++;
-//    }
-//}
+class HiSayer {
+
+    public static fn sayHi() {
+        print getHi()
+    }
+
+    static fn getHi(): str {
+        return "hi"
+    }
+
+}
+
+/**
+* the most stupid possible implementation of fibonacci
+*/
+fn recFibonacci(pos: int): int {
+    if (pos <= 2) return 1
+    return recFibonacci(pos - 1) + recFibonacci(pos - 2)
+}

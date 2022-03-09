@@ -106,7 +106,7 @@ class ASTPrinter : AstNodeVisitor<String> {
     override fun visit(clazz: AstNode.ArtClass): String {
         val builder = StringBuilder()
         builder.append("class ${clazz.name.lexeme} {\n")
-        for (func in clazz.funcs) builder.append(func.accept(this))
+        for (func in clazz.staticFuncs) builder.append(func.accept(this))
         builder.append("}\n")
         return builder.toString()
     }
