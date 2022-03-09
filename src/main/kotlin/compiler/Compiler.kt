@@ -190,8 +190,8 @@ class Compiler : AstNodeVisitor<Unit> {
         lastStackMapFrameOffset = 0
 
         method = MethodBuilder()
-        method!!.isPublic = true
-        method!!.isStatic = true
+//        method!!.isPublic = true
+//        method!!.isStatic = true
         method!!.descriptor = function.functionDescriptor.getDescriptorString()
         method!!.name = function.name.lexeme
 
@@ -242,6 +242,8 @@ class Compiler : AstNodeVisitor<Unit> {
             file!!.isPublic = true
             curFile = file!!.thisClass
             for (func in clazz.staticFuncs) comp(func)
+            for (func in clazz.funcs) comp(func)
+            doDefaultConstructor()
             file!!.build("$outdir/$curFile.class")
         }
 
@@ -333,9 +335,9 @@ class Compiler : AstNodeVisitor<Unit> {
         }
     }
 
-    override fun visit(stmt: AstNode.Block) {
+    override fun visit(block: AstNode.Block) {
         val before = locals.toMutableList()
-        for (s in stmt.statements) {
+        for (s in block.statements) {
             comp(s)
             if (stack.size != 0) {
                 println(stack.size)
@@ -449,8 +451,8 @@ class Compiler : AstNodeVisitor<Unit> {
             emit(_return)
             return
         }
-        comp(returnStmt.toReturn)
-        emit(when (returnStmt.toReturn.type) {
+        comp(returnStmt.toReturn!!)
+        emit(when (returnStmt.toReturn!!.type) {
             Datatype.Str() -> areturn
             Datatype.Integer(), Datatype.Bool() -> ireturn
             else -> TODO("not yet implemented")
@@ -495,6 +497,35 @@ class Compiler : AstNodeVisitor<Unit> {
     override fun visit(breac: AstNode.Break) {
         emit(_goto, 0x00, 0x00)
         loopBreakAddressesToOverwrite.add(method!!.curCodeOffset - 2)
+    }
+
+    override fun visit(constructorCall: AstNode.ConstructorCall) {
+        TODO("Not yet implemented")
+    }
+
+    private fun doDefaultConstructor() {
+        method = MethodBuilder()
+        method!!.isPublic = true
+        method!!.isSynthetic = true
+        method!!.descriptor = "()V"
+        method!!.name = "<init>"
+        method!!.maxStack = 1
+        method!!.maxLocals = 1
+
+        val objConstructorIndex = file!!.methodRefInfo(
+            file!!.classInfo(file!!.utf8Info("java/lang/Object")),
+            file!!.nameAndTypeInfo(
+                file!!.utf8Info("<init>"),
+                file!!.utf8Info("()V")
+            )
+        )
+        emit(
+            aload_0,
+            invokespecial,
+            *Utils.getLastTwoBytes(objConstructorIndex),
+            _return
+        )
+        file!!.addMethod(method!!)
     }
 
     private fun doCompare(compareInstruction: Byte) {

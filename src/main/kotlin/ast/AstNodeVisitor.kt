@@ -27,5 +27,6 @@ interface AstNodeVisitor<T> {
     fun visit(walrus: AstNode.WalrusSet): T
     fun visit(cont: AstNode.Continue): T
     fun visit(breac: AstNode.Break): T
+    fun visit(constructorCall: AstNode.ConstructorCall): T
 
 }

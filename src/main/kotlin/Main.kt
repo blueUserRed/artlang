@@ -48,6 +48,13 @@ object Main {
         program.accept(ControlFlowChecker())
         println("done\n")
 
+        println("------------revised AST-------------")
+        println(program.accept(ASTPrinter()))
+        println("------------------------------------\n\n")
+
+        Files.walk(Paths.get("$outDir/tmp/")).skip(1).forEach(Files::delete)
+        Files.delete(Paths.get("$outDir/tmp"))
+
         println("Compiling into dir: $outDir/tmp")
         Compiler().compile(program, "$outDir/tmp", "Test")
         println("done\n")
@@ -60,7 +67,6 @@ object Main {
         )
         println("done")
 
-        //TODO: remove tmp dir
 //        Files.walk(Paths.get("$outDir/tmp/")).skip(1).forEach(Files::delete)
 //        Files.delete(Paths.get("$outDir/tmp"))
     }

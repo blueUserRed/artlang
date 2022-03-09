@@ -161,6 +161,10 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
         )
     }
 
+    override fun visit(constructorCall: AstNode.ConstructorCall): ControlFlowState {
+        return ControlFlowState()
+    }
+
     private fun check(node: AstNode): ControlFlowState = node.accept(this)
 
     data class ControlFlowState(

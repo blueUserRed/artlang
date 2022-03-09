@@ -1,25 +1,35 @@
 fn main() {
 //    let i = 0
 //    while ((i := i + 1) <= 100) print recFibonacci(i)
-    HiSayer.sayHi()
+    let x = HiSayer()
 }
 
 class HiSayer {
-
-    public static fn sayHi() {
-        print getHi()
+    fn sayHi() {
+        print "hi"
     }
-
-    static fn getHi(): str {
-        return "hi"
-    }
-
 }
 
 /**
 * the most stupid possible implementation of fibonacci
 */
 fn recFibonacci(pos: int): int {
-    if (pos <= 2) return 1
-    return recFibonacci(pos - 1) + recFibonacci(pos - 2)
+    if (pos <= 2) return 1 else return recFibonacci(pos - 1) + recFibonacci(pos - 2)
+}
+
+fn fizzBuzz() {
+    let i = 0
+    while ((i := i + 1) <= 100) {
+        let output = ""
+        let isEmpty = true
+        if (i % 3 == 0) {
+            output = "Fizz"
+            isEmpty = false
+        }
+        if (i % 5 == 0) {
+            output += "Buzz"
+            isEmpty = false
+        }
+        if (isEmpty) print i else print output
+    }
 }

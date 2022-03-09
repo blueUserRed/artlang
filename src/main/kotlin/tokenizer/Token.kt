@@ -3,10 +3,9 @@ package tokenizer
 data class Token(val tokenType: TokenType, val lexeme: String, val literal: Any?, val file: String, val pos: Int) {
 
     override fun toString(): String {
-        return "$tokenType(lexeme='$lexeme', literal='$literal' @ '$file':$pos)"
-//        return tokenType.toString()
-//        return "$tokenType($lexeme)"
-//        return tokenType.toString() + "(" + lexeme + ")"
+        return "$tokenType(lexeme='${
+            if (lexeme == "\n") "\\n" else lexeme
+        }', literal='$literal' @ '$file':$pos)"
     }
 
 }

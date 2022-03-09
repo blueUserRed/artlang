@@ -19,7 +19,7 @@ class ASTPrinter : AstNodeVisitor<String> {
 
     override fun visit(function: AstNode.Function): String {
         val builder = StringBuilder()
-        builder.append("fn ").append(function.name.lexeme).append("() {\n")
+        builder.append("\nfn ").append(function.name.lexeme).append("() {\n")
         for (s in function.statements.statements) builder.append(s.accept(this)).append("\n")
         builder.append("}\n")
         return builder.toString()
@@ -40,7 +40,7 @@ class ASTPrinter : AstNodeVisitor<String> {
         val builder = StringBuilder()
         builder.append("{\n")
         for (s in block.statements) builder.append(s.accept(this)).append("\n")
-        builder.append("}\n")
+        builder.append("}")
         return builder.toString()
     }
 
@@ -82,10 +82,7 @@ class ASTPrinter : AstNodeVisitor<String> {
         val builder = StringBuilder()
         builder
             .append("(i ")
-            .append(
-                if (funcCall.func is Either.Left) funcCall.func.value.accept(this)
-                else (funcCall.func as Either.Right).value.lexeme
-            )
+            .append(funcCall.getFullName())
         for (arg in funcCall.arguments) {
             builder
                 .append(" ")
@@ -105,7 +102,7 @@ class ASTPrinter : AstNodeVisitor<String> {
 
     override fun visit(clazz: AstNode.ArtClass): String {
         val builder = StringBuilder()
-        builder.append("class ${clazz.name.lexeme} {\n")
+        builder.append("\nclass ${clazz.name.lexeme} {\n")
         for (func in clazz.staticFuncs) builder.append(func.accept(this))
         builder.append("}\n")
         return builder.toString()
@@ -133,5 +130,9 @@ class ASTPrinter : AstNodeVisitor<String> {
 
     override fun visit(breac: AstNode.Break): String {
         return "(break)"
+    }
+
+    override fun visit(constructorCall: AstNode.ConstructorCall): String {
+        return "(new ${constructorCall.clazz.name.lexeme})"
     }
 }

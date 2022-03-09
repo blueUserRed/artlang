@@ -7,6 +7,7 @@ import ast.FunctionDescriptor
 import tokenizer.TokenType
 import java.lang.RuntimeException
 import passes.TypeChecker.Datatype
+import tokenizer.Token
 
 class TypeChecker : AstNodeVisitor<Datatype> {
 
@@ -15,9 +16,11 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     private lateinit var curFunction: AstNode.Function
     private var curClass: AstNode.ArtClass? = null
 
+    private var swap: AstNode? = null
+
     override fun visit(binary: AstNode.Binary): Datatype {
-        val type1 = check(binary.left)
-        val type2 = check(binary.right)
+        val type1 = check(binary.left, binary)
+        val type2 = check(binary.right, binary)
         val resultType: Datatype
 
         when (binary.operator.tokenType) {
@@ -81,7 +84,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     }
 
     override fun visit(exprStmt: AstNode.ExpressionStatement): Datatype {
-        check(exprStmt.exp)
+        check(exprStmt.exp, exprStmt)
         return Datatype.Void()
     }
 
@@ -99,14 +102,19 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
     override fun visit(program: AstNode.Program): Datatype {
         curProgram = program
-        for (func in program.funcs) precCalcFuncSigs(func)
-        for (c in program.classes) for (func in c.staticFuncs) precCalcFuncSigs(func)
+        for (func in program.funcs) preCalcFuncSigs(func)
+        for (c in program.classes) preCalcClass(c)
         for (func in program.funcs) func.accept(this)
         for (c in program.classes) c.accept(this)
         return Datatype.Void()
     }
 
-    private fun precCalcFuncSigs(func: AstNode.Function) { //TODO: fix for class funcs
+    private fun preCalcClass(clazz: AstNode.ArtClass) {
+        for (func in clazz.staticFuncs) preCalcFuncSigs(func)
+        for (func in clazz.funcs) preCalcFuncSigs(func)
+    }
+
+    private fun preCalcFuncSigs(func: AstNode.Function) { //TODO: fix for class funcs
         curFunction = func
 
         val args = mutableListOf<Pair<String, Datatype>>()
@@ -117,12 +125,12 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     }
 
     override fun visit(print: AstNode.Print): Datatype {
-        check(print.toPrint)
+        check(print.toPrint, print)
         return Datatype.Void()
     }
 
     override fun visit(block: AstNode.Block): Datatype {
-        for (s in block.statements) check(s)
+        for (s in block.statements) check(s, block)
         return Datatype.Void()
     }
 
@@ -140,7 +148,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     }
 
     override fun visit(varDec: AstNode.VariableDeclaration): Datatype {
-        val type = check(varDec.initializer)
+        val type = check(varDec.initializer, varDec)
         if (type == Datatype.Void()) throw RuntimeException("Expected Expression in var initializer")
         if (varDec.typeToken != null) {
             val type2 = tokenToDataType(varDec.typeToken!!.tokenType)
@@ -152,19 +160,19 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     }
 
     override fun visit(varAssign: AstNode.VariableAssignment): Datatype {
-        val type = check(varAssign.toAssign)
+        val type = check(varAssign.toAssign, varAssign)
         val varType = vars[varAssign.index] ?: throw RuntimeException("unreachable")
         if (type != varType) throw RuntimeException("tried to assign $type to $varType")
         return Datatype.Void()
     }
 
     override fun visit(loop: AstNode.Loop): Datatype {
-        check(loop.body)
+        check(loop.body, loop)
         return Datatype.Void()
     }
 
     override fun visit(ifStmt: AstNode.If): Datatype {
-        val type = check(ifStmt.condition)
+        val type = check(ifStmt.condition, ifStmt)
         if (type != Datatype.Bool()) throw RuntimeException("Expected Boolean value")
         ifStmt.ifStmt.accept(this)
         ifStmt.elseStmt?.accept(this)
@@ -172,7 +180,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     }
 
     override fun visit(unary: AstNode.Unary): Datatype {
-        val type = check(unary.on)
+        val type = check(unary.on, unary)
         if (unary.operator.tokenType == TokenType.MINUS) {
             if (type != Datatype.Integer()) throw RuntimeException("cant negate $type")
         } else {
@@ -183,11 +191,11 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     }
 
     override fun visit(group: AstNode.Group): Datatype {
-        return check(group.grouped)
+        return check(group.grouped, group)
     }
 
     override fun visit(whileStmt: AstNode.While): Datatype {
-        if (check(whileStmt.condition) != Datatype.Bool()) throw RuntimeException("Expected Boolean value")
+        if (check(whileStmt.condition, whileStmt) != Datatype.Bool()) throw RuntimeException("Expected Boolean value")
         whileStmt.body.accept(this)
         return Datatype.Void()
     }
@@ -195,12 +203,12 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     override fun visit(funcCall: AstNode.FunctionCall): Datatype {
         val thisSig = mutableListOf<Datatype>()
         for (arg in funcCall.arguments) {
-            check(arg)
+            check(arg, funcCall)
             thisSig.add(arg.type)
         }
 
         if (funcCall.func is Either.Left) {
-            val ref = check(funcCall.func.value)
+            val ref = check((funcCall.func as Either.Left<AstNode>).value, funcCall)
 
             if (ref.matches(Datakind.STAT_FUNC_REF)) {
                 ref as Datatype.StatFuncRef
@@ -211,7 +219,6 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                 funcCall.type = ref.func.functionDescriptor.returnType
                 return ref.func.functionDescriptor.returnType
             }
-
             if (ref.matches(Datakind.AMBIG_STAT_FUNC_REF)) {
                 ref as Datatype.AmbigStatFuncRef
                 var definition: AstNode.Function? = null
@@ -232,15 +239,33 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
         var funcDefinition: AstNode.Function? = null
         if (curClass != null) for (func in curClass!!.staticFuncs) {
-            if (func.name.lexeme != funcCall.func.value.lexeme) continue
+            if (func.name.lexeme != (funcCall.func as Either.Right<Token>).value.lexeme) continue
             if (!doFuncSigsMatch(thisSig, func.functionDescriptor.args)) continue
             funcDefinition = func
         }
         if (funcDefinition == null) for (func in curProgram.funcs) {
-            if (func.name.lexeme != funcCall.func.value.lexeme) continue
+            if (func.name.lexeme != (funcCall.func as Either.Right<Token>).value.lexeme) continue
             if (!doFuncSigsMatch(thisSig, func.functionDescriptor.args)) continue
             funcDefinition = func
         }
+
+        if (
+            funcDefinition == null &&
+            curClass != null &&
+            curClass!!.name.lexeme == (funcCall.func as Either.Right<Token>).value.lexeme &&
+            thisSig.size == 0
+        ) {
+            swap = AstNode.ConstructorCall(curClass!!, mutableListOf())
+            return Datatype.Object(curClass!!.name.lexeme, curClass!!)
+        }
+
+        if (funcDefinition == null && thisSig.size == 0) for (c in curProgram.classes) {
+            if (c.name.lexeme == (funcCall.func as Either.Right<Token>).value.lexeme) {
+                swap = AstNode.ConstructorCall(c, mutableListOf())
+                return Datatype.Object(c.name.lexeme, c)
+            }
+        }
+
         if (funcDefinition == null) throw RuntimeException("Function ${funcCall.getFullName()} does not exist")
         funcCall.definition = funcDefinition
         val type = funcDefinition.functionDescriptor.returnType
@@ -249,7 +274,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     }
 
     override fun visit(returnStmt: AstNode.Return): Datatype {
-        val type = returnStmt.toReturn?.let { check(it) } ?: Datatype.Void()
+        val type = returnStmt.toReturn?.let { check(it, returnStmt) } ?: Datatype.Void()
         if (curFunction.functionDescriptor.returnType != type) {
             throw RuntimeException("incompatible return types: $type and ${curFunction.functionDescriptor.returnType}")
         }
@@ -266,18 +291,19 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         val tmp = curClass
         curClass = clazz
         for (func in clazz.staticFuncs) func.accept(this)
+        for (func in clazz.funcs) func.accept(this)
         curClass = tmp
         return Datatype.Void()
     }
 
     override fun visit(walrus: AstNode.WalrusAssign): Datatype {
-        val type = check(walrus.toAssign)
+        val type = check(walrus.toAssign, walrus)
         walrus.type = type
         return type
     }
 
     override fun visit(get: AstNode.Get): Datatype {
-        val from = check(get.from)
+        val from = check(get.from, get)
         if (!from.matches(Datakind.STAT_CLASS)) TODO("not yet implemented")
         from as Datatype.StatClass
         val possibilities = mutableListOf<Datatype.StatFuncRef>()
@@ -310,13 +336,23 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         return Datatype.Void()
     }
 
+    override fun visit(constructorCall: AstNode.ConstructorCall): Datatype {
+        throw RuntimeException("unreachable")
+    }
+
     private fun doFuncSigsMatch(types1: List<Datatype>, types2: List<Pair<String, Datatype>>): Boolean {
         if (types1.size != types2.size) return false
         for (i in types1.indices) if (types1[i] != types2[i].second) return false
         return true
     }
 
-    private fun check(node: AstNode): Datatype = node.accept(this)
+    private fun check(node: AstNode, parent: AstNode): Datatype {
+        val res = node.accept(this)
+        if (swap == null) return res
+        parent.swap(node, swap!!)
+        swap = null
+        return res
+    }
 
     private fun tokenToDataType(token: TokenType): Datatype = when (token) {
         TokenType.T_BOOLEAN -> Datatype.Bool()
@@ -365,7 +401,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             override fun toString(): String = "void"
         }
 
-        class Object(val name: String) : Datatype(Datakind.OBJECT) {
+        class Object(val name: String, val clazz: AstNode.ArtClass) : Datatype(Datakind.OBJECT) {
             override val descriptorType: String = "L$name;"
             override fun equals(other: Any?): Boolean {
                 return if (other == null) false else other::class == Object::class && name == (other as Object).name

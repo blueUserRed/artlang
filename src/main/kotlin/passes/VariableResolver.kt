@@ -97,7 +97,7 @@ class VariableResolver : AstNodeVisitor<Unit> {
     }
 
     override fun visit(funcCall: AstNode.FunctionCall) {
-        if (funcCall.func is Either.Left) resolve(funcCall.func.value)
+        if (funcCall.func is Either.Left) resolve((funcCall.func as Either.Left<AstNode>).value)
         for (arg in funcCall.arguments) resolve(arg)
     }
 
@@ -140,6 +140,10 @@ class VariableResolver : AstNodeVisitor<Unit> {
     }
 
     override fun visit(breac: AstNode.Break) {
+    }
+
+    override fun visit(constructorCall: AstNode.ConstructorCall) {
+        for (arg in constructorCall.arguments) resolve(arg)
     }
 
     private fun resolve(node: AstNode) = node.accept(this)
