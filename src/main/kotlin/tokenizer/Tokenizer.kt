@@ -24,6 +24,7 @@ object Tokenizer {
             ';' -> { emit(TokenType.SEMICOLON, ";", null); consume() }
             '%' -> { emit(TokenType.MOD, "%", null); consume() }
             ',' -> { emit(TokenType.COMMA, ",", null); consume() }
+            '.' -> { emit(TokenType.DOT, ".", null); consume() }
             '\n' -> { emit(TokenType.SOFT_BREAK, "\n", null); consume() }
             '"' -> string('"')
             '\'' -> string('\'')
@@ -206,6 +207,8 @@ object Tokenizer {
             "str" -> emit(TokenType.T_STRING, "str", null, start)
             "bool" -> emit(TokenType.T_BOOLEAN, "bool", null, start)
             "return" -> emit(TokenType.K_RETURN, "return", null, start)
+            "break" -> emit(TokenType.K_BREAK, "break", null, start)
+            "continue" -> emit(TokenType.K_CONTINUE, "continue", null, start)
             else -> emit(TokenType.IDENTIFIER, identifier, identifier, start)
         }
     }

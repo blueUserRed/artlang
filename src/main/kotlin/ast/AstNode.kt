@@ -1,10 +1,12 @@
 package ast
-import passes.TypeChecker.Datatype
+import Either
 import tokenizer.Token
+import passes.TypeChecker.Datatype
+import tokenizer.TokenType
 
 abstract class AstNode {
 
-    var type: Datatype = Datatype.VOID
+    var type: Datatype = Datatype.Void()
 
     abstract fun <T> accept(visitor: AstNodeVisitor<T>): T
 
@@ -17,27 +19,23 @@ abstract class AstNode {
 
         var amountLocals: Int = 0
         var argTokens: MutableList<Pair<Token, Token>> = mutableListOf()
-        var args: MutableList<Pair<String, Datatype>> = mutableListOf()
-        var returnType: Datatype = Datatype.VOID
         var returnTypeToken: Token? = null
 
-        fun getDescriptor(): String {
-            val builder = StringBuilder()
-            builder.append("(")
-            for (arg in args) builder.append(getDescriptorFromType(arg.second))
-            builder.append(")")
-            builder.append(getDescriptorFromType(returnType))
-            return builder.toString()
-        }
+        lateinit var functionDescriptor: FunctionDescriptor
 
-        private fun getDescriptorFromType(arg: Datatype) = when (arg) {
-            Datatype.INT -> "I"
-            Datatype.BOOLEAN -> "Z"
-            Datatype.FLOAT -> "F"
-            Datatype.STRING -> "Ljava/lang/String;"
-            Datatype.VOID -> "V"
-            else -> TODO("not yet implemented")
-        }
+        var clazz: ArtClass? = null
+
+        val isStatic: Boolean
+            get() {
+                for (modifier in modifiers) if (modifier.tokenType == TokenType.K_STATIC) return true
+                return false
+            }
+
+        val isPrivate: Boolean
+            get() {
+                for (modifier in modifiers) if (modifier.tokenType == TokenType.K_PUBLIC) return false
+                return true
+            }
 
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
@@ -47,7 +45,7 @@ abstract class AstNode {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
-    class ArtClass(val name: Token, val funcs: Array<Function>) : AstNode() {
+    class ArtClass(val name: Token, val staticFuncs: Array<Function>, val funcs: Array<Function>) : AstNode() {
 
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
@@ -116,7 +114,7 @@ abstract class AstNode {
 
     class Variable(val name: Token) : AstNode() {
 
-        var index: Int = 0
+        var index: Int = -1
 
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
@@ -131,9 +129,14 @@ abstract class AstNode {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
-    class FunctionCall(val name: Token, val arguments: List<AstNode>) : AstNode() {
+    class FunctionCall(val func: Either<AstNode, Token>, val arguments: List<AstNode>) : AstNode() {
 
-        var funcIndex: Int = 0
+        lateinit var definition: Function
+
+        fun getFullName(): String {
+            return if (func is Either.Left) func.value.accept(ASTPrinter())
+            else (func as Either.Right).value.lexeme
+        }
 
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
@@ -143,6 +146,44 @@ abstract class AstNode {
         var index: Int = 0
 
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
+    }
+
+    class Get(val from: AstNode, val name: Token) : AstNode() {
+
+        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
+    }
+
+    class Set(val from: AstNode, val to: AstNode) : AstNode() {
+
+        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
+    }
+
+    class WalrusSet(val from: AstNode, val to: AstNode) : AstNode() {
+
+        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
+    }
+
+    class Break : AstNode() {
+
+        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
+    }
+
+    class Continue : AstNode() {
+
+        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
+    }
+
+}
+
+data class FunctionDescriptor(val args: MutableList<Pair<String, Datatype>>, val returnType: Datatype) {
+
+    fun getDescriptorString(): String {
+        val builder = StringBuilder()
+        builder.append("(")
+        for (arg in args) builder.append(arg.second.descriptorType)
+        builder.append(")")
+        builder.append(returnType.descriptorType)
+        return builder.toString()
     }
 
 }

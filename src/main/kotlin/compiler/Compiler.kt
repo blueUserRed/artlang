@@ -6,9 +6,9 @@ import classFile.ClassFileBuilder
 import classFile.MethodBuilder
 import classFile.StackMapTableAttribute
 import tokenizer.TokenType
-import passes.TypeChecker.Datatype
 import classFile.StackMapTableAttribute.VerificationTypeInfo
 import java.io.File
+import passes.TypeChecker.Datatype
 import java.util.*
 
 class Compiler : AstNodeVisitor<Unit> {
@@ -29,6 +29,9 @@ class Compiler : AstNodeVisitor<Unit> {
 
     private var wasReturn: Boolean = false
 
+    private var loopContinueAddress: Int = -1
+    private var loopBreakAddressesToOverwrite = mutableListOf<Int>()
+
     private lateinit var curProgram: AstNode.Program
 
     fun compile(program: AstNode.Program, outdir: String, name: String) {
@@ -39,21 +42,21 @@ class Compiler : AstNodeVisitor<Unit> {
         program.accept(this)
     }
 
-    override fun visit(exp: AstNode.Binary) {
-        if (exp.type == Datatype.STRING) {
-            doStringConcat(exp)
+    override fun visit(binary: AstNode.Binary) {
+        if (binary.type == Datatype.Str()) {
+            doStringConcat(binary)
             return
         }
 
-        if (exp.operator.tokenType == TokenType.D_AND || exp.operator.tokenType == TokenType.D_OR) {
-            doBooleanComparison(exp)
+        if (binary.operator.tokenType == TokenType.D_AND || binary.operator.tokenType == TokenType.D_OR) {
+            doBooleanComparison(binary)
             return
         }
 
-        comp(exp.left)
-        comp(exp.right)
+        comp(binary.left)
+        comp(binary.right)
 
-        when (exp.operator.tokenType) {
+        when (binary.operator.tokenType) {
             TokenType.PLUS -> {
                 emit(iadd)
                 decStack()
@@ -148,39 +151,38 @@ class Compiler : AstNodeVisitor<Unit> {
         method!!.overwriteByteCode(jmpAddrPos, *Utils.getLastTwoBytes(jmpAddr))
     }
 
-    override fun visit(exp: AstNode.Literal) = when (exp.type) {
-        Datatype.INT -> {
-            emitIntLoad(exp.literal.literal as Int)
+    override fun visit(literal: AstNode.Literal) = when (literal.type) {
+        Datatype.Integer() -> {
+            emitIntLoad(literal.literal.literal as Int)
             incStack(VerificationTypeInfo.Integer())
         }
-        Datatype.STRING -> {
-            emitStringLoad(exp.literal.literal as String)
+        Datatype.Str() -> {
+            emitStringLoad(literal.literal.literal as String)
             incStack(getObjVerificationType("java/lang/String"))
         }
-        Datatype.BOOLEAN -> {
-            if (exp.literal.literal as Boolean) emit(iconst_1)
+        Datatype.Bool() -> {
+            if (literal.literal.literal as Boolean) emit(iconst_1)
             else emit(iconst_0)
             incStack(VerificationTypeInfo.Integer())
         }
         else -> TODO("not yet implemented")
     }
 
-    override fun visit(stmt: AstNode.ExpressionStatement) {
-        comp(stmt.exp)
-        if (!(stmt.exp is AstNode.FunctionCall && stmt.exp.type == Datatype.VOID)) {
-            emit(pop)
-            decStack()
-        }
+    override fun visit(exprStmt: AstNode.ExpressionStatement) {
+        comp(exprStmt.exp)
+        if (exprStmt.exp is AstNode.FunctionCall && exprStmt.exp.type == Datatype.Void()) return
+        emit(pop)
+        decStack()
     }
 
-    override fun visit(stmt: AstNode.Function) {
+    override fun visit(function: AstNode.Function) {
         stack = Stack()
-        locals = MutableList(stmt.amountLocals) { null }
-        for (i in stmt.args.indices) {
-            locals[i] = when (stmt.args[i].second) {
-                Datatype.INT, Datatype.BOOLEAN -> VerificationTypeInfo.Integer()
-                Datatype.FLOAT -> VerificationTypeInfo.Float()
-                Datatype.STRING -> getObjVerificationType("java/lang/String")
+        locals = MutableList(function.amountLocals) { null }
+        for (i in function.functionDescriptor.args.indices) {
+            locals[i] = when (function.functionDescriptor.args[i].second) {
+                Datatype.Integer(), Datatype.Bool() -> VerificationTypeInfo.Integer()
+                Datatype.Float() -> VerificationTypeInfo.Float()
+                Datatype.Str() -> getObjVerificationType("java/lang/String")
                 else -> TODO("not yet implemented")
             }
         }
@@ -190,13 +192,13 @@ class Compiler : AstNodeVisitor<Unit> {
         method = MethodBuilder()
         method!!.isPublic = true
         method!!.isStatic = true
-        method!!.descriptor = stmt.getDescriptor()
-        method!!.name = stmt.name.lexeme
+        method!!.descriptor = function.functionDescriptor.getDescriptorString()
+        method!!.name = function.name.lexeme
 
-        comp(stmt.statements)
+        comp(function.statements)
 
         method!!.maxStack = maxStack
-        method!!.maxLocals = stmt.amountLocals
+        method!!.maxLocals = function.amountLocals
 
         if (method!!.name == "main") {
             method!!.descriptor = "([Ljava/lang/String;)V"
@@ -205,7 +207,7 @@ class Compiler : AstNodeVisitor<Unit> {
             method!!.isStatic = true
         }
 
-        for (modifier in stmt.modifiers) when (modifier.tokenType) {
+        for (modifier in function.modifiers) when (modifier.tokenType) {
             TokenType.K_PUBLIC -> method!!.isPublic = true
             TokenType.K_STATIC -> method!!.isStatic = true
             TokenType.K_ABSTRACT -> method!!.isAbstract = true
@@ -214,12 +216,12 @@ class Compiler : AstNodeVisitor<Unit> {
         method!!.isPrivate = !method!!.isPublic
 
         file!!.addMethod(method!!)
-        if (stmt.returnType == Datatype.VOID) emit(_return)
+        if (function.functionDescriptor.returnType == Datatype.Void()) emit(_return)
         if (lastStackMapFrameOffset >= method!!.curCodeOffset) method!!.popStackMapFrame() //TODO: can probably be done better
     }
 
-    override fun visit(stmt: AstNode.Program) {
-        curProgram = stmt
+    override fun visit(program: AstNode.Program) {
+        curProgram = program
 
         file = ClassFileBuilder()
         file!!.thisClass = topLevelName
@@ -228,24 +230,24 @@ class Compiler : AstNodeVisitor<Unit> {
         file!!.isPublic = true
         curFile = file!!.thisClass
 
-        for (func in stmt.funcs) comp(func)
+        for (func in program.funcs) comp(func)
 
         file!!.build("$outdir/$curFile.class")
 
-        for (clazz in stmt.classes) {
+        for (clazz in program.classes) {
             file = ClassFileBuilder()
             file!!.thisClass = clazz.name.lexeme
             file!!.superClass = "java/lang/Object"
             file!!.isSuper = true
             file!!.isPublic = true
             curFile = file!!.thisClass
-            for (func in clazz.funcs) comp(func)
+            for (func in clazz.staticFuncs) comp(func)
             file!!.build("$outdir/$curFile.class")
         }
 
     }
 
-    override fun visit(stmt: AstNode.Print) {
+    override fun visit(print: AstNode.Print) {
         emit(getStatic)
         emit(*Utils.getLastTwoBytes(file!!.fieldRefInfo(
             file!!.classInfo(file!!.utf8Info("java/lang/System")),
@@ -255,16 +257,10 @@ class Compiler : AstNodeVisitor<Unit> {
             )
         )))
         incStack(getObjVerificationType("java/io/PrintStream"))
-        comp(stmt.toPrint)
+        comp(print.toPrint)
         emit(invokevirtual)
 
-        val dataTypeToPrint = when (stmt.toPrint.type) {
-            Datatype.INT -> "I"
-            Datatype.FLOAT -> "F"
-            Datatype.BOOLEAN -> "Z"
-            Datatype.STRING -> "Ljava/lang/String;"
-            else -> TODO("not yet implemented")
-        }
+        val dataTypeToPrint = print.toPrint.type.descriptorType
 
         emit(*Utils.getLastTwoBytes(file!!.methodRefInfo(
             file!!.classInfo(file!!.utf8Info("java/io/PrintStream")),
@@ -277,58 +273,64 @@ class Compiler : AstNodeVisitor<Unit> {
         decStack()
     }
 
-    override fun visit(stmt: AstNode.ArtClass) {
+    override fun visit(clazz: AstNode.ArtClass) {
         TODO("Not yet implemented")
     }
 
-    override fun visit(exp: AstNode.Variable) {
-        when (exp.type) {
-            Datatype.INT, Datatype.BOOLEAN -> {
-                emitIntVarLoad(exp.index)
+    override fun visit(variable: AstNode.Variable) {
+        when (variable.type) {
+            Datatype.Integer(), Datatype.Bool() -> {
+                emitIntVarLoad(variable.index)
                 incStack(VerificationTypeInfo.Integer())
             }
-            Datatype.STRING -> {
-                emitObjectVarLoad(exp.index)
+            Datatype.Str() -> {
+                emitObjectVarLoad(variable.index)
                 incStack(getObjVerificationType("java/lang/String"))
             }
             else -> TODO("not yet implemented")
         }
     }
 
-    override fun visit(stmt: AstNode.VariableDeclaration) {
-        comp(stmt.initializer)
-        when (stmt.initializer.type) {
-            Datatype.INT , Datatype.BOOLEAN -> {
-                locals[stmt.index] = VerificationTypeInfo.Integer()
-                emitIntVarStore(stmt.index)
+    override fun visit(varDec: AstNode.VariableDeclaration) {
+        comp(varDec.initializer)
+        when (varDec.initializer.type) {
+            Datatype.Integer() , Datatype.Bool() -> {
+                locals[varDec.index] = VerificationTypeInfo.Integer()
+                emitIntVarStore(varDec.index)
             }
-            Datatype.STRING -> {
-                locals[stmt.index] = getObjVerificationType("java/lang/String")
-                emitObjectVarStore(stmt.index)
+            Datatype.Str() -> {
+                locals[varDec.index] = getObjVerificationType("java/lang/String")
+                emitObjectVarStore(varDec.index)
             }
             else -> TODO("not yet implemented")
         }
         decStack()
     }
 
-    override fun visit(stmt: AstNode.VariableAssignment) {
-        comp(stmt.toAssign)
-        when (stmt.toAssign.type) {
-            Datatype.INT -> emitIntVarStore(stmt.index)
-            Datatype.STRING -> emitObjectVarStore(stmt.index)
-            Datatype.BOOLEAN -> emitIntVarStore(stmt.index)
+    override fun visit(varAssign: AstNode.VariableAssignment) {
+        comp(varAssign.toAssign)
+        when (varAssign.toAssign.type) {
+            Datatype.Integer() -> emitIntVarStore(varAssign.index)
+            Datatype.Str() -> emitObjectVarStore(varAssign.index)
+            Datatype.Bool() -> emitIntVarStore(varAssign.index)
             else -> TODO("not yet implemented")
         }
         decStack()
     }
 
-    override fun visit(stmt: AstNode.Loop) {
+    override fun visit(loop: AstNode.Loop) {
         emitStackMapFrame()
         val before = method!!.curCodeOffset
-        comp(stmt.body)
+        loopContinueAddress = before
+        loopBreakAddressesToOverwrite = mutableListOf()
+        comp(loop.body)
         val absOffset = (before - method!!.curCodeOffset)
         emitGoto(absOffset)
         emitStackMapFrame()
+        val offset = method!!.curCodeOffset
+        for (addr in loopBreakAddressesToOverwrite) {
+            method!!.overwriteByteCode(addr, *Utils.getShortAsBytes((offset - (addr - 1)).toShort()))
+        }
     }
 
     override fun visit(stmt: AstNode.Block) {
@@ -344,16 +346,16 @@ class Compiler : AstNodeVisitor<Unit> {
         locals = before
     }
 
-    override fun visit(stmt: AstNode.If) {
-        val hasElse = stmt.elseStmt != null
+    override fun visit(ifStmt: AstNode.If) {
+        val hasElse = ifStmt.elseStmt != null
 
-        comp(stmt.condition)
+        comp(ifStmt.condition)
         emit(ifeq, 0x00.toByte(), 0x00.toByte())
         decStack()
         val jmpAddrOffset = method!!.curCodeOffset - 2
 
         wasReturn = false
-        comp(stmt.ifStmt)
+        comp(ifStmt.ifStmt)
         val skipGoto = wasReturn
         wasReturn = false
 
@@ -362,19 +364,19 @@ class Compiler : AstNodeVisitor<Unit> {
         val jmpAddr = method!!.curCodeOffset - (jmpAddrOffset - 1)
         method!!.overwriteByteCode(jmpAddrOffset, *Utils.getLastTwoBytes(jmpAddr))
         if (hasElse) emitStackMapFrame()
-        if (hasElse) comp(stmt.elseStmt!!)
+        if (hasElse) comp(ifStmt.elseStmt!!)
         val elseJmpAddr = method!!.curCodeOffset - (elseJmpAddrOffset - 1)
         if (hasElse && !skipGoto) method!!.overwriteByteCode(elseJmpAddrOffset, *Utils.getLastTwoBytes(elseJmpAddr))
         emitStackMapFrame()
     }
 
-    override fun visit(exp: AstNode.Group) {
-        comp(exp.grouped)
+    override fun visit(group: AstNode.Group) {
+        comp(group.grouped)
     }
 
-    override fun visit(exp: AstNode.Unary) {
-        comp(exp.on)
-        when (exp.operator.tokenType) {
+    override fun visit(unary: AstNode.Unary) {
+        comp(unary.on)
+        when (unary.operator.tokenType) {
             TokenType.MINUS -> emit(ineg)
             TokenType.NOT -> {
                 emitStackMapFrame()
@@ -390,69 +392,109 @@ class Compiler : AstNodeVisitor<Unit> {
         }
     }
 
-    override fun visit(stmt: AstNode.While) {
+    override fun visit(whileStmt: AstNode.While) {
         val startOffset = method!!.curCodeOffset
+        loopContinueAddress = startOffset
         emitStackMapFrame()
-        comp(stmt.condition)
+        comp(whileStmt.condition)
         emit(ifeq, 0x00.toByte(), 0x00.toByte())
         decStack()
         val jmpAddrOffset = method!!.curCodeOffset - 2
-        comp(stmt.body)
+        comp(whileStmt.body)
         emit(_goto, *Utils.getShortAsBytes((startOffset - method!!.curCodeOffset).toShort()))
         val jmpAddr = method!!.curCodeOffset - (jmpAddrOffset - 1)
         method!!.overwriteByteCode(jmpAddrOffset, *Utils.getLastTwoBytes(jmpAddr))
         emitStackMapFrame()
+        val offset = method!!.curCodeOffset
+        for (addr in loopBreakAddressesToOverwrite) {
+            method!!.overwriteByteCode(addr, *Utils.getShortAsBytes((offset - (addr - 1)).toShort()))
+        }
     }
 
-    override fun visit(exp: AstNode.FunctionCall) {
-        for (arg in exp.arguments) comp(arg)
-        val methodRefIndex = file!!.methodRefInfo(
-            file!!.classInfo(file!!.utf8Info(topLevelName)),
-            file!!.nameAndTypeInfo(
-                file!!.utf8Info(exp.name.lexeme),
-                file!!.utf8Info(curProgram.funcs[exp.funcIndex].getDescriptor())
+    override fun visit(funcCall: AstNode.FunctionCall) {
+        for (arg in funcCall.arguments) comp(arg)
+
+        val methodRefIndex: Int
+
+        if (funcCall.definition.clazz == null) {
+            methodRefIndex = file!!.methodRefInfo(
+                file!!.classInfo(file!!.utf8Info(topLevelName)),
+                file!!.nameAndTypeInfo(
+                    file!!.utf8Info((funcCall.func as Either.Right).value.lexeme),
+                    file!!.utf8Info(funcCall.definition.functionDescriptor.getDescriptorString())
+                )
             )
-        )
+        } else {
+            methodRefIndex = file!!.methodRefInfo(
+                file!!.classInfo(file!!.utf8Info(funcCall.definition.clazz!!.name.lexeme)),
+                file!!.nameAndTypeInfo(
+                    file!!.utf8Info(funcCall.definition.name.lexeme),
+                    file!!.utf8Info(funcCall.definition.functionDescriptor.getDescriptorString())
+                )
+            )
+        }
+
         emit(invokestatic, *Utils.getLastTwoBytes(methodRefIndex))
-        repeat(exp.arguments.size) { decStack() }
-        when (exp.type) {
-            Datatype.INT, Datatype.BOOLEAN -> incStack(VerificationTypeInfo.Integer())
-            Datatype.FLOAT -> incStack(VerificationTypeInfo.Float())
-            Datatype.STRING -> incStack(getObjVerificationType("java/lang/String"))
+        repeat(funcCall.arguments.size) { decStack() }
+        when (funcCall.type) {
+            Datatype.Integer(), Datatype.Bool() -> incStack(VerificationTypeInfo.Integer())
+            Datatype.Float() -> incStack(VerificationTypeInfo.Float())
+            Datatype.Str() -> incStack(getObjVerificationType("java/lang/String"))
             else -> { }
         }
     }
 
-    override fun visit(stmt: AstNode.Return) {
-        if (stmt.toReturn == null) {
+    override fun visit(returnStmt: AstNode.Return) {
+        if (returnStmt.toReturn == null) {
             emit(_return)
             return
         }
-        comp(stmt.toReturn)
-        emit(when (stmt.toReturn.type) {
-            Datatype.STRING -> areturn
-            Datatype.INT, Datatype.BOOLEAN -> ireturn
+        comp(returnStmt.toReturn)
+        emit(when (returnStmt.toReturn.type) {
+            Datatype.Str() -> areturn
+            Datatype.Integer(), Datatype.Bool() -> ireturn
             else -> TODO("not yet implemented")
         })
         decStack()
         wasReturn = true
     }
 
-    override fun visit(stmt: AstNode.VarIncrement) {
-        emit(iinc, (stmt.index and 0xFF).toByte(), stmt.toAdd)
+    override fun visit(varInc: AstNode.VarIncrement) {
+        emit(iinc, (varInc.index and 0xFF).toByte(), varInc.toAdd)
     }
 
-    override fun visit(exp: AstNode.WalrusAssign) {
-        comp(exp.toAssign)
+    override fun visit(walrus: AstNode.WalrusAssign) {
+        comp(walrus.toAssign)
         emit(dup)
         incStack(stack.peek())
-        when (exp.type) {
-            Datatype.INT -> emitIntVarStore(exp.index)
-            Datatype.STRING -> emitObjectVarStore(exp.index)
-            Datatype.BOOLEAN -> emitIntVarStore(exp.index)
+        when (walrus.type) {
+            Datatype.Integer() -> emitIntVarStore(walrus.index)
+            Datatype.Str() -> emitObjectVarStore(walrus.index)
+            Datatype.Bool() -> emitIntVarStore(walrus.index)
             else -> TODO("not yet implemented")
         }
         decStack()
+    }
+
+    override fun visit(get: AstNode.Get) {
+        TODO("Not yet implemented")
+    }
+
+    override fun visit(set: AstNode.Set) {
+        TODO("Not yet implemented")
+    }
+
+    override fun visit(walrus: AstNode.WalrusSet) {
+        TODO("Not yet implemented")
+    }
+
+    override fun visit(cont: AstNode.Continue) {
+        emitGoto(loopContinueAddress - method!!.curCodeOffset)
+    }
+
+    override fun visit(breac: AstNode.Break) {
+        emit(_goto, 0x00, 0x00)
+        loopBreakAddressesToOverwrite.add(method!!.curCodeOffset - 2)
     }
 
     private fun doCompare(compareInstruction: Byte) {

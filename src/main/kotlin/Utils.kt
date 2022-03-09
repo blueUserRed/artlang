@@ -64,3 +64,8 @@ object Utils {
         zipOutput.close()
     }
 }
+
+sealed class Either<out A, out B> {
+    class Left<out T> (val value: T) : Either<T, Nothing>()
+    class Right<out T> (val value: T) : Either<Nothing, T>()
+}

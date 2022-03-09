@@ -4,96 +4,170 @@ import ast.AstNode
 import ast.AstNodeVisitor
 import passes.TypeChecker.Datatype
 import java.lang.RuntimeException
+import passes.ControlFlowChecker.ControlFlowState
 
-//TODO: add more functionality when break and continue is introduced
-class ControlFlowChecker : AstNodeVisitor<Boolean> {
+class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
 
-    override fun visit(exp: AstNode.Binary): Boolean {
-        return false
+    private var surroundingLoop: AstNode? = null
+
+    override fun visit(binary: AstNode.Binary): ControlFlowState {
+        return ControlFlowState()
     }
 
-    override fun visit(exp: AstNode.Literal): Boolean {
-        return false
+    override fun visit(literal: AstNode.Literal): ControlFlowState {
+        return ControlFlowState()
     }
 
-    override fun visit(exp: AstNode.Variable): Boolean {
-        return false
+    override fun visit(variable: AstNode.Variable): ControlFlowState {
+        return ControlFlowState()
     }
 
-    override fun visit(exp: AstNode.Group): Boolean {
-        return false
+    override fun visit(group: AstNode.Group): ControlFlowState {
+        return ControlFlowState()
     }
 
-    override fun visit(exp: AstNode.Unary): Boolean {
-        return false
+    override fun visit(unary: AstNode.Unary): ControlFlowState {
+        return ControlFlowState()
     }
 
-    override fun visit(exp: AstNode.FunctionCall): Boolean {
-        return false
+    override fun visit(funcCall: AstNode.FunctionCall): ControlFlowState {
+        return ControlFlowState()
     }
 
-    override fun visit(stmt: AstNode.ExpressionStatement): Boolean {
-        return check(stmt.exp)
+    override fun visit(exprStmt: AstNode.ExpressionStatement): ControlFlowState {
+        return check(exprStmt.exp)
     }
 
-    override fun visit(stmt: AstNode.Function): Boolean {
-        if (stmt.returnType == Datatype.VOID) return false
-        if (!check(stmt.statements)) throw RuntimeException("Function ${stmt.name.lexeme} does not always return")
-        return false
+    override fun visit(function: AstNode.Function): ControlFlowState {
+        if (function.functionDescriptor.returnType == Datatype.Void()) return ControlFlowState()
+        if (!check(function.statements).alwaysReturns) {
+            throw RuntimeException("Function ${function.name.lexeme} does not always return")
+        }
+        return ControlFlowState()
     }
 
-    override fun visit(stmt: AstNode.Program): Boolean {
-        for (func in stmt.funcs) check(func)
-        for (c in stmt.classes) check(c)
-        return false
+    override fun visit(program: AstNode.Program): ControlFlowState {
+        for (func in program.funcs) check(func)
+        for (c in program.classes) check(c)
+        return ControlFlowState()
     }
 
-    override fun visit(stmt: AstNode.Print): Boolean {
-        return false
+    override fun visit(print: AstNode.Print): ControlFlowState {
+        return ControlFlowState()
     }
 
-    override fun visit(stmt: AstNode.Block): Boolean {
-        for (s in stmt.statements) if (check(s)) return true
-        return false
+    override fun visit(block: AstNode.Block): ControlFlowState {
+        var alwaysRet = false
+        var alwaysBreak = false
+        var sometimesBreak = false
+        var sometimesRet = false
+        for (s in block.statements) {
+            val result = check(s)
+            if (result.alwaysReturns) alwaysRet = true
+            if (result.alwaysBreaks) alwaysBreak = true
+            if (result.sometimesReturns) sometimesRet = true
+            if (result.sometimesBreaks) sometimesBreak = true
+        }
+        return ControlFlowState(alwaysRet, alwaysBreak, sometimesRet, sometimesBreak)
     }
 
-    override fun visit(stmt: AstNode.VariableDeclaration): Boolean {
-        return false
+    override fun visit(varDec: AstNode.VariableDeclaration): ControlFlowState {
+        return ControlFlowState()
     }
 
-    override fun visit(stmt: AstNode.VariableAssignment): Boolean {
-        return false
+    override fun visit(varAssign: AstNode.VariableAssignment): ControlFlowState {
+        return ControlFlowState()
     }
 
-    override fun visit(stmt:AstNode.Loop): Boolean {
-        return check(stmt.body) //TODO: will break when 'break'-keyword is introduced
+    override fun visit(loop: AstNode.Loop): ControlFlowState {
+        val tmp = surroundingLoop
+        surroundingLoop = loop
+        val result = check(loop.body)
+        var alwaysReturns = result.alwaysReturns
+        if (!result.sometimesBreaks && result.sometimesReturns) alwaysReturns = true
+        surroundingLoop = tmp
+        println(alwaysReturns)
+        println(result.sometimesReturns)
+        println(result.sometimesBreaks)
+        return ControlFlowState(
+            alwaysReturns = alwaysReturns,
+            alwaysBreaks = false,
+            sometimesReturns = result.sometimesReturns,
+            sometimesBreaks = false
+        )
     }
 
-    override fun visit(stmt: AstNode.If): Boolean {
-        val ifBranch = check(stmt.ifStmt)
-        val elseBranch = stmt.elseStmt?.let { check(it) } ?: false
-        return ifBranch && elseBranch
+    override fun visit(ifStmt: AstNode.If): ControlFlowState {
+        val ifBranch = check(ifStmt.ifStmt)
+        val elseBranch = ifStmt.elseStmt?.let { check(it) } ?: ControlFlowState()
+        return ControlFlowState(
+            ifBranch.alwaysReturns && elseBranch.alwaysReturns,
+            ifBranch.alwaysBreaks && elseBranch.alwaysBreaks,
+            ifBranch.sometimesReturns || elseBranch.sometimesReturns,
+            ifBranch.sometimesBreaks || elseBranch.sometimesBreaks
+        )
     }
 
-    override fun visit(stmt: AstNode.While): Boolean {
-        return false
+    override fun visit(whileStmt: AstNode.While): ControlFlowState {
+        val result = check(whileStmt.body)
+        return ControlFlowState(
+            alwaysReturns = false,
+            alwaysBreaks = false,
+            sometimesReturns = result.sometimesReturns,
+            sometimesBreaks = false
+        )
     }
 
-    override fun visit(stmt: AstNode.Return): Boolean {
-        return true
+    override fun visit(returnStmt: AstNode.Return): ControlFlowState {
+        return ControlFlowState(alwaysReturns = true, sometimesReturns = true)
     }
 
-    override fun visit(stmt: AstNode.VarIncrement): Boolean {
-        return false
+    override fun visit(varInc: AstNode.VarIncrement): ControlFlowState {
+        return ControlFlowState()
     }
 
-    override fun visit(stmt: AstNode.ArtClass): Boolean {
-        return false
+    override fun visit(clazz: AstNode.ArtClass): ControlFlowState {
+        return ControlFlowState()
     }
 
-    override fun visit(exp: AstNode.WalrusAssign): Boolean {
-        return false
+    override fun visit(walrus: AstNode.WalrusAssign): ControlFlowState {
+        return ControlFlowState()
     }
 
-    private fun check(node: AstNode): Boolean = node.accept(this)
+    override fun visit(get: AstNode.Get): ControlFlowState {
+        return ControlFlowState()
+    }
+
+    override fun visit(set: AstNode.Set): ControlFlowState {
+        return ControlFlowState()
+    }
+
+    override fun visit(walrus: AstNode.WalrusSet): ControlFlowState {
+        return ControlFlowState()
+    }
+
+    override fun visit(cont: AstNode.Continue): ControlFlowState {
+        if (surroundingLoop == null) throw RuntimeException("Used continue outside of a loop")
+        return ControlFlowState()
+    }
+
+    override fun visit(breac: AstNode.Break): ControlFlowState {
+        if (surroundingLoop == null) throw RuntimeException("Used break outside of a loop")
+        return ControlFlowState(
+            alwaysReturns = false,
+            alwaysBreaks = true,
+            sometimesReturns = false,
+            sometimesBreaks = true
+        )
+    }
+
+    private fun check(node: AstNode): ControlFlowState = node.accept(this)
+
+    data class ControlFlowState(
+        val alwaysReturns: Boolean = false,
+        val alwaysBreaks: Boolean = false,
+        val sometimesReturns: Boolean = false,
+        val sometimesBreaks: Boolean = false
+    )
+
 }
