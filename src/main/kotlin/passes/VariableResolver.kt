@@ -32,8 +32,10 @@ class VariableResolver : AstNodeVisitor<Unit> {
 
     override fun visit(function: AstNode.Function) {
         val vars = mutableListOf<String>()
-        for (entry in function.argTokens) vars.add(entry.first.lexeme)
+        if (function.hasThis) vars.add("this")
+        for (arg in function.args) vars.add(arg.first.lexeme)
         curVars = vars
+        maxLocals = vars.size
         resolve(function.statements)
         function.amountLocals = maxLocals
     }
@@ -48,10 +50,10 @@ class VariableResolver : AstNodeVisitor<Unit> {
         resolve(print.toPrint)
     }
 
-    override fun visit(stmt: AstNode.Block) {
+    override fun visit(block: AstNode.Block) {
         val before = curVars.toMutableList()
         val beforeDecs = varDeclarations.toMutableList()
-        for (s in stmt.statements) resolve(s)
+        for (s in block.statements) resolve(s)
         if (curVars.size > maxLocals) maxLocals = curVars.size
         curVars = before
         varDeclarations = beforeDecs
@@ -113,6 +115,7 @@ class VariableResolver : AstNodeVisitor<Unit> {
 
     override fun visit(clazz: AstNode.ArtClass) {
         for (func in clazz.staticFuncs) resolve(func)
+        for (func in clazz.funcs) resolve(func)
     }
 
     override fun visit(walrus: AstNode.WalrusAssign) {

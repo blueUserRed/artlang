@@ -2,9 +2,11 @@ package parser
 
 import Either
 import ast.AstNode
+import passes.TypeChecker
 import tokenizer.Token
 import tokenizer.TokenType
 import java.lang.RuntimeException
+import passes.TypeChecker.Datakind
 
 object Parser {
 
@@ -19,7 +21,7 @@ object Parser {
         val classes = mutableListOf<AstNode.ArtClass>()
         while (!match(TokenType.EOF)) {
             if (match(TokenType.K_FN)) {
-                functions.add(parseFunc(listOf()))
+                functions.add(parseFunc(listOf(), true))
                 continue
             }
             if (match(TokenType.K_CLASS)) {
@@ -31,7 +33,7 @@ object Parser {
         return AstNode.Program(functions.toTypedArray(), classes.toTypedArray())
     }
 
-    private fun parseFunc(modifiers: List<Token>): AstNode.Function {
+    private fun parseFunc(modifiers: List<Token>, isTopLevel: Boolean): AstNode.Function {
         consumeOrError(TokenType.IDENTIFIER, "Expected function name")
         val funcName = last()
         consumeOrError(TokenType.L_PAREN, "Expected () after function name")
@@ -39,7 +41,7 @@ object Parser {
         if (funcName.lexeme == "main" && modifiers.isNotEmpty())
             throw RuntimeException("function main must not have access modifiers")
 
-        val args = mutableListOf<Pair<Token, Token>>()
+        val args = mutableListOf<Pair<Token, AstNode.DatatypeNode>>()
 
         while (match(TokenType.IDENTIFIER)) {
             val name = last()
@@ -51,14 +53,14 @@ object Parser {
 
         consumeOrError(TokenType.R_PAREN, "Expected () after function name")
 
-        var returnType: Token? = null
+        var returnType: AstNode.DatatypeNode? = null
         if (match(TokenType.COLON)) returnType = parseType()
 
         consumeOrError(TokenType.L_BRACE, "Expected code block after function declaration")
 
-        val function = AstNode.Function(parseBlock(), funcName, modifiers)
-        function.argTokens = args
-        function.returnTypeToken = returnType
+        val function = AstNode.Function(parseBlock(), funcName, modifiers, isTopLevel)
+        function.args = args
+        function.returnType = returnType
 
         return function
     }
@@ -72,7 +74,7 @@ object Parser {
         while (!match(TokenType.R_BRACE)) {
             val modifiers = parseModifiers()
             consumeOrError(TokenType.K_FN, "Expected function")
-            val func = parseFunc(modifiers)
+            val func = parseFunc(modifiers, false)
             if (func.isStatic) staticFuncs.add(func) else funcs.add(func)
         }
         return AstNode.ArtClass(name, staticFuncs.toTypedArray(), funcs.toTypedArray())
@@ -219,14 +221,14 @@ object Parser {
     private fun parseVariableDeclaration(isConst: Boolean): AstNode {
         consumeOrError(TokenType.IDENTIFIER, "expected identifier after let")
         val name = last()
-        var type: Token? = null
+        var type: AstNode.DatatypeNode? = null
         if (match(TokenType.COLON)) type = parseType()
         consumeOrError(TokenType.EQ, "initializer expected")
         val initializer = parseStatement()
 //        consumeOrError(TokenType.SEMICOLON, "Expected a Semicolon after variable Declaration")
 //        consumeSoftBreaks()
         val stmt = AstNode.VariableDeclaration(name, initializer, isConst)
-        stmt.typeToken = type
+        stmt.explType = type
         return stmt
     }
 
@@ -356,11 +358,17 @@ object Parser {
         return AstNode.Print(exp)
     }
 
-    private fun parseType(): Token {
-        if (!match(TokenType.T_INT, TokenType.T_STRING, TokenType.T_BOOLEAN)) {
-            throw RuntimeException("Expected Datatype")
+    private fun parseType(): AstNode.DatatypeNode {
+        if (match(TokenType.T_INT, TokenType.T_STRING, TokenType.T_BOOLEAN)) {
+            return AstNode.PrimitiveTypeNode(when (last().tokenType) {
+                TokenType.T_INT -> Datakind.INT
+                TokenType.T_STRING -> Datakind.STRING
+                TokenType.T_BOOLEAN -> Datakind.BOOLEAN
+                else -> throw RuntimeException("unreachable")
+            })
         }
-        return last()
+        consumeOrError(TokenType.IDENTIFIER, "Expected Type")
+        return AstNode.ObjectTypeNode(last())
     }
 
     private fun match(vararg types: TokenType): Boolean {

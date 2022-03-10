@@ -94,7 +94,6 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         val newVars = mutableMapOf<Int, Datatype>()
         for (i in function.functionDescriptor.args.indices) newVars[i] = function.functionDescriptor.args[i].second
         vars = newVars
-        vars = newVars
         function.clazz = curClass
         function.statements.accept(this)
         return Datatype.Void()
@@ -102,7 +101,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
     override fun visit(program: AstNode.Program): Datatype {
         curProgram = program
-        for (func in program.funcs) preCalcFuncSigs(func)
+        for (func in program.funcs) preCalcFuncSigs(func, null)
         for (c in program.classes) preCalcClass(c)
         for (func in program.funcs) func.accept(this)
         for (c in program.classes) c.accept(this)
@@ -110,17 +109,18 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     }
 
     private fun preCalcClass(clazz: AstNode.ArtClass) {
-        for (func in clazz.staticFuncs) preCalcFuncSigs(func)
-        for (func in clazz.funcs) preCalcFuncSigs(func)
+        for (func in clazz.staticFuncs) preCalcFuncSigs(func, clazz)
+        for (func in clazz.funcs) preCalcFuncSigs(func, clazz)
     }
 
-    private fun preCalcFuncSigs(func: AstNode.Function) { //TODO: fix for class funcs
+    private fun preCalcFuncSigs(func: AstNode.Function, clazz: AstNode.ArtClass?) {
         curFunction = func
 
         val args = mutableListOf<Pair<String, Datatype>>()
-        for (arg in func.argTokens) args.add(Pair(arg.first.lexeme, tokenToDataType(arg.second.tokenType)))
+        if (func.hasThis) args.add(Pair("this", Datatype.Object(clazz!!.name.lexeme, clazz)))
+        for (arg in func.args) args.add(Pair(arg.first.lexeme, typeNodeToDataType(arg.second)))
 
-        val returnType = func.returnTypeToken?.let { tokenToDataType(it.tokenType) } ?: Datatype.Void()
+        val returnType = func.returnType?.let { typeNodeToDataType(it) } ?: Datatype.Void()
         func.functionDescriptor = FunctionDescriptor(args, returnType)
     }
 
@@ -150,8 +150,8 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     override fun visit(varDec: AstNode.VariableDeclaration): Datatype {
         val type = check(varDec.initializer, varDec)
         if (type == Datatype.Void()) throw RuntimeException("Expected Expression in var initializer")
-        if (varDec.typeToken != null) {
-            val type2 = tokenToDataType(varDec.typeToken!!.tokenType)
+        if (varDec.explType != null) {
+            val type2 = typeNodeToDataType(varDec.explType!!)
             if (type2 != type) throw RuntimeException("Incompatible types in declaration: $type2 and $type")
         }
         vars[varDec.index] = type
@@ -207,48 +207,27 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             thisSig.add(arg.type)
         }
 
-        if (funcCall.func is Either.Left) {
-            val ref = check((funcCall.func as Either.Left<AstNode>).value, funcCall)
-
-            if (ref.matches(Datakind.STAT_FUNC_REF)) {
-                ref as Datatype.StatFuncRef
-                if (!doFuncSigsMatch(thisSig, ref.func.functionDescriptor.args)) {
-                    throw RuntimeException("incorrect Arguments supplied for function ${funcCall.getFullName()}")
-                }
-                funcCall.definition = ref.func
-                funcCall.type = ref.func.functionDescriptor.returnType
-                return ref.func.functionDescriptor.returnType
-            }
-            if (ref.matches(Datakind.AMBIG_STAT_FUNC_REF)) {
-                ref as Datatype.AmbigStatFuncRef
-                var definition: AstNode.Function? = null
-                for (func in ref.possibilities) if (doFuncSigsMatch(thisSig, func.func.functionDescriptor.args)) {
-                    definition = func.func
-                    break
-                }
-                if (definition == null) {
-                    throw RuntimeException("Cant call any variant of ${funcCall.getFullName()} with arguments supplied")
-                }
-                funcCall.definition = definition
-                funcCall.type = definition.functionDescriptor.returnType
-                return definition.functionDescriptor.returnType
-            }
-        }
-
-        funcCall.func as Either.Right
+        if (funcCall.func is Either.Left) return doFuncCallFromNode(funcCall, thisSig)
 
         var funcDefinition: AstNode.Function? = null
-        if (curClass != null) for (func in curClass!!.staticFuncs) {
-            if (func.name.lexeme != (funcCall.func as Either.Right<Token>).value.lexeme) continue
-            if (!doFuncSigsMatch(thisSig, func.functionDescriptor.args)) continue
-            funcDefinition = func
-        }
-        if (funcDefinition == null) for (func in curProgram.funcs) {
-            if (func.name.lexeme != (funcCall.func as Either.Right<Token>).value.lexeme) continue
-            if (!doFuncSigsMatch(thisSig, func.functionDescriptor.args)) continue
-            funcDefinition = func
-        }
+        if (funcDefinition == null) funcDefinition = findStaticFunc(funcCall, thisSig)
 
+        val result = doConstructorCall(funcDefinition, funcCall, thisSig)
+        if (result != null) return result
+
+        if (funcDefinition == null) throw RuntimeException("Function ${funcCall.getFullName()} does not exist")
+
+        funcCall.definition = funcDefinition
+        val type = funcDefinition.functionDescriptor.returnType
+        funcCall.type = type
+        return type
+    }
+
+    private fun doConstructorCall(
+        funcDefinition: AstNode.Function?,
+        funcCall: AstNode.FunctionCall,
+        thisSig: MutableList<Datatype>
+    ): Datatype.Object? {
         if (
             funcDefinition == null &&
             curClass != null &&
@@ -256,21 +235,61 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             thisSig.size == 0
         ) {
             swap = AstNode.ConstructorCall(curClass!!, mutableListOf())
+            swap!!.type = Datatype.Object(curClass!!.name.lexeme, curClass!!)
             return Datatype.Object(curClass!!.name.lexeme, curClass!!)
         }
 
         if (funcDefinition == null && thisSig.size == 0) for (c in curProgram.classes) {
             if (c.name.lexeme == (funcCall.func as Either.Right<Token>).value.lexeme) {
                 swap = AstNode.ConstructorCall(c, mutableListOf())
+                swap!!.type = Datatype.Object(c.name.lexeme, c)
                 return Datatype.Object(c.name.lexeme, c)
             }
         }
+        return null
+    }
 
-        if (funcDefinition == null) throw RuntimeException("Function ${funcCall.getFullName()} does not exist")
-        funcCall.definition = funcDefinition
-        val type = funcDefinition.functionDescriptor.returnType
-        funcCall.type = type
-        return type
+    private fun findStaticFunc(funcCall: AstNode.FunctionCall, thisSig: MutableList<Datatype>): AstNode.Function? {
+        if (curClass != null) for (func in curClass!!.staticFuncs) {
+            if (func.name.lexeme != (funcCall.func as Either.Right<Token>).value.lexeme) continue
+            if (!doFuncSigsMatch(thisSig, func.functionDescriptor.args)) continue
+            return func
+        }
+        for (func in curProgram.funcs) {
+            if (func.name.lexeme != (funcCall.func as Either.Right<Token>).value.lexeme) continue
+            if (!doFuncSigsMatch(thisSig, func.functionDescriptor.args)) continue
+            return func
+        }
+        return null
+    }
+
+    private fun doFuncCallFromNode(funcCall: AstNode.FunctionCall, thisSig: MutableList<Datatype>): Datatype {
+        val ref = check((funcCall.func as Either.Left<AstNode>).value, funcCall)
+
+        if (ref.matches(Datakind.STAT_FUNC_REF)) {
+            ref as Datatype.StatFuncRef
+            if (!doFuncSigsMatch(thisSig, ref.func.functionDescriptor.args)) {
+                throw RuntimeException("incorrect Arguments supplied for function ${funcCall.getFullName()}")
+            }
+            funcCall.definition = ref.func
+            funcCall.type = ref.func.functionDescriptor.returnType
+            return ref.func.functionDescriptor.returnType
+        }
+
+        if (!ref.matches(Datakind.AMBIG_STAT_FUNC_REF)) throw RuntimeException("unreachable")
+
+        ref as Datatype.AmbigStatFuncRef
+        var definition: AstNode.Function? = null
+        for (func in ref.possibilities) if (doFuncSigsMatch(thisSig, func.func.functionDescriptor.args)) {
+            definition = func.func
+            break
+        }
+        if (definition == null) {
+            throw RuntimeException("Cant call any variant of ${funcCall.getFullName()} with arguments supplied")
+        }
+        funcCall.definition = definition
+        funcCall.type = definition.functionDescriptor.returnType
+        return definition.functionDescriptor.returnType
     }
 
     override fun visit(returnStmt: AstNode.Return): Datatype {
@@ -354,10 +373,18 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         return res
     }
 
-    private fun tokenToDataType(token: TokenType): Datatype = when (token) {
-        TokenType.T_BOOLEAN -> Datatype.Bool()
-        TokenType.T_INT -> Datatype.Integer()
-        TokenType.T_STRING -> Datatype.Str()
+    private fun typeNodeToDataType(node: AstNode.DatatypeNode): Datatype = when (node.kind) {
+        Datakind.BOOLEAN -> Datatype.Bool()
+        Datakind.INT -> Datatype.Integer()
+        Datakind.STRING -> Datatype.Str()
+        Datakind.OBJECT -> {
+            node as AstNode.ObjectTypeNode
+            var toRet: Datatype? = null
+            for (c in curProgram.classes) if (c.name.lexeme == node.identifier.lexeme) {
+                toRet = Datatype.Object(c.name.lexeme, c)
+            }
+            toRet ?: throw RuntimeException("unknown Type: ${node.identifier.lexeme}")
+        }
         else -> throw RuntimeException("invalid type")
     }
 

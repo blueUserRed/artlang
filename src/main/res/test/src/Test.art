@@ -8,6 +8,10 @@ class HiSayer {
     fn sayHi() {
         print "hi"
     }
+
+    static fn getInstance(): HiSayer {
+        return HiSayer()
+    }
 }
 
 /**

@@ -7,6 +7,7 @@ import classFile.MethodBuilder
 import classFile.StackMapTableAttribute
 import tokenizer.TokenType
 import classFile.StackMapTableAttribute.VerificationTypeInfo
+import passes.TypeChecker.Datakind
 import java.io.File
 import passes.TypeChecker.Datatype
 import java.util.*
@@ -17,6 +18,7 @@ class Compiler : AstNodeVisitor<Unit> {
     private var topLevelName: String = ""
     private var originFileName: String = ""
     private var curFile: String = ""
+    private var isTopLevel: Boolean = false
 
     private var stack: Stack<VerificationTypeInfo> = Stack()
     private var maxStack: Int = 0
@@ -178,20 +180,24 @@ class Compiler : AstNodeVisitor<Unit> {
     override fun visit(function: AstNode.Function) {
         stack = Stack()
         locals = MutableList(function.amountLocals) { null }
+
         for (i in function.functionDescriptor.args.indices) {
-            locals[i] = when (function.functionDescriptor.args[i].second) {
+            locals[i] = when (val arg = function.functionDescriptor.args[i].second) {
                 Datatype.Integer(), Datatype.Bool() -> VerificationTypeInfo.Integer()
                 Datatype.Float() -> VerificationTypeInfo.Float()
                 Datatype.Str() -> getObjVerificationType("java/lang/String")
-                else -> TODO("not yet implemented")
+                else -> {
+                    if (arg.matches(Datakind.OBJECT)) getObjVerificationType((arg as Datatype.Object).name)
+                    else TODO("not yet implemented")
+                }
             }
         }
+
         maxStack = 0
         lastStackMapFrameOffset = 0
 
         method = MethodBuilder()
-//        method!!.isPublic = true
-//        method!!.isStatic = true
+
         method!!.descriptor = function.functionDescriptor.getDescriptorString()
         method!!.name = function.name.lexeme
 
@@ -213,6 +219,12 @@ class Compiler : AstNodeVisitor<Unit> {
             TokenType.K_ABSTRACT -> method!!.isAbstract = true
             else -> TODO("not yet implemented")
         }
+
+        if (isTopLevel) {
+            method!!.isPublic = true
+            method!!.isStatic = true
+        }
+
         method!!.isPrivate = !method!!.isPublic
 
         file!!.addMethod(method!!)
@@ -230,7 +242,9 @@ class Compiler : AstNodeVisitor<Unit> {
         file!!.isPublic = true
         curFile = file!!.thisClass
 
+        isTopLevel = true
         for (func in program.funcs) comp(func)
+        isTopLevel = false
 
         file!!.build("$outdir/$curFile.class")
 
@@ -295,17 +309,19 @@ class Compiler : AstNodeVisitor<Unit> {
 
     override fun visit(varDec: AstNode.VariableDeclaration) {
         comp(varDec.initializer)
-        when (varDec.initializer.type) {
-            Datatype.Integer() , Datatype.Bool() -> {
-                locals[varDec.index] = VerificationTypeInfo.Integer()
-                emitIntVarStore(varDec.index)
-            }
-            Datatype.Str() -> {
-                locals[varDec.index] = getObjVerificationType("java/lang/String")
-                emitObjectVarStore(varDec.index)
-            }
-            else -> TODO("not yet implemented")
+        if (varDec.initializer.type.matches(Datakind.INT, Datakind.BOOLEAN)) {
+            locals[varDec.index] = VerificationTypeInfo.Integer()
+            emitIntVarStore(varDec.index)
         }
+        else if (varDec.initializer.type.matches(Datakind.STRING)) {
+            locals[varDec.index] = getObjVerificationType("java/lang/String")
+            emitObjectVarStore(varDec.index)
+        }
+        else if (varDec.initializer.type.matches(Datakind.OBJECT)) {
+            locals[varDec.index] = getObjVerificationType((varDec.initializer.type as Datatype.Object).clazz.name.lexeme)
+            emitObjectVarStore(varDec.index)
+        }
+        else TODO("not yet implemented")
         decStack()
     }
 
@@ -451,12 +467,14 @@ class Compiler : AstNodeVisitor<Unit> {
             emit(_return)
             return
         }
+
         comp(returnStmt.toReturn!!)
-        emit(when (returnStmt.toReturn!!.type) {
-            Datatype.Str() -> areturn
-            Datatype.Integer(), Datatype.Bool() -> ireturn
-            else -> TODO("not yet implemented")
-        })
+
+        if (returnStmt.toReturn!!.type.matches(Datakind.STRING)) emit(areturn)
+        else if (returnStmt.toReturn!!.type.matches(Datakind.INT, Datakind.STRING)) emit(ireturn)
+        else if (returnStmt.toReturn!!.type.matches(Datakind.OBJECT)) emit(areturn)
+        else TODO("not yet implemented")
+
         decStack()
         wasReturn = true
     }
@@ -500,7 +518,20 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     override fun visit(constructorCall: AstNode.ConstructorCall) {
-        TODO("Not yet implemented")
+        emit(new, *Utils.getLastTwoBytes(file!!.classInfo(file!!.utf8Info(constructorCall.clazz.name.lexeme))))
+        incStack(getObjVerificationType(constructorCall.clazz.name.lexeme))
+        emit(dup)
+        incStack(getObjVerificationType(constructorCall.clazz.name.lexeme))
+
+        val methodIndex = file!!.methodRefInfo(
+            file!!.classInfo(file!!.utf8Info(constructorCall.clazz.name.lexeme)),
+            file!!.nameAndTypeInfo(
+                file!!.utf8Info("<init>"),
+                file!!.utf8Info("()V")
+            )
+        )
+        emit(invokespecial, *Utils.getLastTwoBytes(methodIndex))
+        decStack()
     }
 
     private fun doDefaultConstructor() {

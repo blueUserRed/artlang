@@ -1,8 +1,10 @@
 package ast
 import Either
+import passes.TypeChecker
 import tokenizer.Token
 import passes.TypeChecker.Datatype
 import tokenizer.TokenType
+import passes.TypeChecker.Datakind
 
 abstract class AstNode {
 
@@ -25,11 +27,16 @@ abstract class AstNode {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
-    class Function(var statements: Block, val name: Token, val modifiers: List<Token>) : AstNode() {
+    class Function(
+        var statements: Block,
+        val name: Token,
+        val modifiers: List<Token>,
+        val isTopLevel: Boolean
+    ) : AstNode() {
 
         var amountLocals: Int = 0
-        var argTokens: MutableList<Pair<Token, Token>> = mutableListOf()
-        var returnTypeToken: Token? = null
+        var args: MutableList<Pair<Token, DatatypeNode>> = mutableListOf()
+        var returnType: DatatypeNode? = null
 
         lateinit var functionDescriptor: FunctionDescriptor
 
@@ -46,6 +53,9 @@ abstract class AstNode {
                 for (modifier in modifiers) if (modifier.tokenType == TokenType.K_PUBLIC) return false
                 return true
             }
+
+        val hasThis: Boolean
+            get() = !isStatic && !isTopLevel
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (statements !== orig || to !is Block) throw CantSwapException()
@@ -116,7 +126,8 @@ abstract class AstNode {
     class VariableDeclaration(val name: Token, var initializer: AstNode, val isConst: Boolean) : AstNode() {
 
         var index: Int = 0
-        var typeToken: Token? = null
+//        var typeToken: Token? = null
+        var explType: DatatypeNode? = null
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (orig !== initializer) throw CantSwapException()
@@ -369,6 +380,10 @@ abstract class AstNode {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
+    abstract class DatatypeNode(val kind: Datakind)
+    class PrimitiveTypeNode(kind: Datakind) : DatatypeNode(kind)
+    class ObjectTypeNode(val identifier: Token) : DatatypeNode(Datakind.OBJECT)
+
 }
 
 data class FunctionDescriptor(val args: MutableList<Pair<String, Datatype>>, val returnType: Datatype) {
@@ -376,7 +391,7 @@ data class FunctionDescriptor(val args: MutableList<Pair<String, Datatype>>, val
     fun getDescriptorString(): String {
         val builder = StringBuilder()
         builder.append("(")
-        for (arg in args) builder.append(arg.second.descriptorType)
+        for (arg in args) if (arg.first != "this") builder.append(arg.second.descriptorType)
         builder.append(")")
         builder.append(returnType.descriptorType)
         return builder.toString()
