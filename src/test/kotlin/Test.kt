@@ -1,6 +1,6 @@
 import Test.programDir
 import Test.sampleOutDir
-import ast.ASTPrinter
+import ast.AstPrinter
 import parser.Parser
 import passes.ControlFlowChecker
 import passes.TypeChecker
@@ -44,7 +44,7 @@ object Test {
         println("------------------------------------\n\n")
 
         println("----------------AST-----------------")
-        println(program.accept(ASTPrinter()))
+        println(program.accept(AstPrinter()))
         println("------------------------------------\n\n")
 
         println("running variable resolver")

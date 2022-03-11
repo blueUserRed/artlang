@@ -1,17 +1,20 @@
 package compiler
 
+import Either
+import Utils
 import ast.AstNode
 import ast.AstNodeVisitor
 import classFile.ClassFileBuilder
 import classFile.MethodBuilder
 import classFile.StackMapTableAttribute
-import tokenizer.TokenType
 import classFile.StackMapTableAttribute.VerificationTypeInfo
 import passes.TypeChecker.Datakind
-import java.io.File
 import passes.TypeChecker.Datatype
+import tokenizer.TokenType
+import java.io.File
 import java.util.*
 
+//TODO: there are way to many todos in here
 class Compiler : AstNodeVisitor<Unit> {
 
     private var outdir: String = ""
@@ -294,17 +297,16 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     override fun visit(variable: AstNode.Variable) {
-        when (variable.type) {
-            Datatype.Integer(), Datatype.Bool() -> {
-                emitIntVarLoad(variable.index)
-                incStack(VerificationTypeInfo.Integer())
-            }
-            Datatype.Str() -> {
-                emitObjectVarLoad(variable.index)
-                incStack(getObjVerificationType("java/lang/String"))
-            }
-            else -> TODO("not yet implemented")
-        }
+        if (variable.type.matches(Datakind.INT, Datakind.BOOLEAN)) {
+            emitIntVarLoad(variable.index)
+            incStack(VerificationTypeInfo.Integer())
+        } else if (variable.type.matches(Datakind.STRING)) {
+            emitObjectVarLoad(variable.index)
+            incStack(getObjVerificationType("java/lang/String"))
+        } else if (variable.type.matches(Datakind.OBJECT)) {
+            emitObjectVarLoad(variable.index)
+            incStack(getObjVerificationType((variable.type as Datatype.Object).clazz.name.lexeme))
+        } else TODO("not yet implemented")
     }
 
     override fun visit(varDec: AstNode.VariableDeclaration) {
@@ -430,6 +432,38 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     override fun visit(funcCall: AstNode.FunctionCall) {
+        if (funcCall.definition.isStatic || funcCall.definition.isTopLevel) {
+            doStaticFuncCall(funcCall)
+            return
+        }
+
+        val funcref = (funcCall.func as Either.Left).value as AstNode.Get
+        comp(funcref)
+        for (arg in funcCall.arguments) comp(arg)
+
+        val methodRefIndex = file!!.methodRefInfo(
+            file!!.classInfo(file!!.utf8Info((funcref.from.type as Datatype.Object).clazz.name.lexeme)),
+            file!!.nameAndTypeInfo(
+                file!!.utf8Info(funcCall.definition.name.lexeme),
+                file!!.utf8Info(funcCall.definition.functionDescriptor.getDescriptorString())
+            )
+        )
+
+        emit(invokevirtual, *Utils.getLastTwoBytes(methodRefIndex))
+        decStack()
+        repeat(funcCall.arguments.size) { decStack() }
+
+        if (funcCall.type.matches(Datakind.INT, Datakind.BOOLEAN)) {
+            incStack(VerificationTypeInfo.Integer())
+        } else if (funcCall.type.matches(Datakind.STRING)) {
+            incStack(getObjVerificationType("java/lang/String"))
+        } else if (funcCall.type.matches(Datakind.OBJECT)) {
+            incStack(getObjVerificationType((funcCall.type as Datatype.Object).clazz.name.lexeme))
+        } else if (funcCall.type.matches(Datakind.VOID)) {
+        } else TODO("not yet implemented")
+    }
+
+    private fun doStaticFuncCall(funcCall: AstNode.FunctionCall) {
         for (arg in funcCall.arguments) comp(arg)
 
         val methodRefIndex: Int
@@ -458,7 +492,7 @@ class Compiler : AstNodeVisitor<Unit> {
             Datatype.Integer(), Datatype.Bool() -> incStack(VerificationTypeInfo.Integer())
             Datatype.Float() -> incStack(VerificationTypeInfo.Float())
             Datatype.Str() -> incStack(getObjVerificationType("java/lang/String"))
-            else -> { }
+            else -> TODO("not yet implemented")
         }
     }
 
@@ -497,7 +531,8 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     override fun visit(get: AstNode.Get) {
-        TODO("Not yet implemented")
+        if (!get.from.type.matches(Datakind.OBJECT)) TODO("not yet implemented")
+        comp(get.from)
     }
 
     override fun visit(set: AstNode.Set) {

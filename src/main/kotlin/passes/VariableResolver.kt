@@ -126,16 +126,16 @@ class VariableResolver : AstNodeVisitor<Unit> {
     }
 
     override fun visit(get: AstNode.Get) {
-//        resolve(get.from)
+        resolve(get.from)
     }
 
     override fun visit(set: AstNode.Set) {
-//        resolve(set.from)
+        resolve(set.from)
         resolve(set.to)
     }
 
     override fun visit(walrus: AstNode.WalrusSet) {
-//        resolve(walrus.from)
+        resolve(walrus.from)
         resolve(walrus.to)
     }
 

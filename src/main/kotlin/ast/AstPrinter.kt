@@ -2,7 +2,7 @@ package ast
 
 import tokenizer.TokenType
 
-class ASTPrinter : AstNodeVisitor<String> {
+class AstPrinter : AstNodeVisitor<String> {
 
     override fun visit(binary: AstNode.Binary): String {
         return "(${binary.left.accept(this)} ${binary.right.accept(this)} ${binary.operator.lexeme})"
@@ -113,7 +113,7 @@ class ASTPrinter : AstNodeVisitor<String> {
     }
 
     override fun visit(get: AstNode.Get): String {
-        return "${get.from.accept(this)}.${get.name}"
+        return "${get.from.accept(this)}.${get.name.lexeme}"
     }
 
     override fun visit(set: AstNode.Set): String {

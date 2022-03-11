@@ -1,4 +1,4 @@
-import ast.ASTPrinter
+import ast.AstPrinter
 import compiler.Compiler
 import parser.Parser
 import passes.ControlFlowChecker
@@ -33,7 +33,7 @@ object Main {
         val program = Parser.parse(tokens)
 
         println("----------------AST-----------------")
-        println(program.accept(ASTPrinter()))
+        println(program.accept(AstPrinter()))
         println("------------------------------------\n\n")
 
         println("running variable resolver")
@@ -49,7 +49,7 @@ object Main {
         println("done\n")
 
         println("------------revised AST-------------")
-        println(program.accept(ASTPrinter()))
+        println(program.accept(AstPrinter()))
         println("------------------------------------\n\n")
 
         Files.walk(Paths.get("$outDir/tmp/")).skip(1).forEach(Files::delete)

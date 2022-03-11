@@ -1,6 +1,6 @@
 package passes
 
-import ast.ASTPrinter
+import ast.AstPrinter
 import ast.AstNode
 import ast.AstNodeVisitor
 import ast.FunctionDescriptor
@@ -267,30 +267,72 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         val ref = check((funcCall.func as Either.Left<AstNode>).value, funcCall)
 
         if (ref.matches(Datakind.STAT_FUNC_REF)) {
+
             ref as Datatype.StatFuncRef
+            if (!doFuncSigsMatch(thisSig, ref.func.functionDescriptor.args)) {
+                throw RuntimeException("incorrect Arguments supplied for static function ${funcCall.getFullName()}")
+            }
+            funcCall.definition = ref.func
+            funcCall.type = ref.func.functionDescriptor.returnType
+            return ref.func.functionDescriptor.returnType
+
+        } else if (ref.matches(Datakind.AMBIG_STAT_FUNC_REF)) {
+
+            ref as Datatype.AmbigStatFuncRef
+            var definition: AstNode.Function? = null
+            for (func in ref.possibilities) if (doFuncSigsMatch(thisSig, func.func.functionDescriptor.args)) {
+                definition = func.func
+                break
+            }
+            if (definition == null) {
+                throw RuntimeException("Cant call any variant of static function " +
+                        "${funcCall.getFullName()} with arguments supplied")
+            }
+            funcCall.definition = definition
+            funcCall.type = definition.functionDescriptor.returnType
+            return definition.functionDescriptor.returnType
+
+        } else if (ref.matches(Datakind.FUNC_REF)) {
+
+            ref as Datatype.FuncRef
             if (!doFuncSigsMatch(thisSig, ref.func.functionDescriptor.args)) {
                 throw RuntimeException("incorrect Arguments supplied for function ${funcCall.getFullName()}")
             }
             funcCall.definition = ref.func
             funcCall.type = ref.func.functionDescriptor.returnType
             return ref.func.functionDescriptor.returnType
-        }
 
-        if (!ref.matches(Datakind.AMBIG_STAT_FUNC_REF)) throw RuntimeException("unreachable")
+        } else if (ref.matches(Datakind.AMBIG_FUNC_REF)) {
 
-        ref as Datatype.AmbigStatFuncRef
-        var definition: AstNode.Function? = null
-        for (func in ref.possibilities) if (doFuncSigsMatch(thisSig, func.func.functionDescriptor.args)) {
-            definition = func.func
-            break
-        }
-        if (definition == null) {
-            throw RuntimeException("Cant call any variant of ${funcCall.getFullName()} with arguments supplied")
-        }
-        funcCall.definition = definition
-        funcCall.type = definition.functionDescriptor.returnType
-        return definition.functionDescriptor.returnType
+            ref as Datatype.AmbigFuncRef
+            var definition: AstNode.Function? = null
+            for (func in ref.possibilities) if (doFuncSigsMatch(thisSig, func.func.functionDescriptor.args)) {
+                definition = func.func
+                break
+            }
+            if (definition == null) {
+                throw RuntimeException("Cant call any variant of function " +
+                        "${funcCall.getFullName()} with arguments supplied")
+            }
+            funcCall.definition = definition
+            funcCall.type = definition.functionDescriptor.returnType
+            return definition.functionDescriptor.returnType
+
+        } else throw RuntimeException("cant call any function on ${funcCall.getFullName()}")
     }
+
+//    private fun doObjectFuncCall(funcCall: AstNode.FunctionCall, ref: Datatype, thisSig: MutableList<Datatype>): Datatype {
+//        ref as Datatype.Object
+//
+//        for (func in ref.clazz.funcs) {
+//            if (func.name.lexeme != ((funcCall.func as Either.Left).value as AstNode.Get).name.lexeme) continue
+//            if (!doFuncSigsMatch(thisSig, func.functionDescriptor.args)) continue
+//            funcCall.definition = func
+//            funcCall.type = func.functionDescriptor.returnType
+//            return funcCall.type
+//        }
+//        throw RuntimeException("couldnt find function ${funcCall.definition.name.lexeme} on type ${ref.clazz.name.lexeme}")
+//    }
 
     override fun visit(returnStmt: AstNode.Return): Datatype {
         val type = returnStmt.toReturn?.let { check(it, returnStmt) } ?: Datatype.Void()
@@ -323,15 +365,34 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
     override fun visit(get: AstNode.Get): Datatype {
         val from = check(get.from, get)
-        if (!from.matches(Datakind.STAT_CLASS)) TODO("not yet implemented")
-        from as Datatype.StatClass
+        if (from.matches(Datakind.STAT_CLASS)) return doGetFromStatClass(from as Datatype.StatClass, get)
+        else if (from.matches(Datakind.OBJECT)) {
+
+            from as Datatype.Object
+
+            val possibilities: MutableList<Datatype.FuncRef> = mutableListOf()
+            for (func in from.clazz.funcs) if (func.name.lexeme == get.name.lexeme) {
+                if (func.isPrivate && curClass !== from.clazz) continue
+                possibilities.add(Datatype.FuncRef(func))
+            }
+            if (possibilities.size == 0) {
+                throw RuntimeException("couldn't access ${get.name.lexeme} from ${get.from.accept(AstPrinter())}")
+            }
+            val type = if (possibilities.size == 1) possibilities[0]
+            else Datatype.AmbigFuncRef(possibilities)
+            get.type = type
+            return type
+        } else TODO("not yet implemented")
+    }
+
+    private fun doGetFromStatClass(from: Datatype.StatClass, get: AstNode.Get): Datatype {
         val possibilities = mutableListOf<Datatype.StatFuncRef>()
         for (func in from.artClass.staticFuncs) if (func.name.lexeme == get.name.lexeme) {
             if (func.isPrivate && curClass !== from.artClass) continue
             possibilities.add(Datatype.StatFuncRef(func))
         }
         if (possibilities.size == 0) {
-            throw RuntimeException("couldn't access ${get.name.lexeme} from ${get.from.accept(ASTPrinter())}")
+            throw RuntimeException("couldn't access static function ${get.name.lexeme} from ${get.from.accept(AstPrinter())}")
         }
         val type = if (possibilities.size == 1) possibilities[0]
         else Datatype.AmbigStatFuncRef(possibilities)
@@ -360,8 +421,10 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     }
 
     private fun doFuncSigsMatch(types1: List<Datatype>, types2: List<Pair<String, Datatype>>): Boolean {
-        if (types1.size != types2.size) return false
-        for (i in types1.indices) if (types1[i] != types2[i].second) return false
+        val types2NoThis = types2.toMutableList()
+        if (types2.isNotEmpty() && types2[0].first == "this") types2NoThis.removeAt(0)
+        if (types1.size != types2NoThis.size) return false
+        for (i in types1.indices) if (types1[i] != types2NoThis[i].second) return false
         return true
     }
 
@@ -481,9 +544,35 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
             override fun toString(): String = "AmbigStatFuncRef"
         }
+
+        class FuncRef(val func: AstNode.Function) : Datatype(Datakind.FUNC_REF) {
+            override val descriptorType: String = "---FuncRef has no descriptor---" //TODO: lol
+
+            override fun equals(other: Any?): Boolean {
+                return if (other == null) false else other::class == FuncRef::class && func === (other as FuncRef).func
+            }
+
+            override fun toString(): String = "FuncRef<${func.name.lexeme}>"
+        }
+
+        class AmbigFuncRef(val possibilities: List<FuncRef>) : Datatype(Datakind.AMBIG_FUNC_REF) {
+
+            override val descriptorType: String = "---AmbigFuncRef has no descriptor---" //TODO: lol
+
+            override fun equals(other: Any?): Boolean {
+                if (other == null) return false
+                if (other::class != FuncRef::class) return false
+                other as AmbigFuncRef
+                for (i in possibilities.indices) if (possibilities[i] != other.possibilities[i]) return false
+                return true
+            }
+
+            override fun toString(): String = "AmbigFuncRef"
+        }
     }
 
     enum class Datakind {
-        INT, FLOAT, STRING, VOID, BOOLEAN, OBJECT, STAT_CLASS, STAT_FUNC_REF, AMBIG_STAT_FUNC_REF
+        INT, FLOAT, STRING, VOID, BOOLEAN, OBJECT, STAT_CLASS,
+        STAT_FUNC_REF, AMBIG_STAT_FUNC_REF, FUNC_REF, AMBIG_FUNC_REF
     }
 }

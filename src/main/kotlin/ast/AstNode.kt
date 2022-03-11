@@ -1,6 +1,5 @@
 package ast
 import Either
-import passes.TypeChecker
 import tokenizer.Token
 import passes.TypeChecker.Datatype
 import tokenizer.TokenType
@@ -274,7 +273,7 @@ abstract class AstNode {
         lateinit var definition: Function
 
         fun getFullName(): String {
-            return if (func is Either.Left) (func as Either.Left<AstNode>).value.accept(ASTPrinter())
+            return if (func is Either.Left) (func as Either.Left<AstNode>).value.accept(AstPrinter())
             else (func as Either.Right).value.lexeme
         }
 
