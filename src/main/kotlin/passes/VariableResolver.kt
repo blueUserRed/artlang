@@ -2,7 +2,7 @@ package passes
 
 import ast.AstNode
 import ast.AstNodeVisitor
-import java.lang.RuntimeException
+import kotlin.RuntimeException
 
 class VariableResolver : AstNodeVisitor<Unit> {
 
@@ -22,7 +22,7 @@ class VariableResolver : AstNodeVisitor<Unit> {
 
     override fun visit(variable: AstNode.Variable) {
         val index = curVars.indexOf(variable.name.lexeme)
-        if (index == -1) throw RuntimeException("Unknown Variable: ${variable.name.lexeme}")
+        if (index == -1) println(variable.name.lexeme) //throw RuntimeException("Unknown Variable: ${variable.name.lexeme}")
         variable.index = index
     }
 
@@ -42,6 +42,8 @@ class VariableResolver : AstNodeVisitor<Unit> {
 
     override fun visit(program: AstNode.Program) {
         curProgram = program
+
+        for (field in program.fields) resolve(field)
         for (func in program.funcs) resolve(func)
         for (c in program.classes) resolve(c)
     }
@@ -70,7 +72,11 @@ class VariableResolver : AstNodeVisitor<Unit> {
     override fun visit(varAssign: AstNode.VariableAssignment) {
         resolve(varAssign.toAssign)
         val index = curVars.indexOf(varAssign.name.lexeme)
-        if (index == -1) throw RuntimeException("Unknown variable ${varAssign.name.lexeme}")
+        if (index == -1) {
+//            throw RuntimeException("Unknown variable ${varAssign.name.lexeme}")
+            varAssign.index = -1
+            return
+        }
         if (varDeclarations[index].isConst) throw RuntimeException("Tried to assign to const ${varAssign.name.lexeme}")
         varAssign.index = index
     }
@@ -109,7 +115,6 @@ class VariableResolver : AstNodeVisitor<Unit> {
 
     override fun visit(varInc: AstNode.VarIncrement) {
         val index = curVars.indexOf(varInc.name.lexeme)
-        if (index == -1) throw RuntimeException("Unknown variable ${varInc.name.lexeme}")
         varInc.index = index
     }
 
@@ -147,6 +152,18 @@ class VariableResolver : AstNodeVisitor<Unit> {
 
     override fun visit(constructorCall: AstNode.ConstructorCall) {
         for (arg in constructorCall.arguments) resolve(arg)
+    }
+
+    override fun visit(field: AstNode.FieldDeclaration) {
+        resolve(field.initializer)
+    }
+
+    override fun visit(fieldGet: AstNode.FieldReference) {
+        throw RuntimeException("unreachable")
+    }
+
+    override fun visit(fieldSet: AstNode.FieldSet) {
+        throw RuntimeException("unreachable")
     }
 
     private fun resolve(node: AstNode) = node.accept(this)

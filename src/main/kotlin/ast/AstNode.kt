@@ -64,7 +64,11 @@ abstract class AstNode {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
-    class Program(val funcs: Array<Function>, val classes: Array<ArtClass>) : AstNode() {
+    class Program(
+        val funcs: Array<Function>,
+        val classes: Array<ArtClass>,
+        val fields: Array<FieldDeclaration>
+    ) : AstNode() {
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (to is Function) for (i in funcs.indices) if (funcs[i] === orig) {
@@ -73,6 +77,10 @@ abstract class AstNode {
             }
             if (to is ArtClass) for (i in classes.indices) if (classes[i] === orig) {
                 classes[i] = to
+                return
+            }
+            if (to is FieldDeclaration) for (i in fields.indices) if (fields[i] === orig) {
+                fields[i] = to
                 return
             }
             throw CantSwapException()
@@ -103,7 +111,7 @@ abstract class AstNode {
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (orig !== toPrint) throw CantSwapException()
-            toPrint = orig
+            toPrint = to
         }
 
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
@@ -374,6 +382,41 @@ abstract class AstNode {
                 return
             }
             throw CantSwapException()
+        }
+
+        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
+    }
+
+    class FieldDeclaration(
+        val name: Token,
+        val explType: DatatypeNode,
+        var initializer: AstNode,
+        val isConst: Boolean,
+        val modifiers: List<Token>
+    ) : AstNode() {
+
+        override fun swap(orig: AstNode, to: AstNode) {
+            if (initializer !== orig) throw CantSwapException()
+            initializer = to
+        }
+
+        var fieldType: Datatype = Datatype.Void()
+
+        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
+    }
+
+    class FieldReference(val name: Token) : AstNode() {
+
+        override fun swap(orig: AstNode, to: AstNode) = throw CantSwapException()
+
+        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
+    }
+
+    class FieldSet(val name: Token, var to: AstNode, var definition: FieldDeclaration) : AstNode() {
+
+        override fun swap(orig: AstNode, to: AstNode) {
+            if (orig !== to) throw CantSwapException()
+            this.to = to
         }
 
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)

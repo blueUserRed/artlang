@@ -19,6 +19,7 @@ object Parser {
 
         val functions = mutableListOf<AstNode.Function>()
         val classes = mutableListOf<AstNode.ArtClass>()
+        val fields = mutableListOf<AstNode.FieldDeclaration>()
         while (!match(TokenType.EOF)) {
             if (match(TokenType.K_FN)) {
                 functions.add(parseFunc(listOf(), true))
@@ -28,9 +29,23 @@ object Parser {
                 classes.add(parseClass(listOf()))
                 continue
             }
+            if (match(TokenType.K_LET, TokenType.K_CONST)) {
+                fields.add(parseFieldDeclaration(last().tokenType == TokenType.K_CONST))
+                continue
+            }
             throw RuntimeException("Expected function or class in global scope")
         }
-        return AstNode.Program(functions.toTypedArray(), classes.toTypedArray())
+        return AstNode.Program(functions.toTypedArray(), classes.toTypedArray(), fields.toTypedArray())
+    }
+
+    private fun parseFieldDeclaration(isConst: Boolean): AstNode.FieldDeclaration {
+        consumeOrError(TokenType.IDENTIFIER, "expected name")
+        val name = last()
+        consumeOrError(TokenType.COLON, "Field-definitions always require a explicit type")
+        val type = parseType()
+        consumeOrError(TokenType.EQ, "")
+        val initializer = parseStatement()
+        return AstNode.FieldDeclaration(name, type, initializer, isConst, mutableListOf())
     }
 
     private fun parseFunc(modifiers: List<Token>, isTopLevel: Boolean): AstNode.Function {
@@ -169,7 +184,7 @@ object Parser {
         val toInc = last()
         match(TokenType.D_MINUS, TokenType.D_PLUS)
         val op = last()
-        consumeOrError(TokenType.SEMICOLON, "Expected semicolon after inc/dec")
+//        consumeOrError(TokenType.SEMICOLON, "Expected semicolon after inc/dec")
         return AstNode.VarIncrement(toInc, if (op.tokenType == TokenType.D_PLUS) 1 else -1)
     }
 
@@ -218,7 +233,7 @@ object Parser {
         return AstNode.Loop(stmt)
     }
 
-    private fun parseVariableDeclaration(isConst: Boolean): AstNode {
+    private fun parseVariableDeclaration(isConst: Boolean): AstNode.VariableDeclaration {
         consumeOrError(TokenType.IDENTIFIER, "expected identifier after let")
         val name = last()
         var type: AstNode.DatatypeNode? = null

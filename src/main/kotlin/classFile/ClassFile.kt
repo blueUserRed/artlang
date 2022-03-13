@@ -3,12 +3,14 @@ package classFile
 import java.lang.RuntimeException
 import java.nio.file.Files
 import java.nio.file.Paths
+import compiler.Compiler
 
 class ClassFileBuilder {
 
     private val constantPool: MutableList<ConstantInfo> = mutableListOf()
     private val methods: MutableList<MethodBuilder> = mutableListOf()
     private val attributes: MutableList<Attribute> = mutableListOf()
+    private val fields: MutableList<Field> = mutableListOf()
 
     var thisClass: String = ""
     var superClass: String = ""
@@ -80,6 +82,7 @@ class ClassFileBuilder {
 
     fun addMethod(method: MethodBuilder) = methods.add(method)
     fun addAttribute(attrib: Attribute) = attributes.add(attrib)
+    fun addField(field: Field) = fields.add(field)
 
     fun build(path: String) {
 
@@ -87,6 +90,7 @@ class ClassFileBuilder {
         val superClassIndex = classInfo(utf8Info(superClass))
 
         val methodBytes = Utils.arrayConcat(*Array(methods.size) { methods[it].build(this) })
+        val fieldBytes = Utils.arrayConcat(*Array(fields.size) { fields[it].toBytes() })
 
         val out = Files.newOutputStream(Paths.get(path))
 
@@ -101,8 +105,10 @@ class ClassFileBuilder {
         out.write(Utils.getLastTwoBytes(thisClassIndex))
         out.write(Utils.getLastTwoBytes(superClassIndex))
 
-        out.write(Utils.getLastTwoBytes(0)) //interface count //TODO: Unhardcode
-        out.write(Utils.getLastTwoBytes(0)) //field count
+        out.write(Utils.getLastTwoBytes(0)) //interface count
+
+        out.write(Utils.getLastTwoBytes(fields.size))
+        out.write(fieldBytes)
 
         out.write(Utils.getLastTwoBytes(methods.size))
         out.write(methodBytes)
@@ -253,7 +259,7 @@ class ConstantIntegerInfo(val i: Int) : ConstantInfo(3) {
     }
 }
 
-class MethodBuilder {
+class MethodBuilder : Compiler.EmitterTarget {
 
     var name: String = ""
     var descriptor: String = ""
@@ -316,11 +322,11 @@ class MethodBuilder {
     fun addStackMapFrame(stackMapFrame: StackMapTableAttribute.StackMapFrame) = stackMapFrames.add(stackMapFrame)
     fun popStackMapFrame() = stackMapFrames.removeLast()
 
-    fun emitByteCode(vararg bytes: Byte) {
+    override fun emitByteCode(vararg bytes: Byte) {
         for (byte in bytes) code.add(byte)
     }
 
-    fun overwriteByteCode(insertPos: Int, vararg bytes: Byte) {
+    override fun overwriteByteCode(insertPos: Int, vararg bytes: Byte) {
         for (i in bytes.indices) code[insertPos + i] = bytes[i]
     }
 
@@ -448,4 +454,47 @@ class StackMapTableAttribute(val nameIndex: Int) : Attribute() {
             )
         }
     }
+}
+
+class Field(val nameIndex: Int, val descriptorIndex: Int) {
+
+    var isPublic: Boolean = false
+    var isPrivate: Boolean = false
+    var isProtected: Boolean = false
+    var isStatic: Boolean = false
+    var isFinal: Boolean = false
+    var isVolatile: Boolean = false
+    var isTransient: Boolean = false
+    var isSynthetic: Boolean = false
+    var isEnum: Boolean = false
+
+    private val attributes: MutableList<Attribute> = mutableListOf()
+
+    fun addAttribute(attrib: Attribute) = attributes.add(attrib)
+
+    fun toBytes(): ByteArray {
+        val attribBytes = Array(attributes.size) { attributes[it].toBytes() }
+        return Utils.arrayConcat(
+            getAccessFlagsAsBytes(),
+            Utils.getLastTwoBytes(nameIndex),
+            Utils.getLastTwoBytes(descriptorIndex),
+            Utils.getLastTwoBytes(attributes.size),
+            *attribBytes
+        )
+    }
+
+    private fun getAccessFlagsAsBytes(): ByteArray {
+        var flags = 0
+        if (isPublic) flags = flags or 0x0001
+        if (isPrivate) flags = flags or 0x0002
+        if (isProtected) flags = flags or 0x0004
+        if (isStatic) flags = flags or 0x0008
+        if (isFinal) flags = flags or 0x0010
+        if (isVolatile) flags = flags or 0x0040
+        if (isTransient) flags = flags or 0x0080
+        if (isSynthetic) flags = flags or 0x1000
+        if (isEnum) flags = flags or 0x4000
+        return Utils.getLastTwoBytes(flags)
+    }
+
 }

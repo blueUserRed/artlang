@@ -47,6 +47,7 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
     }
 
     override fun visit(program: AstNode.Program): ControlFlowState {
+        for (field in program.fields) check(field)
         for (func in program.funcs) check(func)
         for (c in program.classes) check(c)
         return ControlFlowState()
@@ -86,9 +87,6 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
         var alwaysReturns = result.alwaysReturns
         if (!result.sometimesBreaks && result.sometimesReturns) alwaysReturns = true
         surroundingLoop = tmp
-        println(alwaysReturns)
-        println(result.sometimesReturns)
-        println(result.sometimesBreaks)
         return ControlFlowState(
             alwaysReturns = alwaysReturns,
             alwaysBreaks = false,
@@ -162,6 +160,19 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
     }
 
     override fun visit(constructorCall: AstNode.ConstructorCall): ControlFlowState {
+        return ControlFlowState()
+    }
+
+    override fun visit(field: AstNode.FieldDeclaration): ControlFlowState {
+        check(field.initializer)
+        return ControlFlowState()
+    }
+
+    override fun visit(fieldGet: AstNode.FieldReference): ControlFlowState {
+        return ControlFlowState()
+    }
+
+    override fun visit(fieldSet: AstNode.FieldSet): ControlFlowState {
         return ControlFlowState()
     }
 

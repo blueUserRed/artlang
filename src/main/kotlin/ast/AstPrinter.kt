@@ -27,6 +27,7 @@ class AstPrinter : AstNodeVisitor<String> {
 
     override fun visit(program: AstNode.Program): String {
         val builder = StringBuilder()
+        for (field in program.fields) builder.append(field.accept(this))
         for (func in program.funcs) builder.append(func.accept(this))
         for (c in program.classes) builder.append(c.accept(this))
         return builder.toString()
@@ -134,5 +135,18 @@ class AstPrinter : AstNodeVisitor<String> {
 
     override fun visit(constructorCall: AstNode.ConstructorCall): String {
         return "(new ${constructorCall.clazz.name.lexeme})"
+    }
+
+    override fun visit(field: AstNode.FieldDeclaration): String {
+        return "(${ if (field.isConst) "const" else "" }" +
+                "field ${field.name.lexeme} ${field.initializer.accept(this)})\n"
+    }
+
+    override fun visit(fieldGet: AstNode.FieldReference): String {
+        return "(f-get ${fieldGet.name.lexeme})"
+    }
+
+    override fun visit(fieldSet: AstNode.FieldSet): String {
+        return "(f-set ${fieldSet.name.lexeme} ${fieldSet.to.accept(this)})"
     }
 }

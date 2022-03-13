@@ -1,15 +1,19 @@
+let x: int = 0
+
 fn main() {
-//    let i = 0
-//    while ((i := i + 1) <= 100) print recFibonacci(i)
-
+    x = 2
+    x += 24
+    x++
+    print x
 }
 
-class HiSayer {
-    public fn sayHi() {
-        print "hi"
-    }
-}
-
+//class HiSayer {
+//    public fn sayHi() {
+//        print "hi"
+//    }
+//}
+//
+//
 ///**
 //* the most stupid possible implementation of fibonacci
 //*/

@@ -5,9 +5,9 @@ import ast.AstNode
 import ast.AstNodeVisitor
 import ast.FunctionDescriptor
 import tokenizer.TokenType
-import java.lang.RuntimeException
 import passes.TypeChecker.Datatype
 import tokenizer.Token
+import kotlin.RuntimeException
 
 class TypeChecker : AstNodeVisitor<Datatype> {
 
@@ -103,8 +103,9 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         curProgram = program
         for (func in program.funcs) preCalcFuncSigs(func, null)
         for (c in program.classes) preCalcClass(c)
-        for (func in program.funcs) func.accept(this)
-        for (c in program.classes) c.accept(this)
+        for (field in program.fields) check(field, program)
+        for (func in program.funcs) check(func, program)
+        for (c in program.classes) check(c, program)
         return Datatype.Void()
     }
 
@@ -144,6 +145,12 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             variable.type = Datatype.StatClass(c)
             return variable.type
         }
+        for (field in curProgram.fields) if (field.name.lexeme == variable.name.lexeme) {
+            val toSwap = AstNode.FieldReference(field.name)
+            toSwap.type = field.fieldType
+            swap = toSwap
+            return field.fieldType
+        }
         throw RuntimeException("Unknown Variable ${variable.name.lexeme}")
     }
 
@@ -160,10 +167,23 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     }
 
     override fun visit(varAssign: AstNode.VariableAssignment): Datatype {
-        val type = check(varAssign.toAssign, varAssign)
-        val varType = vars[varAssign.index] ?: throw RuntimeException("unreachable")
-        if (type != varType) throw RuntimeException("tried to assign $type to $varType")
-        return Datatype.Void()
+        val typeToAssign = check(varAssign.toAssign, varAssign)
+        if (varAssign.index != -1) {
+            val varType = vars[varAssign.index] ?: throw RuntimeException("unreachable")
+            if (typeToAssign != varType) throw RuntimeException("tried to assign $typeToAssign to $varType")
+            return Datatype.Void()
+        }
+
+        for (field in curProgram.fields) if (field.name.lexeme == varAssign.name.lexeme) {
+            val toSwap = AstNode.FieldSet(varAssign.name, varAssign.toAssign, field)
+            if (typeToAssign != toSwap.definition.fieldType) {
+                throw RuntimeException("tried to assign $typeToAssign to ${toSwap.type}")
+            }
+            toSwap.type = Datatype.Void()
+            swap = toSwap
+            return Datatype.Void()
+        }
+        throw RuntimeException("cant find variable ${varAssign.name.lexeme}")
     }
 
     override fun visit(loop: AstNode.Loop): Datatype {
@@ -321,19 +341,6 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         } else throw RuntimeException("cant call any function on ${funcCall.getFullName()}")
     }
 
-//    private fun doObjectFuncCall(funcCall: AstNode.FunctionCall, ref: Datatype, thisSig: MutableList<Datatype>): Datatype {
-//        ref as Datatype.Object
-//
-//        for (func in ref.clazz.funcs) {
-//            if (func.name.lexeme != ((funcCall.func as Either.Left).value as AstNode.Get).name.lexeme) continue
-//            if (!doFuncSigsMatch(thisSig, func.functionDescriptor.args)) continue
-//            funcCall.definition = func
-//            funcCall.type = func.functionDescriptor.returnType
-//            return funcCall.type
-//        }
-//        throw RuntimeException("couldnt find function ${funcCall.definition.name.lexeme} on type ${ref.clazz.name.lexeme}")
-//    }
-
     override fun visit(returnStmt: AstNode.Return): Datatype {
         val type = returnStmt.toReturn?.let { check(it, returnStmt) } ?: Datatype.Void()
         if (curFunction.functionDescriptor.returnType != type) {
@@ -343,9 +350,30 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     }
 
     override fun visit(varInc: AstNode.VarIncrement): Datatype {
-        val varType = vars[varInc.index] ?: throw RuntimeException("unreachable")
-        if (varType != Datatype.Integer()) TODO("not yet implemented")
-        return Datatype.Void()
+        if (varInc.index != -1) {
+            val varType = vars[varInc.index] ?: throw RuntimeException("unreachable")
+            if (varType != Datatype.Integer()) TODO("not yet implemented")
+            return Datatype.Void()
+        }
+        for (field in curProgram.fields) if (field.name.lexeme == varInc.name.lexeme) {
+            val toSwap = AstNode.FieldSet(
+                varInc.name,
+                AstNode.Binary(
+                    AstNode.FieldReference(varInc.name),
+                    Token(TokenType.PLUS, "+=", null, varInc.name.file,  varInc.name.pos),
+                    AstNode.Literal(
+                        Token(TokenType.INT, "+=", varInc.toAdd.toInt(), varInc.name.file, varInc.name.pos)
+                    )
+                ),
+                field
+            )
+            toSwap.to.type = Datatype.Integer()
+            (toSwap.to as AstNode.Binary).left.type = Datatype.Integer()
+            (toSwap.to as AstNode.Binary).right.type = Datatype.Integer()
+            swap = toSwap
+            return Datatype.Void()
+        }
+        throw RuntimeException("unknown Variable ${varInc.name.lexeme}")
     }
 
     override fun visit(clazz: AstNode.ArtClass): Datatype {
@@ -420,6 +448,24 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         throw RuntimeException("unreachable")
     }
 
+    override fun visit(field: AstNode.FieldDeclaration): Datatype {
+        check(field.initializer, field)
+        val explType = typeNodeToDataType(field.explType)
+        if (explType != field.initializer.type) {
+            throw RuntimeException("incompatible types in field declaration $explType and ${field.initializer.type}")
+        }
+        field.fieldType = explType
+        return Datatype.Void()
+    }
+
+    override fun visit(fieldGet: AstNode.FieldReference): Datatype {
+        throw RuntimeException("unreachable")
+    }
+
+    override fun visit(fieldSet: AstNode.FieldSet): Datatype {
+        throw RuntimeException("unreachable")
+    }
+
     private fun doFuncSigsMatch(types1: List<Datatype>, types2: List<Pair<String, Datatype>>): Boolean {
         val types2NoThis = types2.toMutableList()
         if (types2.isNotEmpty() && types2[0].first == "this") types2NoThis.removeAt(0)
@@ -461,6 +507,12 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
     abstract class Datatype(val kind: Datakind) {
 
+        abstract val descriptorType: String
+
+        abstract override fun equals(other: Any?): Boolean
+        abstract override fun toString(): String
+
+
         class Integer : Datatype(Datakind.INT) {
             override val descriptorType: String = "I"
             override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Integer::class
@@ -498,11 +550,6 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             }
             override fun toString(): String = name
         }
-
-        abstract val descriptorType: String
-
-        abstract override fun equals(other: Any?): Boolean
-        abstract override fun toString(): String
 
         fun matches(vararg kinds: Datakind): Boolean {
             for (kind in kinds) if (kind == this.kind) return true

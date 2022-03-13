@@ -28,5 +28,8 @@ interface AstNodeVisitor<T> {
     fun visit(cont: AstNode.Continue): T
     fun visit(breac: AstNode.Break): T
     fun visit(constructorCall: AstNode.ConstructorCall): T
+    fun visit(field: AstNode.FieldDeclaration): T
+    fun visit(fieldGet: AstNode.FieldReference): T
+    fun visit(fieldSet: AstNode.FieldSet): T
 
 }
