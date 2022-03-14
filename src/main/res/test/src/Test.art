@@ -1,17 +1,22 @@
-let x: int = 0
+let x: int = 1
 
 fn main() {
-    x = 2
-    x += 24
-    x++
+    x *= 2
     print x
+    HiSayer().sayHi()
 }
 
-//class HiSayer {
-//    public fn sayHi() {
-//        print "hi"
-//    }
-//}
+class HiSayer {
+
+    public fn sayHi() {
+        print this.getHi()
+    }
+
+    fn getHi(): str {
+        return "hi"
+    }
+
+}
 //
 //
 ///**

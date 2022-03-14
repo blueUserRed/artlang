@@ -234,9 +234,10 @@ class Compiler : AstNodeVisitor<Unit> {
 
         method!!.isPrivate = !method!!.isPublic
 
-        file!!.addMethod(method!!)
         if (function.functionDescriptor.returnType == Datatype.Void()) emit(_return)
         if (lastStackMapFrameOffset >= method!!.curCodeOffset) method!!.popStackMapFrame() //TODO: can probably be done better
+
+        if (method!!.curCodeOffset != 0) file!!.addMethod(method!!)
     }
 
     override fun visit(program: AstNode.Program) {
@@ -372,7 +373,7 @@ class Compiler : AstNodeVisitor<Unit> {
         emitStackMapFrame()
         val offset = method!!.curCodeOffset
         for (addr in loopBreakAddressesToOverwrite) {
-           overwriteByteCode(addr, *Utils.getShortAsBytes((offset - (addr - 1)).toShort()))
+            overwriteByteCode(addr, *Utils.getShortAsBytes((offset - (addr - 1)).toShort()))
         }
     }
 
@@ -631,13 +632,15 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     private fun doDefaultConstructor() {
-        method = MethodBuilder()
-        method!!.isPublic = true
-        method!!.isSynthetic = true
-        method!!.descriptor = "()V"
-        method!!.name = "<init>"
-        method!!.maxStack = 1
-        method!!.maxLocals = 1
+        val constructor = MethodBuilder()
+        constructor.isPublic = true
+        constructor.isSynthetic = true
+        constructor.descriptor = "()V"
+        constructor.name = "<init>"
+        constructor.maxStack = 1
+        constructor.maxLocals = 1
+
+        emitterTarget = constructor
 
         val objConstructorIndex = file!!.methodRefInfo(
             file!!.classInfo(file!!.utf8Info("java/lang/Object")),
@@ -652,7 +655,7 @@ class Compiler : AstNodeVisitor<Unit> {
             *Utils.getLastTwoBytes(objConstructorIndex),
             _return
         )
-        file!!.addMethod(method!!)
+        file!!.addMethod(constructor)
     }
 
     private fun doCompare(compareInstruction: Byte) {
@@ -676,7 +679,7 @@ class Compiler : AstNodeVisitor<Unit> {
         //TODO: instead of always emitting FullStackMapFrames also use other types of StackMapFrames
 
         val offsetDelta = if (lastStackMapFrameOffset == 0) method!!.curCodeOffset
-                            else (method!!.curCodeOffset - lastStackMapFrameOffset) - 1
+        else (method!!.curCodeOffset - lastStackMapFrameOffset) - 1
 
         if (offsetDelta < 0) return //frame already exists at this offset
 

@@ -6,15 +6,15 @@ import java.util.zip.ZipOutputStream
 object Utils {
 
     object Ansi {
-        val reset = "\u001B[0m"
-        val yellow = "\u001B[33m"
-        val red = "\u001B[31m"
-        val blue = "\u001B[34m"
-        val white = "\u001B[37m"
+        const val reset = "\u001B[0m"
+        const val yellow = "\u001B[33m"
+        const val red = "\u001B[31m"
+        const val blue = "\u001B[34m"
+        const val white = "\u001B[37m"
     }
 
     fun readFile(file: String): String {
-        return Paths.get("src/main/res/$file").toFile().readText(Charsets.UTF_8)
+        return Paths.get(file).toFile().readText(Charsets.UTF_8)
     }
 
     fun arrayConcat(vararg byteArrs: ByteArray): ByteArray {
