@@ -16,20 +16,16 @@ interface AstNodeVisitor<T> {
     fun visit(print: AstNode.Print): T
     fun visit(block: AstNode.Block): T
     fun visit(varDec: AstNode.VariableDeclaration): T
-    fun visit(varAssign: AstNode.VariableAssignment): T
+    fun visit(varAssign: AstNode.Assignment): T
     fun visit(loop: AstNode.Loop): T
     fun visit(ifStmt: AstNode.If): T
     fun visit(whileStmt: AstNode.While): T
     fun visit(returnStmt: AstNode.Return): T
     fun visit(varInc: AstNode.VarIncrement): T
     fun visit(get: AstNode.Get): T
-    fun visit(set: AstNode.Set): T
-    fun visit(walrus: AstNode.WalrusSet): T
     fun visit(cont: AstNode.Continue): T
     fun visit(breac: AstNode.Break): T
     fun visit(constructorCall: AstNode.ConstructorCall): T
     fun visit(field: AstNode.FieldDeclaration): T
-    fun visit(fieldGet: AstNode.FieldReference): T
-    fun visit(fieldSet: AstNode.FieldSet): T
 
 }

@@ -76,7 +76,7 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
         return ControlFlowState()
     }
 
-    override fun visit(varAssign: AstNode.VariableAssignment): ControlFlowState {
+    override fun visit(varAssign: AstNode.Assignment): ControlFlowState {
         return ControlFlowState()
     }
 
@@ -136,14 +136,6 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
         return ControlFlowState()
     }
 
-    override fun visit(set: AstNode.Set): ControlFlowState {
-        return ControlFlowState()
-    }
-
-    override fun visit(walrus: AstNode.WalrusSet): ControlFlowState {
-        return ControlFlowState()
-    }
-
     override fun visit(cont: AstNode.Continue): ControlFlowState {
         if (surroundingLoop == null) throw RuntimeException("Used continue outside of a loop")
         return ControlFlowState()
@@ -165,14 +157,6 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
 
     override fun visit(field: AstNode.FieldDeclaration): ControlFlowState {
         check(field.initializer)
-        return ControlFlowState()
-    }
-
-    override fun visit(fieldGet: AstNode.FieldReference): ControlFlowState {
-        return ControlFlowState()
-    }
-
-    override fun visit(fieldSet: AstNode.FieldSet): ControlFlowState {
         return ControlFlowState()
     }
 

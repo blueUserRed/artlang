@@ -53,8 +53,8 @@ class AstPrinter : AstNodeVisitor<String> {
         return "(let ${varDec.name.lexeme} ${varDec.initializer.accept(this)})"
     }
 
-    override fun visit(varAssign: AstNode.VariableAssignment): String {
-        return "(${varAssign.name.lexeme} = ${varAssign.toAssign.accept(this)})"
+    override fun visit(varAssign: AstNode.Assignment): String {
+        return "(${varAssign.name.accept(this)} = ${varAssign.toAssign.accept(this)})"
     }
 
     override fun visit(loop:AstNode.Loop): String {
@@ -98,7 +98,7 @@ class AstPrinter : AstNodeVisitor<String> {
     }
 
     override fun visit(varInc: AstNode.VarIncrement): String {
-        return "(${varInc.name.lexeme} ${varInc.toAdd} ++)"
+        return "(${varInc.name.accept(this)} ${varInc.toAdd} ++)"
     }
 
     override fun visit(clazz: AstNode.ArtClass): String {
@@ -110,19 +110,11 @@ class AstPrinter : AstNodeVisitor<String> {
     }
 
     override fun visit(walrus: AstNode.WalrusAssign): String {
-        return "(${walrus.name.lexeme} ${walrus.toAssign.accept(this)} :=)"
+        return "(${walrus.name.accept(this)} ${walrus.toAssign.accept(this)} :=)"
     }
 
     override fun visit(get: AstNode.Get): String {
-        return "${get.from.accept(this)}.${get.name.lexeme}"
-    }
-
-    override fun visit(set: AstNode.Set): String {
-        return "(${set.from.accept(this)} ${set.to.accept(this)} = "
-    }
-
-    override fun visit(walrus: AstNode.WalrusSet): String {
-        return "(${walrus.from.accept(this)} ${walrus.to.accept(this)} := "
+        return if (get.from == null) "(${get.name.lexeme})" else "(${get.from!!.accept(this)}.${get.name.lexeme})"
     }
 
     override fun visit(cont: AstNode.Continue): String {
@@ -140,13 +132,5 @@ class AstPrinter : AstNodeVisitor<String> {
     override fun visit(field: AstNode.FieldDeclaration): String {
         return "(${ if (field.isConst) "const" else "" }" +
                 "field ${field.name.lexeme} ${field.initializer.accept(this)})\n"
-    }
-
-    override fun visit(fieldGet: AstNode.FieldReference): String {
-        return "(f-get ${fieldGet.name.lexeme})"
-    }
-
-    override fun visit(fieldSet: AstNode.FieldSet): String {
-        return "(f-set ${fieldSet.name.lexeme} ${fieldSet.to.accept(this)})"
     }
 }

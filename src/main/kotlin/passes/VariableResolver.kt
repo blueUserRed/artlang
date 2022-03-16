@@ -10,24 +10,26 @@ class VariableResolver : AstNodeVisitor<Unit> {
     private var varDeclarations: MutableList<AstNode.VariableDeclaration> = mutableListOf()
     private var maxLocals: Int = 0
 
+    private var swap: AstNode? = null
+
     private lateinit var curProgram: AstNode.Program
 
     override fun visit(binary: AstNode.Binary) {
-        resolve(binary.left)
-        resolve(binary.right)
+        resolve(binary.left, binary)
+        resolve(binary.right, binary)
     }
 
     override fun visit(literal: AstNode.Literal) {
     }
 
     override fun visit(variable: AstNode.Variable) {
-        val index = curVars.indexOf(variable.name.lexeme)
-        if (index == -1) println(variable.name.lexeme) //throw RuntimeException("Unknown Variable: ${variable.name.lexeme}")
-        variable.index = index
+//        if (variable.name.from != null) return
+//        val index = curVars.indexOf(variable.name.name.lexeme)
+//        variable.index = index
     }
 
     override fun visit(exprStmt: AstNode.ExpressionStatement) {
-        resolve(exprStmt.exp)
+        resolve(exprStmt.exp, exprStmt)
     }
 
     override fun visit(function: AstNode.Function) {
@@ -36,26 +38,26 @@ class VariableResolver : AstNodeVisitor<Unit> {
         for (arg in function.args) vars.add(arg.first.lexeme)
         curVars = vars
         maxLocals = vars.size
-        resolve(function.statements)
+        resolve(function.statements, function)
         function.amountLocals = maxLocals
     }
 
     override fun visit(program: AstNode.Program) {
         curProgram = program
 
-        for (field in program.fields) resolve(field)
-        for (func in program.funcs) resolve(func)
-        for (c in program.classes) resolve(c)
+        for (field in program.fields) resolve(field, program)
+        for (func in program.funcs) resolve(func, program)
+        for (c in program.classes) resolve(c, program)
     }
 
     override fun visit(print: AstNode.Print) {
-        resolve(print.toPrint)
+        resolve(print.toPrint, print)
     }
 
     override fun visit(block: AstNode.Block) {
         val before = curVars.toMutableList()
         val beforeDecs = varDeclarations.toMutableList()
-        for (s in block.statements) resolve(s)
+        for (s in block.statements) resolve(s, block)
         if (curVars.size > maxLocals) maxLocals = curVars.size
         curVars = before
         varDeclarations = beforeDecs
@@ -63,85 +65,85 @@ class VariableResolver : AstNodeVisitor<Unit> {
 
     override fun visit(varDec: AstNode.VariableDeclaration) {
         if (varDec.name.lexeme in curVars) throw RuntimeException("Redeclaration of variable ${varDec.name.lexeme}")
-        resolve(varDec.initializer)
+        resolve(varDec.initializer, varDec)
         curVars.add(varDec.name.lexeme)
         varDeclarations.add(varDec)
         varDec.index = curVars.size - 1
     }
 
-    override fun visit(varAssign: AstNode.VariableAssignment) {
-        resolve(varAssign.toAssign)
-        val index = curVars.indexOf(varAssign.name.lexeme)
+    override fun visit(varAssign: AstNode.Assignment) {
+        resolve(varAssign.toAssign, varAssign)
+        if (varAssign.name.from != null) return
+        val index = curVars.indexOf(varAssign.name.name.lexeme)
         if (index == -1) {
-//            throw RuntimeException("Unknown variable ${varAssign.name.lexeme}")
             varAssign.index = -1
             return
         }
-        if (varDeclarations[index].isConst) throw RuntimeException("Tried to assign to const ${varAssign.name.lexeme}")
+        if (varDeclarations[index].isConst) throw RuntimeException("Tried to assign to const ${varAssign.name.name.lexeme}")
         varAssign.index = index
     }
 
     override fun visit(loop: AstNode.Loop) {
-        resolve(loop.body)
+        resolve(loop.body, loop)
     }
 
     override fun visit(ifStmt: AstNode.If) {
-        resolve(ifStmt.condition)
-        resolve(ifStmt.ifStmt)
-        ifStmt.elseStmt?.let { resolve(it) }
+        resolve(ifStmt.condition, ifStmt)
+        resolve(ifStmt.ifStmt, ifStmt)
+        ifStmt.elseStmt?.let { resolve(it, ifStmt) }
     }
 
     override fun visit(group: AstNode.Group) {
-        resolve(group.grouped)
+        resolve(group.grouped, group)
     }
 
     override fun visit(unary: AstNode.Unary) {
-        resolve(unary.on)
+        resolve(unary.on, unary)
     }
 
     override fun visit(whileStmt: AstNode.While) {
-        resolve(whileStmt.condition)
-        resolve(whileStmt.body)
+        resolve(whileStmt.condition, whileStmt)
+        resolve(whileStmt.body, whileStmt)
     }
 
     override fun visit(funcCall: AstNode.FunctionCall) {
-        if (funcCall.func is Either.Left) resolve((funcCall.func as Either.Left<AstNode>).value)
-        for (arg in funcCall.arguments) resolve(arg)
+        resolve(funcCall.func, funcCall)
+        for (arg in funcCall.arguments) resolve(arg, funcCall)
     }
 
     override fun visit(returnStmt: AstNode.Return) {
-        returnStmt.toReturn?.let { resolve(it) }
+        returnStmt.toReturn?.let { resolve(it, returnStmt) }
     }
 
     override fun visit(varInc: AstNode.VarIncrement) {
-        val index = curVars.indexOf(varInc.name.lexeme)
+        if (varInc.name.from != null) return
+        val index = curVars.indexOf(varInc.name.name.lexeme)
         varInc.index = index
     }
 
     override fun visit(clazz: AstNode.ArtClass) {
-        for (func in clazz.staticFuncs) resolve(func)
-        for (func in clazz.funcs) resolve(func)
+        for (func in clazz.staticFuncs) resolve(func, clazz)
+        for (func in clazz.funcs) resolve(func, clazz)
     }
 
     override fun visit(walrus: AstNode.WalrusAssign) {
-        resolve(walrus.toAssign)
-        val index = curVars.indexOf(walrus.name.lexeme)
-        if (index == -1) throw RuntimeException("Unknown variable ${walrus.name.lexeme}")
+        resolve(walrus.toAssign, walrus)
+        if (walrus.name.from != null) return
+        val index = curVars.indexOf(walrus.name.name.lexeme)
         walrus.index = index
     }
 
     override fun visit(get: AstNode.Get) {
-        resolve(get.from)
-    }
-
-    override fun visit(set: AstNode.Set) {
-        resolve(set.from)
-        resolve(set.to)
-    }
-
-    override fun visit(walrus: AstNode.WalrusSet) {
-        resolve(walrus.from)
-        resolve(walrus.to)
+        if (get.from != null) {
+            resolve(get.from!!, get)
+            return
+        }
+        val index = curVars.indexOf(get.name.lexeme)
+        if (index == -1) return
+        val toSwap = AstNode.Variable(get.name)
+        toSwap.index = index
+        swap = toSwap
+        return
     }
 
     override fun visit(cont: AstNode.Continue) {
@@ -151,21 +153,20 @@ class VariableResolver : AstNodeVisitor<Unit> {
     }
 
     override fun visit(constructorCall: AstNode.ConstructorCall) {
-        for (arg in constructorCall.arguments) resolve(arg)
+        for (arg in constructorCall.arguments) resolve(arg, constructorCall)
     }
 
     override fun visit(field: AstNode.FieldDeclaration) {
-        resolve(field.initializer)
+        resolve(field.initializer, field)
     }
 
-    override fun visit(fieldGet: AstNode.FieldReference) {
-        throw RuntimeException("unreachable")
+    private fun resolve(node: AstNode, parent: AstNode?) {
+        val res = node.accept(this)
+        if (swap == null) return res
+        if (parent == null) throw AstNode.CantSwapException()
+        parent.swap(node, swap!!)
+        swap = null
+        return res
     }
-
-    override fun visit(fieldSet: AstNode.FieldSet) {
-        throw RuntimeException("unreachable")
-    }
-
-    private fun resolve(node: AstNode) = node.accept(this)
 
 }

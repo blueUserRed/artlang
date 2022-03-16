@@ -1,12 +1,11 @@
 package parser
 
-import Either
 import ast.AstNode
-import passes.TypeChecker
+import ast.AstPrinter
 import tokenizer.Token
 import tokenizer.TokenType
-import java.lang.RuntimeException
 import passes.TypeChecker.Datakind
+import kotlin.RuntimeException
 
 object Parser {
 
@@ -131,32 +130,31 @@ object Parser {
         match(TokenType.PLUS_EQ, TokenType.MINUS_EQ, TokenType.STAR_EQ, TokenType.SLASH_EQ)
         val op = last()
         val num = parseStatement()
-//        consumeOrError(TokenType.SEMICOLON, "Expected semicolon after shorthand operator")
         when (op.tokenType) {
-            TokenType.STAR_EQ -> return AstNode.VariableAssignment(
-                variable,
+            TokenType.STAR_EQ -> return AstNode.Assignment(
+                AstNode.Get(variable, null),
                 AstNode.Binary(
-                    AstNode.Variable(variable),
+                    AstNode.Get(variable, null),
                     Token(TokenType.STAR, "*=", null, op.file, op.pos),
                     num
                 )
             )
-            TokenType.SLASH_EQ -> return AstNode.VariableAssignment(
-                variable,
+            TokenType.SLASH_EQ -> return AstNode.Assignment(
+                AstNode.Get(variable, null),
                 AstNode.Binary(
-                    AstNode.Variable(variable),
+                    AstNode.Get(variable, null),
                     Token(TokenType.SLASH, "/=", null, op.file, op.pos),
                     num
                 )
             )
             TokenType.PLUS_EQ -> {
                 if (num is AstNode.Literal && num.literal.literal is Int && num.literal.literal in Byte.MIN_VALUE..Byte.MAX_VALUE) {
-                    return AstNode.VarIncrement(variable, num.literal.literal.toByte())
+                    return AstNode.VarIncrement(AstNode.Get(variable, null), num.literal.literal.toByte())
                 }
-                return AstNode.VariableAssignment(
-                    variable,
+                return AstNode.Assignment(
+                    AstNode.Get(variable, null),
                     AstNode.Binary(
-                        AstNode.Variable(variable),
+                        AstNode.Get(variable, null),
                         Token(TokenType.PLUS, "+=", null, op.file, op.pos),
                         num
                     )
@@ -164,10 +162,10 @@ object Parser {
             }
             TokenType.MINUS_EQ -> {
                 if (num is AstNode.Literal && num.literal.literal is Int && num.literal.literal in Byte.MIN_VALUE..Byte.MAX_VALUE) {
-                    return AstNode.VarIncrement(variable, (-num.literal.literal).toByte())
+                    return AstNode.VarIncrement(AstNode.Get(variable, null), (-num.literal.literal).toByte())
                 }
-                return AstNode.VariableAssignment(
-                    variable,
+                return AstNode.Assignment(
+                    AstNode.Get(variable, null),
                     AstNode.Binary(
                         AstNode.Variable(variable),
                         Token(TokenType.MINUS, "-=", null, op.file, op.pos),
@@ -184,14 +182,12 @@ object Parser {
         val toInc = last()
         match(TokenType.D_MINUS, TokenType.D_PLUS)
         val op = last()
-//        consumeOrError(TokenType.SEMICOLON, "Expected semicolon after inc/dec")
-        return AstNode.VarIncrement(toInc, if (op.tokenType == TokenType.D_PLUS) 1 else -1)
+        return AstNode.VarIncrement(AstNode.Get(toInc, null), if (op.tokenType == TokenType.D_PLUS) 1 else -1)
     }
 
     private fun parseReturn(): AstNode.Return {
         if (matchNSFB(TokenType.SOFT_BREAK)) return AstNode.Return(null)
         val returnExpr = parseStatement()
-//        consumeOrError(TokenType.SEMICOLON, "Semicolon expected after return")
         return AstNode.Return(returnExpr)
     }
 
@@ -250,13 +246,11 @@ object Parser {
     private fun parseAssignment(): AstNode {
         val left = parseBooleanComparison()
         if (match(TokenType.EQ)) {
-            if (left is AstNode.Variable) return AstNode.VariableAssignment(left.name, parseStatement())
-            else if (left is AstNode.Get) return AstNode.Set(left, parseStatement())
+            if (left is AstNode.Get) return AstNode.Assignment(AstNode.Get(left.name, null), parseStatement())
             else throw RuntimeException("expected variable before Assignment")
         }
         if (match(TokenType.WALRUS)) {
-            if (left is AstNode.Variable) return AstNode.WalrusAssign(left.name, parseStatement())
-            else if (left is AstNode.Get) return AstNode.WalrusSet(left, parseStatement())
+            if (left is AstNode.Get) return AstNode.WalrusAssign(AstNode.Get(left.name, null), parseStatement())
             else throw RuntimeException("expected variable before Assignment")
         }
         return left
@@ -304,7 +298,7 @@ object Parser {
 
     private fun parseUnaryExpression(): AstNode {
         var cur: AstNode? = null
-        if (matchNSFB(TokenType.MINUS, TokenType.NOT)) {
+        if (match(TokenType.MINUS, TokenType.NOT)) {
             val operator = last()
             val exp = parseUnaryExpression()
             cur = AstNode.Unary(exp, operator)
@@ -317,7 +311,7 @@ object Parser {
         while (true) {
             if (match(TokenType.DOT)) {
                 consumeOrError(TokenType.IDENTIFIER, "Expected indentifier after dot")
-                left = AstNode.Get(left, last())
+                left = AstNode.Get(last(), left)
             } else if (matchNSFB(TokenType.L_PAREN)) left = parseFunctionCall(left)
             else break
         }
@@ -325,12 +319,8 @@ object Parser {
     }
 
     private fun parseLiteralExpression(): AstNode {
-        if (match(TokenType.IDENTIFIER)) {
-//            if (peek()?.tokenType == TokenType.L_PAREN) return parseFunctionCall()
-            return AstNode.Variable(last())
-        }
+        if (match(TokenType.IDENTIFIER)) return AstNode.Get(last(), null)
         if (match(TokenType.L_PAREN)) return groupExpression()
-
         if (!match(TokenType.INT, TokenType.FLOAT, TokenType.STRING, TokenType.BOOLEAN)) {
             throw RuntimeException("Not a Statement")
         }
@@ -347,8 +337,8 @@ object Parser {
                 break
             }
         }
-        val name = if (func !is AstNode.Variable) Either.Left(func) else Either.Right(func.name)
-        return AstNode.FunctionCall(name, args)
+        if (func !is AstNode.Get) throw RuntimeException("cant call ${func.accept(AstPrinter())} like a function")
+        return AstNode.FunctionCall(func, args)
     }
 
     private fun groupExpression(): AstNode {

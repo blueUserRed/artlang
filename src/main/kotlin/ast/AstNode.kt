@@ -1,5 +1,5 @@
 package ast
-import Either
+
 import tokenizer.Token
 import passes.TypeChecker.Datatype
 import tokenizer.TokenType
@@ -144,9 +144,9 @@ abstract class AstNode {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
-    class VariableAssignment(val name: Token, var toAssign: AstNode) : AstNode() {
+    class Assignment(val name: Get, var toAssign: AstNode) : AstNode() {
 
-        var index: Int = 0
+        var index: Int = -1
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (toAssign !== orig) throw CantSwapException()
@@ -214,7 +214,7 @@ abstract class AstNode {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
-    class VarIncrement(val name: Token, val toAdd: Byte) : AstNode() {
+    class VarIncrement(val name: Get, val toAdd: Byte) : AstNode() {
 
         var index: Int = 0
 
@@ -276,18 +276,17 @@ abstract class AstNode {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
-    class FunctionCall(var func: Either<AstNode, Token>, val arguments: MutableList<AstNode>) : AstNode() {
+    class FunctionCall(var func: Get, val arguments: MutableList<AstNode>) : AstNode() {
 
         lateinit var definition: Function
 
         fun getFullName(): String {
-            return if (func is Either.Left) (func as Either.Left<AstNode>).value.accept(AstPrinter())
-            else (func as Either.Right).value.lexeme
+            return AstPrinter().visit(func)
         }
 
         override fun swap(orig: AstNode, to: AstNode) {
-            if (func is Either.Left && (func as Either.Left).value === orig) {
-                func = Either.Left(to)
+            if (func === orig && to is Get) {
+                func = to
                 return
             }
             for (i in arguments.indices) if (arguments[i] === orig) {
@@ -300,7 +299,7 @@ abstract class AstNode {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
-    class WalrusAssign(val name: Token, var toAssign: AstNode) : AstNode() {
+    class WalrusAssign(val name: Get, var toAssign: AstNode) : AstNode() {
 
         var index: Int = 0
 
@@ -312,45 +311,13 @@ abstract class AstNode {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
-    class Get(var from: AstNode, val name: Token) : AstNode() {
+    class Get(val name: Token, var from: AstNode?) : AstNode() {
+
+        var fieldDef: FieldDeclaration? = null
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (from !== orig) throw CantSwapException()
             from = to
-        }
-
-        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
-    }
-
-    class Set(var from: AstNode, var to: AstNode) : AstNode() {
-
-        override fun swap(orig: AstNode, to: AstNode) {
-            if (from === orig) {
-                from = to
-                return
-            }
-            if (this.to === orig) {
-                this.to = to
-                return
-            }
-            throw CantSwapException()
-        }
-
-        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
-    }
-
-    class WalrusSet(var from: AstNode, var to: AstNode) : AstNode() {
-
-        override fun swap(orig: AstNode, to: AstNode) {
-            if (from === orig) {
-                from = to
-                return
-            }
-            if (this.to === orig) {
-                this.to = to
-                return
-            }
-            throw CantSwapException()
         }
 
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
@@ -401,23 +368,7 @@ abstract class AstNode {
         }
 
         var fieldType: Datatype = Datatype.Void()
-
-        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
-    }
-
-    class FieldReference(val name: Token) : AstNode() {
-
-        override fun swap(orig: AstNode, to: AstNode) = throw CantSwapException()
-
-        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
-    }
-
-    class FieldSet(val name: Token, var to: AstNode, var definition: FieldDeclaration) : AstNode() {
-
-        override fun swap(orig: AstNode, to: AstNode) {
-            if (orig !== to) throw CantSwapException()
-            this.to = to
-        }
+        var clazz: ArtClass? = null
 
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
