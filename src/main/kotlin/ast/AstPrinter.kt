@@ -18,8 +18,9 @@ class AstPrinter : AstNodeVisitor<String> {
     }
 
     override fun visit(function: AstNode.Function): String {
-        val builder = StringBuilder()
-        builder.append("\nfn ").append(function.name.lexeme).append("() {\n")
+        val builder = StringBuilder("\n")
+        for (modifier in function.modifiers) builder.append(modifier).append(" ")
+        builder.append("fn ").append(function.name.lexeme).append("() {\n")
         for (s in function.statements.statements) builder.append(s.accept(this)).append("\n")
         builder.append("}\n")
         return builder.toString()
@@ -104,7 +105,10 @@ class AstPrinter : AstNodeVisitor<String> {
     override fun visit(clazz: AstNode.ArtClass): String {
         val builder = StringBuilder()
         builder.append("\nclass ${clazz.name.lexeme} {\n")
+        for (field in clazz.fields) builder.append(field.accept(this)).append("\n")
+        for (field in clazz.staticFields) builder.append(field.accept(this))
         for (func in clazz.staticFuncs) builder.append(func.accept(this))
+        for (func in clazz.funcs) builder.append(func.accept(this))
         builder.append("}\n")
         return builder.toString()
     }
@@ -130,7 +134,14 @@ class AstPrinter : AstNodeVisitor<String> {
     }
 
     override fun visit(field: AstNode.FieldDeclaration): String {
-        return "(${ if (field.isConst) "const" else "" }" +
-                "field ${field.name.lexeme} ${field.initializer.accept(this)})\n"
+        val builder = StringBuilder()
+        for (modifier in field.modifiers) builder.append(modifier.lexeme).append(" ")
+        if (field.isConst) builder.append("const ")
+        builder
+            .append(field.name.lexeme)
+            .append(" = ")
+            .append(field.initializer.accept(this))
+            .append("\n")
+        return builder.toString()
     }
 }

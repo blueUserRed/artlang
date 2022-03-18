@@ -20,31 +20,42 @@ object Parser {
         val classes = mutableListOf<AstNode.ArtClass>()
         val fields = mutableListOf<AstNode.FieldDeclaration>()
         while (!match(TokenType.EOF)) {
+            val modifiers = parseModifiers()
             if (match(TokenType.K_FN)) {
+                if (modifiers.isNotEmpty()) throw RuntimeException("functions cant have modifiers in top level")
                 functions.add(parseFunc(listOf(), true))
                 continue
             }
             if (match(TokenType.K_CLASS)) {
+                if (modifiers.isNotEmpty()) throw RuntimeException("classes cant have modifiers in top level")
                 classes.add(parseClass(listOf()))
                 continue
             }
-            if (match(TokenType.K_LET, TokenType.K_CONST)) {
-                fields.add(parseFieldDeclaration(last().tokenType == TokenType.K_CONST))
+            if (matchIdent("field")) {
+                if (modifiers.isNotEmpty()) throw RuntimeException("fields cant have modifiers in top level")
+                fields.add(parseFieldDeclaration(listOf(), false, true))
                 continue
             }
-            throw RuntimeException("Expected function or class in global scope")
+            if (match(TokenType.K_CONST)) {
+                consumeIdentOrError("field", "Expected field declaration after const")
+                if (modifiers.isNotEmpty()) throw RuntimeException("classes cant have modifiers in top level")
+                fields.add(parseFieldDeclaration(listOf(),true, true))
+                continue
+            }
+            throw RuntimeException("Expected function, class or field in global scope")
         }
-        return AstNode.Program(functions.toTypedArray(), classes.toTypedArray(), fields.toTypedArray())
+        return AstNode.Program(functions, classes, fields)
     }
 
-    private fun parseFieldDeclaration(isConst: Boolean): AstNode.FieldDeclaration {
+    private fun parseFieldDeclaration(modifiers: List<Token>, isConst: Boolean, isTopLevel: Boolean)
+    : AstNode.FieldDeclaration {
         consumeOrError(TokenType.IDENTIFIER, "expected name")
         val name = last()
         consumeOrError(TokenType.COLON, "Field-definitions always require a explicit type")
         val type = parseType()
         consumeOrError(TokenType.EQ, "")
         val initializer = parseStatement()
-        return AstNode.FieldDeclaration(name, type, initializer, isConst, mutableListOf())
+        return AstNode.FieldDeclaration(name, type, initializer, isConst, modifiers, isTopLevel)
     }
 
     private fun parseFunc(modifiers: List<Token>, isTopLevel: Boolean): AstNode.Function {
@@ -79,27 +90,86 @@ object Parser {
         return function
     }
 
-    private fun parseClass(modifier: List<Token>): AstNode.ArtClass {
+    private fun parseClass(classModifiers: List<Token>): AstNode.ArtClass {
         consumeOrError(TokenType.IDENTIFIER, "Expected class name")
         val name = last()
         consumeOrError(TokenType.L_BRACE, "Expected opening brace after class definition")
+
         val funcs = mutableListOf<AstNode.Function>()
         val staticFuncs = mutableListOf<AstNode.Function>()
+        val fields = mutableListOf<AstNode.FieldDeclaration>()
+        val staticFields = mutableListOf<AstNode.FieldDeclaration>()
+
         while (!match(TokenType.R_BRACE)) {
             val modifiers = parseModifiers()
-            consumeOrError(TokenType.K_FN, "Expected function")
-            val func = parseFunc(modifiers, false)
-            if (func.isStatic) staticFuncs.add(func) else funcs.add(func)
+
+            if (match(TokenType.K_FN)) {
+                validateModifiersForFunc(modifiers)
+                val func = parseFunc(modifiers, false)
+                if (func.isStatic) staticFuncs.add(func) else funcs.add(func)
+                continue
+            }
+            if (matchIdent("field")) {
+                validateModifiersForField(modifiers)
+                val field = parseFieldDeclaration(modifiers, false, false)
+                if (field.isStatic) staticFields.add(field) else fields.add(field)
+                continue
+            }
+            if (match(TokenType.K_CONST)) {
+                consumeIdentOrError("field", "expected field declaration after const")
+                val field = parseFieldDeclaration(modifiers, true, false)
+                if (field.isStatic) staticFields.add(field) else fields.add(field)
+                continue
+            }
+            throw RuntimeException("expected function or field declaration in class body")
         }
-        return AstNode.ArtClass(name, staticFuncs.toTypedArray(), funcs.toTypedArray())
+
+        return AstNode.ArtClass(name, staticFuncs, funcs, fields, staticFields)
     }
 
     private fun parseModifiers(): List<Token> {
         val modifiers = mutableListOf<Token>()
-        while (match(TokenType.K_PUBLIC, TokenType.K_PRIVATE, TokenType.K_STATIC, TokenType.K_ABSTRACT)) {
-            modifiers.add(last())
-        }
+        while (matchIdent("public", "abstract", "static")) modifiers.add(last())
         return modifiers
+    }
+
+    private fun validateModifiersForFunc(modifiers: List<Token>) {
+        val had = mutableListOf<String>()
+        for (modifier in modifiers) {
+            if (modifier.lexeme in had) throw RuntimeException("duplicate modifier ${modifier.lexeme}")
+            when (modifier.lexeme) {
+                "abstract" -> TODO("abstract functions are not yet implemented")
+                "public" -> had.add("public")
+                "static" -> had.add("static")
+                else -> throw RuntimeException("unknown modifier ${modifier.lexeme}")
+            }
+        }
+    }
+
+    private fun validateModifiersForField(modifiers: List<Token>) {
+        val had = mutableListOf<String>()
+        for (modifier in modifiers) {
+            if (modifier.lexeme in had) throw RuntimeException("duplicate modifier ${modifier.lexeme}")
+            when (modifier.lexeme) {
+                "abstract" -> throw RuntimeException("field cant be abstract")
+                "public" -> had.add("public")
+                "static" -> had.add("static")
+                else -> throw RuntimeException("unknown modifier ${modifier.lexeme}")
+            }
+        }
+    }
+
+    private fun validateModifiersForClass(modifiers: List<Token>) {
+        val had = mutableListOf<String>()
+        for (modifier in modifiers) {
+            if (modifier.lexeme in had) throw RuntimeException("duplicate modifier ${modifier.lexeme}")
+            when (modifier.lexeme) {
+                "abstract" -> TODO("abstract classes are not implemented")
+                "public" -> throw RuntimeException("class cant be public")
+                "static" -> throw RuntimeException("class cant be static")
+                else -> throw RuntimeException("unknown modifier ${modifier.lexeme}")
+            }
+        }
     }
 
     private fun parseStatement(): AstNode {
@@ -114,7 +184,7 @@ object Parser {
         if (match(TokenType.K_BREAK)) return AstNode.Break()
         if (match(TokenType.K_CONTINUE)) return AstNode.Continue()
 
-        if (peekNext()?.tokenType in arrayOf(TokenType.D_PLUS, TokenType.D_MINUS)) return parseVarIncrement()
+//        if (peekNext()?.tokenType in arrayOf(TokenType.D_PLUS, TokenType.D_MINUS)) return parseVarIncrement()
 
         if (peekNext()?.tokenType in
             arrayOf(TokenType.PLUS_EQ, TokenType.MINUS_EQ, TokenType.STAR_EQ, TokenType.SLASH_EQ)) {
@@ -177,13 +247,13 @@ object Parser {
         }
     }
 
-    private fun parseVarIncrement(): AstNode {
-        consumeOrError(TokenType.IDENTIFIER, "expected variable before inc/dec operator")
-        val toInc = last()
-        match(TokenType.D_MINUS, TokenType.D_PLUS)
-        val op = last()
-        return AstNode.VarIncrement(AstNode.Get(toInc, null), if (op.tokenType == TokenType.D_PLUS) 1 else -1)
-    }
+//    private fun parseVarIncrement(): AstNode {
+//        consumeOrError(TokenType.IDENTIFIER, "expected variable before inc/dec operator")
+//        val toInc = last()
+//        match(TokenType.D_MINUS, TokenType.D_PLUS)
+//        val op = last()
+//        return AstNode.VarIncrement(AstNode.Get(toInc, null), if (op.tokenType == TokenType.D_PLUS) 1 else -1)
+//    }
 
     private fun parseReturn(): AstNode.Return {
         if (matchNSFB(TokenType.SOFT_BREAK)) return AstNode.Return(null)
@@ -246,11 +316,11 @@ object Parser {
     private fun parseAssignment(): AstNode {
         val left = parseBooleanComparison()
         if (match(TokenType.EQ)) {
-            if (left is AstNode.Get) return AstNode.Assignment(AstNode.Get(left.name, null), parseStatement())
+            if (left is AstNode.Get) return AstNode.Assignment(left, parseStatement())
             else throw RuntimeException("expected variable before Assignment")
         }
         if (match(TokenType.WALRUS)) {
-            if (left is AstNode.Get) return AstNode.WalrusAssign(AstNode.Get(left.name, null), parseStatement())
+            if (left is AstNode.Get) return AstNode.WalrusAssign(left, parseStatement())
             else throw RuntimeException("expected variable before Assignment")
         }
         return left
@@ -312,7 +382,19 @@ object Parser {
             if (match(TokenType.DOT)) {
                 consumeOrError(TokenType.IDENTIFIER, "Expected indentifier after dot")
                 left = AstNode.Get(last(), left)
-            } else if (matchNSFB(TokenType.L_PAREN)) left = parseFunctionCall(left)
+            } else if (matchNSFB(TokenType.L_PAREN)) {
+                left = parseFunctionCall(left)
+            } else if (match(TokenType.D_PLUS)) {
+                if (left !is AstNode.Get) {
+                    throw RuntimeException("invalid increment target ${left.accept(AstPrinter())}")
+                }
+                left = AstNode.VarIncrement(left, 1)
+            } else if (match(TokenType.D_MINUS)) {
+                if (left !is AstNode.Get) {
+                    throw RuntimeException("invalid decrement target ${left.accept(AstPrinter())}")
+                }
+                left = AstNode.VarIncrement(left, -1)
+            }
             else break
         }
         return left
@@ -387,6 +469,19 @@ object Parser {
         return false
     }
 
+    private fun matchIdent(vararg identifiers: String): Boolean {
+        val start = cur
+        while (tokens[cur].tokenType == TokenType.SOFT_BREAK) cur++
+        for (ident in identifiers) {
+            if (tokens[cur].tokenType == TokenType.IDENTIFIER && tokens[cur].lexeme == ident) {
+                cur++
+                return true
+            }
+        }
+        cur = start
+        return false
+    }
+
     //match no soft break; TODO: come up with better name
     private fun matchNSFB(vararg types: TokenType): Boolean {
         for (type in types) if (tokens[cur].tokenType == type) {
@@ -401,13 +496,20 @@ object Parser {
     }
 
     private fun consumeExpectingSoftBreakOrError(message: String) {
-        if (tokens[cur].tokenType !in arrayOf(TokenType.SOFT_BREAK, TokenType.SEMICOLON)) throw RuntimeException(message)
+        if (tokens[cur].tokenType !in arrayOf(TokenType.SOFT_BREAK, TokenType.SEMICOLON))
+            throw RuntimeException(message)
         while (tokens[cur].tokenType in arrayOf(TokenType.SOFT_BREAK, TokenType.SEMICOLON)) cur++
     }
 
     private fun consumeOrError(type: TokenType, message: String) {
         while (tokens[cur].tokenType == TokenType.SOFT_BREAK) cur++
         if (tokens[cur].tokenType == type) cur++
+        else throw RuntimeException(message)
+    }
+
+    private fun consumeIdentOrError(identifier: String, message: String) {
+        while (tokens[cur].tokenType == TokenType.SOFT_BREAK) cur++
+        if (tokens[cur].tokenType == TokenType.IDENTIFIER && tokens[cur].lexeme == identifier) cur++
         else throw RuntimeException(message)
     }
 

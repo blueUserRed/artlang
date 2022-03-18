@@ -125,6 +125,10 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
     }
 
     override fun visit(clazz: AstNode.ArtClass): ControlFlowState {
+        for (field in clazz.fields) check(field)
+        for (field in clazz.staticFields) check(field)
+        for (func in clazz.funcs) check(func)
+        for (func in clazz.staticFuncs) check(func)
         return ControlFlowState()
     }
 

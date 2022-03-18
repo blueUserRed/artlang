@@ -122,6 +122,8 @@ class VariableResolver : AstNodeVisitor<Unit> {
     }
 
     override fun visit(clazz: AstNode.ArtClass) {
+        for (field in clazz.fields) resolve(field, clazz)
+        for (field in clazz.staticFields) resolve(field, clazz)
         for (func in clazz.staticFuncs) resolve(func, clazz)
         for (func in clazz.funcs) resolve(func, clazz)
     }

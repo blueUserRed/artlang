@@ -4,6 +4,7 @@ import java.lang.RuntimeException
 import java.nio.file.Files
 import java.nio.file.Paths
 import compiler.Compiler
+import java.util.*
 
 class ClassFileBuilder {
 
@@ -259,7 +260,7 @@ class ConstantIntegerInfo(val i: Int) : ConstantInfo(3) {
     }
 }
 
-class MethodBuilder : Compiler.EmitterTarget {
+class MethodBuilder {
 
     var name: String = ""
     var descriptor: String = ""
@@ -322,11 +323,11 @@ class MethodBuilder : Compiler.EmitterTarget {
     fun addStackMapFrame(stackMapFrame: StackMapTableAttribute.StackMapFrame) = stackMapFrames.add(stackMapFrame)
     fun popStackMapFrame() = stackMapFrames.removeLast()
 
-    override fun emitByteCode(vararg bytes: Byte) {
+    fun emitByteCode(vararg bytes: Byte) {
         for (byte in bytes) code.add(byte)
     }
 
-    override fun overwriteByteCode(insertPos: Int, vararg bytes: Byte) {
+    fun overwriteByteCode(insertPos: Int, vararg bytes: Byte) {
         for (i in bytes.indices) code[insertPos + i] = bytes[i]
     }
 

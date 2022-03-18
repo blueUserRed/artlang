@@ -1,23 +1,10 @@
-let x: int = 1
-
 fn main() {
-    HiSayer().sayHi()
+    print x
 }
-
 
 class HiSayer {
-
-    static field x = 0
-
-    public fn sayHi() {
-        print this.getHi()
-    }
-
-    fn getHi(): str {
-        return "hi"
-    }
-
 }
+
 //
 //
 ///**

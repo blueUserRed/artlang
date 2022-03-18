@@ -43,13 +43,17 @@ abstract class AstNode {
 
         val isStatic: Boolean
             get() {
-                for (modifier in modifiers) if (modifier.tokenType == TokenType.K_STATIC) return true
+                for (modifier in modifiers) {
+                    if (modifier.tokenType == TokenType.IDENTIFIER && modifier.lexeme == "static") return true
+                }
                 return false
             }
 
         val isPrivate: Boolean
             get() {
-                for (modifier in modifiers) if (modifier.tokenType == TokenType.K_PUBLIC) return false
+                for (modifier in modifiers) {
+                    if (modifier.tokenType == TokenType.IDENTIFIER && modifier.lexeme == "public") return false
+                }
                 return true
             }
 
@@ -65,9 +69,9 @@ abstract class AstNode {
     }
 
     class Program(
-        val funcs: Array<Function>,
-        val classes: Array<ArtClass>,
-        val fields: Array<FieldDeclaration>
+        val funcs: MutableList<Function>,
+        val classes: MutableList<ArtClass>,
+        val fields: MutableList<FieldDeclaration>
     ) : AstNode() {
 
         override fun swap(orig: AstNode, to: AstNode) {
@@ -89,16 +93,29 @@ abstract class AstNode {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
-    class ArtClass(val name: Token, val staticFuncs: Array<Function>, val funcs: Array<Function>) : AstNode() {
+    class ArtClass(
+        val name: Token,
+        val staticFuncs: MutableList<Function>,
+        val funcs: MutableList<Function>,
+        val fields: MutableList<FieldDeclaration>,
+        val staticFields: MutableList<FieldDeclaration>
+    ) : AstNode() {
 
         override fun swap(orig: AstNode, to: AstNode) {
-            if (to !is Function) throw CantSwapException()
-            for (i in staticFuncs.indices) if (staticFuncs[i] === orig) {
+            if (to is Function) for (i in staticFuncs.indices) if (staticFuncs[i] === orig) {
                 staticFuncs[i] = to
                 return
             }
-            for (i in funcs.indices) if (funcs[i] === orig) {
+            if (to is Function) for (i in funcs.indices) if (funcs[i] === orig) {
                 funcs[i] = to
+                return
+            }
+            if (to is FieldDeclaration) for (i in fields.indices) if (fields[i] === orig) {
+                fields[i] = to
+                return
+            }
+            if (to is FieldDeclaration) for (i in staticFields.indices) if (staticFields[i] === orig) {
+                staticFields[i] = to
                 return
             }
             throw CantSwapException()
@@ -359,8 +376,25 @@ abstract class AstNode {
         val explType: DatatypeNode,
         var initializer: AstNode,
         val isConst: Boolean,
-        val modifiers: List<Token>
+        val modifiers: List<Token>,
+        val isTopLevel: Boolean
     ) : AstNode() {
+
+        val isStatic: Boolean
+            get() {
+                for (modifier in modifiers) {
+                    if (modifier.tokenType == TokenType.IDENTIFIER && modifier.lexeme == "static") return true
+                }
+                return false
+            }
+
+        val isPrivate: Boolean
+            get() {
+                for (modifier in modifiers) {
+                    if (modifier.tokenType == TokenType.IDENTIFIER && modifier.lexeme == "public") return false
+                }
+                return true
+            }
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (initializer !== orig) throw CantSwapException()
@@ -388,6 +422,12 @@ data class FunctionDescriptor(val args: MutableList<Pair<String, Datatype>>, val
         builder.append(")")
         builder.append(returnType.descriptorType)
         return builder.toString()
+    }
+
+    fun matches(desc: FunctionDescriptor): Boolean {
+        if (desc.args.size != args.size) return false
+        for (i in desc.args.indices) if (desc.args[i].second != args[i].second) return false
+        return true
     }
 
 }
