@@ -21,6 +21,8 @@ object Tokenizer {
             ')' -> { emit(TokenType.R_PAREN, ")", null); consume() }
             '{' -> { emit(TokenType.L_BRACE, "{", null); consume() }
             '}' -> { emit(TokenType.R_BRACE, "}", null); consume() }
+            '[' -> { emit(TokenType.L_BRACKET, "[", null); consume() }
+            ']' -> { emit(TokenType.R_BRACKET, "]", null); consume() }
             ';' -> { emit(TokenType.SEMICOLON, ";", null); consume() }
             '%' -> { emit(TokenType.MOD, "%", null); consume() }
             ',' -> { emit(TokenType.COMMA, ",", null); consume() }

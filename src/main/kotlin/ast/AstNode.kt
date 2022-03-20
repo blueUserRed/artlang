@@ -152,6 +152,7 @@ abstract class AstNode {
         var index: Int = 0
 //        var typeToken: Token? = null
         var explType: DatatypeNode? = null
+        lateinit var varType: Datatype
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (orig !== initializer) throw CantSwapException()
@@ -161,13 +162,25 @@ abstract class AstNode {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
-    class Assignment(val name: Get, var toAssign: AstNode) : AstNode() {
+    class Assignment(var name: Get, var toAssign: AstNode) : AstNode() {
 
         var index: Int = -1
+        var arrIndex: AstNode? = null
 
         override fun swap(orig: AstNode, to: AstNode) {
-            if (toAssign !== orig) throw CantSwapException()
-            toAssign = to
+            if (name === orig && to is Get) {
+                name = to
+                return
+            }
+            if (toAssign === orig) {
+                toAssign = to
+                return
+            }
+            if (arrIndex === orig) {
+                arrIndex = to
+                return
+            }
+            throw CantSwapException()
         }
 
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
@@ -231,11 +244,14 @@ abstract class AstNode {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
-    class VarIncrement(val name: Get, val toAdd: Byte) : AstNode() {
+    class VarIncrement(var name: Get, val toAdd: Byte) : AstNode() {
 
         var index: Int = 0
 
-        override fun swap(orig: AstNode, to: AstNode) = throw CantSwapException()
+        override fun swap(orig: AstNode, to: AstNode) {
+            if (name !== orig || to !is Get) throw CantSwapException()
+            name = to
+        }
 
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
@@ -268,7 +284,12 @@ abstract class AstNode {
 
         var index: Int = -1
 
-        override fun swap(orig: AstNode, to: AstNode) = throw CantSwapException()
+        var arrIndex: AstNode? = null
+
+        override fun swap(orig: AstNode, to: AstNode){
+            if (arrIndex !== orig) throw CantSwapException()
+            arrIndex = to
+        }
 
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
@@ -331,10 +352,22 @@ abstract class AstNode {
     class Get(val name: Token, var from: AstNode?) : AstNode() {
 
         var fieldDef: FieldDeclaration? = null
+        var arrIndex: AstNode? = null
 
         override fun swap(orig: AstNode, to: AstNode) {
-            if (from !== orig) throw CantSwapException()
-            from = to
+            if (arrIndex === orig) {
+                arrIndex = to
+                return
+            }
+            if (from === orig) {
+                from = to
+                return
+            }
+            if (arrIndex === orig) {
+                arrIndex = to
+                return
+            }
+            throw CantSwapException()
         }
 
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
@@ -407,9 +440,38 @@ abstract class AstNode {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
-    abstract class DatatypeNode(val kind: Datakind)
-    class PrimitiveTypeNode(kind: Datakind) : DatatypeNode(kind)
-    class ObjectTypeNode(val identifier: Token) : DatatypeNode(Datakind.OBJECT)
+    class ArrayCreate(val typeNode: DatatypeNode, var amount: AstNode) : AstNode() {
+
+        override fun swap(orig: AstNode, to: AstNode) {
+            if (amount !== orig) throw CantSwapException()
+            amount = to
+        }
+
+        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
+    }
+
+    class ArrayLiteral(val elements: MutableList<AstNode>) : AstNode() {
+
+        override fun swap(orig: AstNode, to: AstNode) {
+            for (i in elements.indices) if (elements[i] === orig) {
+                elements[i] = to
+                return
+            }
+            throw CantSwapException()
+        }
+
+        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
+    }
+
+    abstract class DatatypeNode(val kind: Datakind) {
+        abstract override fun toString(): String
+    }
+    class PrimitiveTypeNode(kind: Datakind) : DatatypeNode(kind) {
+        override fun toString(): String = kind.toString()
+    }
+    class ObjectTypeNode(val identifier: Token) : DatatypeNode(Datakind.OBJECT) {
+        override fun toString(): String = identifier.lexeme
+    }
 
 }
 

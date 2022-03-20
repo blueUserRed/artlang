@@ -1,5 +1,6 @@
 package ast
 
+import passes.TypeChecker
 import tokenizer.TokenType
 
 class AstPrinter : AstNodeVisitor<String> {
@@ -142,6 +143,18 @@ class AstPrinter : AstNodeVisitor<String> {
             .append(" = ")
             .append(field.initializer.accept(this))
             .append("\n")
+        return builder.toString()
+    }
+
+    override fun visit(arr: AstNode.ArrayCreate): String {
+        return "new ${arr.typeNode}[${arr.amount.accept(this)}]"
+    }
+
+    override fun visit(arr: AstNode.ArrayLiteral): String {
+        val builder = StringBuilder()
+        builder.append("[")
+        for (el in arr.elements) builder.append(el.accept(this)).append(", ")
+        builder.append("]")
         return builder.toString()
     }
 }

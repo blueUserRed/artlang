@@ -63,8 +63,6 @@ class Compiler : AstNodeVisitor<Unit> {
             return
         }
 
-        if (!binary.type.matches(Datakind.INT)) TODO("not yet implemented")
-
         comp(binary.left)
         comp(binary.right)
 
@@ -205,6 +203,7 @@ class Compiler : AstNodeVisitor<Unit> {
 
         emitterTarget.maxStack = 0
         emitterTarget.lastStackMapFrameOffset = 0
+        emitterTarget.maxLocals = function.amountLocals
 
         methodBuilder.descriptor = function.functionDescriptor.getDescriptorString()
         methodBuilder.name = function.name.lexeme
@@ -213,7 +212,7 @@ class Compiler : AstNodeVisitor<Unit> {
 
         if (methodBuilder.name == "main") {
             methodBuilder.descriptor = "([Ljava/lang/String;)V"
-            method!!.maxLocals = 1
+            if (method!!.maxLocals < 1) methodBuilder.maxLocals = 1
             methodBuilder.isPrivate = false
             methodBuilder.isStatic = true
         }
@@ -302,6 +301,7 @@ class Compiler : AstNodeVisitor<Unit> {
         initBuilder.descriptor = "()V"
         initBuilder.maxLocals = 1
 
+        emitterTarget = init
         doDefaultConstructor()
 
         doNonStaticFields(clazz.fields)
@@ -361,42 +361,58 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     override fun visit(clazz: AstNode.ArtClass) {
-        TODO("Not yet implemented")
+        throw RuntimeException("unreachable")
     }
 
     override fun visit(variable: AstNode.Variable) {
-        if (variable.type.matches(Datakind.INT, Datakind.BOOLEAN)) {
-            emitIntVarLoad(variable.index)
-        } else if (variable.type.matches(Datakind.STRING)) {
-            emitObjectVarLoad(variable.index)
-        } else if (variable.type.matches(Datakind.OBJECT)) {
-            emitObjectVarLoad(variable.index)
-        } else TODO("not yet implemented")
+
+        if (variable.arrIndex == null) {
+            when (variable.type.kind) {
+                Datakind.INT, Datakind.BOOLEAN -> emitIntVarLoad(variable.index)
+                Datakind.STRING, Datakind.OBJECT -> emitObjectVarLoad(variable.index)
+                else -> TODO("variable load type not implemented")
+            }
+            incStack(variable.type)
+            return
+        }
+
+        emitObjectVarLoad(variable.index)
+        incStack(emitterTarget.locals[variable.index]!!)
+        comp(variable.arrIndex!!)
+        emitALoad(variable.type)
+        decStack()
+        decStack()
         incStack(variable.type)
     }
 
     override fun visit(varDec: AstNode.VariableDeclaration) {
         comp(varDec.initializer)
-        if (varDec.initializer.type.matches(Datakind.INT, Datakind.BOOLEAN)) {
-            emitterTarget.locals[varDec.index] = VerificationTypeInfo.Integer()
-            emitIntVarStore(varDec.index)
+        when (varDec.varType.kind) {
+            Datakind.INT, Datakind.BOOLEAN -> {
+                emitterTarget.locals[varDec.index] = VerificationTypeInfo.Integer()
+                emitIntVarStore(varDec.index)
+            }
+            Datakind.STRING -> {
+                emitterTarget.locals[varDec.index] = getObjVerificationType("java/lang/String")
+                emitObjectVarStore(varDec.index)
+            }
+            Datakind.OBJECT -> {
+                emitterTarget.locals[varDec.index] =
+                    getObjVerificationType((varDec.varType as Datatype.Object).clazz.name.lexeme)
+                emitObjectVarStore(varDec.index)
+            }
+            Datakind.ARRAY -> {
+                emitterTarget.locals[varDec.index] = getObjVerificationType(varDec.varType.descriptorType)
+                emitObjectVarStore(varDec.index)
+            }
+            else -> TODO("not yet implemented")
         }
-        else if (varDec.initializer.type.matches(Datakind.STRING)) {
-            emitterTarget.locals[varDec.index] = getObjVerificationType("java/lang/String")
-            emitObjectVarStore(varDec.index)
-        }
-        else if (varDec.initializer.type.matches(Datakind.OBJECT)) {
-            emitterTarget.locals[varDec.index] =
-                getObjVerificationType((varDec.initializer.type as Datatype.Object).clazz.name.lexeme)
-            emitObjectVarStore(varDec.index)
-        }
-        else TODO("not yet implemented")
         decStack()
     }
 
     override fun visit(varAssign: AstNode.Assignment) {
-        comp(varAssign.toAssign)
         if (varAssign.index != -1) {
+            comp(varAssign.toAssign)
             when (varAssign.toAssign.type) {
                 Datatype.Integer() -> emitIntVarStore(varAssign.index)
                 Datatype.Str() -> emitObjectVarStore(varAssign.index)
@@ -406,7 +422,25 @@ class Compiler : AstNodeVisitor<Unit> {
             decStack()
             return
         }
-        emit(putstatic)
+
+        if (varAssign.name.fieldDef!!.isStatic || varAssign.name.fieldDef!!.isTopLevel) {
+            comp(varAssign.toAssign)
+            emit(putstatic)
+            val fieldRef = file.fieldRefInfo(
+                file.classInfo(file.utf8Info(varAssign.name.fieldDef!!.clazz?.name?.lexeme ?: topLevelName)),
+                file.nameAndTypeInfo(
+                    file.utf8Info(varAssign.name.name.lexeme),
+                    file.utf8Info(varAssign.name.fieldDef!!.fieldType.descriptorType)
+                )
+            )
+            emit(*Utils.getLastTwoBytes(fieldRef))
+            decStack()
+            return
+        }
+
+        comp(varAssign.name.from!!)
+        comp(varAssign.toAssign)
+        emit(putfield)
         val fieldRef = file.fieldRefInfo(
             file.classInfo(file.utf8Info(varAssign.name.fieldDef!!.clazz?.name?.lexeme ?: topLevelName)),
             file.nameAndTypeInfo(
@@ -415,6 +449,7 @@ class Compiler : AstNodeVisitor<Unit> {
             )
         )
         emit(*Utils.getLastTwoBytes(fieldRef))
+        decStack()
         decStack()
     }
 
@@ -592,10 +627,16 @@ class Compiler : AstNodeVisitor<Unit> {
             )
             emit(*Utils.getLastTwoBytes(fieldRef))
             incStack(get.fieldDef!!.fieldType)
+            if (get.arrIndex == null) return
+            comp(get.arrIndex!!)
+            emitALoad(get.type)
+            decStack()
+            decStack()
+            incStack(get.type)
             return
         }
 
-        if (get.fieldDef!!.isStatic && get.fieldDef!!.isTopLevel) {
+        if (get.fieldDef!!.isStatic || get.fieldDef!!.isTopLevel) {
             emit(getstatic)
             val fieldRef = file.fieldRefInfo(
                 file.classInfo(file.utf8Info((get.from!!.type as Datatype.StatClass).clazz.name.lexeme)),
@@ -606,6 +647,12 @@ class Compiler : AstNodeVisitor<Unit> {
             )
             emit(*Utils.getLastTwoBytes(fieldRef))
             incStack(get.fieldDef!!.fieldType)
+            if (get.arrIndex == null) return
+            comp(get.arrIndex!!)
+            emitALoad(get.type)
+            decStack()
+            decStack()
+            incStack(get.type)
             return
         }
 
@@ -622,6 +669,24 @@ class Compiler : AstNodeVisitor<Unit> {
         emit(*Utils.getLastTwoBytes(fieldRef))
         decStack()
         incStack(get.fieldDef!!.fieldType)
+        if (get.arrIndex == null) return
+        comp(get.arrIndex!!)
+        emitALoad(get.type)
+        decStack()
+        decStack()
+        incStack(get.type)
+    }
+
+    fun emitAStore(type: Datatype) = when (type.kind) {
+        Datakind.INT -> emit(iastore)
+        Datakind.STRING, Datakind.OBJECT -> emit(aastore)
+        else -> TODO("only int and string arrays are implemented")
+    }
+
+    fun emitALoad(type: Datatype) = when (type.kind) {
+        Datakind.INT -> emit(iaload)
+        Datakind.STRING, Datakind.OBJECT -> emit(aaload)
+        else -> TODO("only int and string arrays are implemented")
     }
 
     override fun visit(cont: AstNode.Continue) {
@@ -685,6 +750,73 @@ class Compiler : AstNodeVisitor<Unit> {
         else emit(putfield, *Utils.getLastTwoBytes(fieldRefIndex))
         decStack()
         if (!field.isStatic && !field.isTopLevel) decStack()
+    }
+
+    override fun visit(arr: AstNode.ArrayCreate) {
+        when (val kind = (arr.type as Datatype.ArrayType).type.kind) {
+            Datakind.INT -> {
+                comp(arr.amount)
+                emit(newarray, getAType(kind))
+                decStack()
+                incStack(arr.type)
+            }
+            Datakind.STRING -> {
+                comp(arr.amount)
+                emit(anewarray, *Utils.getLastTwoBytes(file.classInfo(file.utf8Info("java/lang/String"))))
+                decStack()
+                incStack(arr.type)
+            }
+            else -> TODO("only int and string arrs are implemented")
+        }
+    }
+
+    override fun visit(arr: AstNode.ArrayLiteral) {
+        when (val kind = (arr.type as Datatype.ArrayType).type.kind) {
+            Datakind.INT -> {
+                emitIntLoad(arr.elements.size)
+                incStack(Datatype.Integer())
+                emit(newarray, getAType(kind))
+                decStack()
+                incStack(arr.type)
+                for (i in arr.elements.indices) {
+                    emit(dup)
+                    incStack(emitterTarget.stack.peek())
+                    emitIntLoad(i)
+                    incStack(Datatype.Integer())
+                    comp(arr.elements[i])
+                    emit(iastore)
+                    decStack()
+                    decStack()
+                    decStack()
+                }
+            }
+            Datakind.STRING -> {
+                emitIntLoad(arr.elements.size)
+                incStack(Datatype.Integer())
+                emit(anewarray, *Utils.getLastTwoBytes(file.classInfo(file.utf8Info("java/lang/String"))))
+                decStack()
+                incStack(arr.type)
+                for (i in arr.elements.indices) {
+                    emit(dup)
+                    incStack(emitterTarget.stack.peek())
+                    emitIntLoad(i)
+                    incStack(Datatype.Integer())
+                    comp(arr.elements[i])
+                    emit(aastore)
+                    decStack()
+                    decStack()
+                    decStack()
+                }
+            }
+            else -> TODO("only int and string arrays are implemented")
+        }
+    }
+
+    private fun getAType(type: Datakind): Byte = when (type) {
+        Datakind.INT -> 10
+        Datakind.BOOLEAN -> 4
+        Datakind.FLOAT -> 6
+        else -> TODO("Not yet implemented")
     }
 
     private fun doDefaultConstructor() {
@@ -813,6 +945,7 @@ class Compiler : AstNodeVisitor<Unit> {
             Datakind.FLOAT -> VerificationTypeInfo.Float()
             Datakind.STRING -> getObjVerificationType("java/lang/String")
             Datakind.OBJECT -> getObjVerificationType((type as Datatype.Object).clazz.name.lexeme)
+            Datakind.ARRAY -> getObjVerificationType(type.descriptorType)
             else -> TODO("not yet implemented")
         }
 
@@ -964,5 +1097,15 @@ class Compiler : AstNodeVisitor<Unit> {
         const val ifle: Byte = 0x9E.toByte()
         const val iflt: Byte = 0x9B.toByte()
         const val ifne: Byte = 0x9A.toByte()
+
+        const val aaload: Byte = 0x32.toByte()
+        const val aastore: Byte = 0x53.toByte()
+        const val anewarray: Byte = 0xBD.toByte()
+
+        const val iastore: Byte = 0x4F.toByte()
+        const val iaload: Byte = 0x2E.toByte()
+
+        const val newarray: Byte = 0xBC.toByte()
+        const val multianewarray: Byte = 0xC5.toByte()
     }
 }

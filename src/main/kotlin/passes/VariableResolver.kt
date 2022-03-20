@@ -73,7 +73,10 @@ class VariableResolver : AstNodeVisitor<Unit> {
 
     override fun visit(varAssign: AstNode.Assignment) {
         resolve(varAssign.toAssign, varAssign)
-        if (varAssign.name.from != null) return
+        if (varAssign.name.from != null) {
+            resolve(varAssign.name.from!!, varAssign.name)
+            return
+        }
         val index = curVars.indexOf(varAssign.name.name.lexeme)
         if (index == -1) {
             varAssign.index = -1
@@ -116,7 +119,10 @@ class VariableResolver : AstNodeVisitor<Unit> {
     }
 
     override fun visit(varInc: AstNode.VarIncrement) {
-        if (varInc.name.from != null) return
+        if (varInc.name.from != null) {
+            resolve(varInc.name.from!!, varInc.name)
+            return
+        }
         val index = curVars.indexOf(varInc.name.name.lexeme)
         varInc.index = index
     }
@@ -136,6 +142,7 @@ class VariableResolver : AstNodeVisitor<Unit> {
     }
 
     override fun visit(get: AstNode.Get) {
+        if (get.arrIndex != null) resolve(get.arrIndex!!, get)
         if (get.from != null) {
             resolve(get.from!!, get)
             return
@@ -144,6 +151,7 @@ class VariableResolver : AstNodeVisitor<Unit> {
         if (index == -1) return
         val toSwap = AstNode.Variable(get.name)
         toSwap.index = index
+        toSwap.arrIndex = get.arrIndex
         swap = toSwap
         return
     }
@@ -171,4 +179,11 @@ class VariableResolver : AstNodeVisitor<Unit> {
         return res
     }
 
+    override fun visit(arr: AstNode.ArrayCreate) {
+        resolve(arr.amount, arr)
+    }
+
+    override fun visit(arr: AstNode.ArrayLiteral) {
+        for (el in arr.elements) resolve(el, arr)
+    }
 }

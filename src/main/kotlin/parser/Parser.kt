@@ -184,47 +184,35 @@ object Parser {
         if (match(TokenType.K_BREAK)) return AstNode.Break()
         if (match(TokenType.K_CONTINUE)) return AstNode.Continue()
 
-//        if (peekNext()?.tokenType in arrayOf(TokenType.D_PLUS, TokenType.D_MINUS)) return parseVarIncrement()
-
-        if (peekNext()?.tokenType in
-            arrayOf(TokenType.PLUS_EQ, TokenType.MINUS_EQ, TokenType.STAR_EQ, TokenType.SLASH_EQ)) {
-            return parseVarAssignShorthand()
-        }
-
         return parseAssignment()
     }
 
-    private fun parseVarAssignShorthand(): AstNode {
-        consumeOrError(TokenType.IDENTIFIER, "Expected variable before shorthand operator")
-        val variable = last()
-        match(TokenType.PLUS_EQ, TokenType.MINUS_EQ, TokenType.STAR_EQ, TokenType.SLASH_EQ)
-        val op = last()
-        val num = parseStatement()
+    private fun parseVarAssignShorthand(variable: AstNode.Get, op: Token, num: AstNode): AstNode {
         when (op.tokenType) {
             TokenType.STAR_EQ -> return AstNode.Assignment(
-                AstNode.Get(variable, null),
+                variable,
                 AstNode.Binary(
-                    AstNode.Get(variable, null),
+                    variable,
                     Token(TokenType.STAR, "*=", null, op.file, op.pos),
                     num
                 )
             )
             TokenType.SLASH_EQ -> return AstNode.Assignment(
-                AstNode.Get(variable, null),
+                variable,
                 AstNode.Binary(
-                    AstNode.Get(variable, null),
+                    variable,
                     Token(TokenType.SLASH, "/=", null, op.file, op.pos),
                     num
                 )
             )
             TokenType.PLUS_EQ -> {
                 if (num is AstNode.Literal && num.literal.literal is Int && num.literal.literal in Byte.MIN_VALUE..Byte.MAX_VALUE) {
-                    return AstNode.VarIncrement(AstNode.Get(variable, null), num.literal.literal.toByte())
+                    return AstNode.VarIncrement(variable, num.literal.literal.toByte())
                 }
                 return AstNode.Assignment(
-                    AstNode.Get(variable, null),
+                    variable,
                     AstNode.Binary(
-                        AstNode.Get(variable, null),
+                        variable,
                         Token(TokenType.PLUS, "+=", null, op.file, op.pos),
                         num
                     )
@@ -232,12 +220,12 @@ object Parser {
             }
             TokenType.MINUS_EQ -> {
                 if (num is AstNode.Literal && num.literal.literal is Int && num.literal.literal in Byte.MIN_VALUE..Byte.MAX_VALUE) {
-                    return AstNode.VarIncrement(AstNode.Get(variable, null), (-num.literal.literal).toByte())
+                    return AstNode.VarIncrement(variable, (-num.literal.literal).toByte())
                 }
                 return AstNode.Assignment(
-                    AstNode.Get(variable, null),
+                    variable,
                     AstNode.Binary(
-                        AstNode.Variable(variable),
+                        variable,
                         Token(TokenType.MINUS, "-=", null, op.file, op.pos),
                         num
                     )
@@ -246,14 +234,6 @@ object Parser {
             else -> throw RuntimeException("unreachable")
         }
     }
-
-//    private fun parseVarIncrement(): AstNode {
-//        consumeOrError(TokenType.IDENTIFIER, "expected variable before inc/dec operator")
-//        val toInc = last()
-//        match(TokenType.D_MINUS, TokenType.D_PLUS)
-//        val op = last()
-//        return AstNode.VarIncrement(AstNode.Get(toInc, null), if (op.tokenType == TokenType.D_PLUS) 1 else -1)
-//    }
 
     private fun parseReturn(): AstNode.Return {
         if (matchNSFB(TokenType.SOFT_BREAK)) return AstNode.Return(null)
@@ -322,6 +302,10 @@ object Parser {
         if (match(TokenType.WALRUS)) {
             if (left is AstNode.Get) return AstNode.WalrusAssign(left, parseStatement())
             else throw RuntimeException("expected variable before Assignment")
+        }
+        if (match(TokenType.PLUS_EQ, TokenType.MINUS_EQ, TokenType.STAR_EQ, TokenType.SLASH_EQ)) {
+            if (left !is AstNode.Get) throw RuntimeException("expected variable before assignment")
+            return parseVarAssignShorthand(left, last(), parseStatement())
         }
         return left
     }
@@ -394,6 +378,14 @@ object Parser {
                     throw RuntimeException("invalid decrement target ${left.accept(AstPrinter())}")
                 }
                 left = AstNode.VarIncrement(left, -1)
+            } else if (match(TokenType.L_BRACKET)) {
+                val element = parseStatement()
+                consumeOrError(TokenType.R_BRACKET, "Expected right bracket")
+                if (left !is AstNode.Get) {
+                    throw RuntimeException("invalid Array-get target ${left.accept(AstPrinter())}")
+                }
+                left = AstNode.Get(left.name, left.from)
+                left.arrIndex = element
             }
             else break
         }
@@ -403,11 +395,36 @@ object Parser {
     private fun parseLiteralExpression(): AstNode {
         if (match(TokenType.IDENTIFIER)) return AstNode.Get(last(), null)
         if (match(TokenType.L_PAREN)) return groupExpression()
+        if (match(TokenType.L_BRACKET)) return parseArrayLiteral()
+        if (match(TokenType.T_INT, TokenType.T_BOOLEAN, TokenType.T_BOOLEAN)) {
+            val primitive = last()
+            consumeOrError(TokenType.L_BRACKET, "Expected array initializer")
+            val amount = parseStatement()
+            consumeOrError(TokenType.R_BRACKET, "Expected closing bracket for array initializer")
+            return AstNode.ArrayCreate(AstNode.PrimitiveTypeNode(when (primitive.tokenType) {
+                TokenType.T_INT -> Datakind.INT
+                TokenType.T_BOOLEAN -> Datakind.BOOLEAN
+                TokenType.T_STRING -> Datakind.STRING
+                else -> TODO("not yet implemented")
+            }), amount)
+        }
         if (!match(TokenType.INT, TokenType.FLOAT, TokenType.STRING, TokenType.BOOLEAN)) {
             throw RuntimeException("Not a Statement")
         }
 
         return AstNode.Literal(last())
+    }
+
+    private fun parseArrayLiteral(): AstNode.ArrayLiteral {
+        val elements = mutableListOf<AstNode>()
+        while (!match(TokenType.R_BRACKET)) {
+            elements.add(parseStatement())
+            if (!match(TokenType.COMMA)) {
+                consumeOrError(TokenType.R_BRACKET, "expected closing bracket after array literal")
+                break
+            }
+        }
+        return AstNode.ArrayLiteral(elements)
     }
 
     private fun parseFunctionCall(func: AstNode): AstNode {
@@ -440,8 +457,6 @@ object Parser {
 
     private fun parsePrint(): AstNode {
         val exp = parseStatement()
-//        consumeOrError(TokenType.SEMICOLON, "Expected Semicolon after print")
-//        consumeExpectingSoftBreakOrError("expected end of line")
         return AstNode.Print(exp)
     }
 

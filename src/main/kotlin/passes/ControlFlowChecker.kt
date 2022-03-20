@@ -164,6 +164,25 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
         return ControlFlowState()
     }
 
+    override fun visit(arr: AstNode.ArrayCreate): ControlFlowState {
+        return ControlFlowState()
+    }
+
+    override fun visit(arr: AstNode.ArrayLiteral): ControlFlowState {
+        var alwaysRet = false
+        var alwaysBreak = false
+        var sometimesBreak = false
+        var sometimesRet = false
+        for (el in arr.elements) {
+            val result = check(el)
+            if (result.alwaysReturns) alwaysRet = true
+            if (result.alwaysBreaks) alwaysBreak = true
+            if (result.sometimesReturns) sometimesRet = true
+            if (result.sometimesBreaks) sometimesBreak = true
+        }
+        return ControlFlowState(alwaysRet, alwaysBreak, sometimesRet, sometimesBreak)
+    }
+
     private fun check(node: AstNode): ControlFlowState = node.accept(this)
 
     data class ControlFlowState(

@@ -1,9 +1,26 @@
 fn main() {
-    print x
+    const arr = ["Hello", " ", "World", "!"]
+    const arrSize = 4
+    let i = 0
+    while (i < arrSize) {
+        print arr[i]
+        i++
+    }
 }
 
-class HiSayer {
-}
+//class HiSayer {
+//    public field x: int = 0
+//
+//    public fn doSomething() {
+//        this.x++
+//        print this.x
+//    }
+//
+//    public static fn getInstance(): HiSayer {
+//        return HiSayer()
+//    }
+//
+//}
 
 //
 //
@@ -14,7 +31,7 @@ class HiSayer {
 //    if (pos <= 2) return 1 else return recFibonacci(pos - 1) + recFibonacci(pos - 2)
 //}
 //
-//fn fizzBuzz() {
+//fn fizzBuzz() { //TODO: fix walrus
 //    let i = 0
 //    while ((i := i + 1) <= 100) {
 //        let output = ""
