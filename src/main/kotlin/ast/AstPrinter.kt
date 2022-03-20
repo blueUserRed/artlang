@@ -56,7 +56,9 @@ class AstPrinter : AstNodeVisitor<String> {
     }
 
     override fun visit(varAssign: AstNode.Assignment): String {
-        return "(${varAssign.name.accept(this)} = ${varAssign.toAssign.accept(this)})"
+        return "(${varAssign.name.accept(this)} ${
+            if (varAssign.isWalrus) ":=" else "="
+        } ${varAssign.toAssign.accept(this)})"
     }
 
     override fun visit(loop:AstNode.Loop): String {
@@ -112,10 +114,6 @@ class AstPrinter : AstNodeVisitor<String> {
         for (func in clazz.funcs) builder.append(func.accept(this))
         builder.append("}\n")
         return builder.toString()
-    }
-
-    override fun visit(walrus: AstNode.WalrusAssign): String {
-        return "(${walrus.name.accept(this)} ${walrus.toAssign.accept(this)} :=)"
     }
 
     override fun visit(get: AstNode.Get): String {

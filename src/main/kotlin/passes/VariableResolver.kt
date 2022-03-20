@@ -23,9 +23,7 @@ class VariableResolver : AstNodeVisitor<Unit> {
     }
 
     override fun visit(variable: AstNode.Variable) {
-//        if (variable.name.from != null) return
-//        val index = curVars.indexOf(variable.name.name.lexeme)
-//        variable.index = index
+        throw RuntimeException("unreachable")
     }
 
     override fun visit(exprStmt: AstNode.ExpressionStatement) {
@@ -72,6 +70,7 @@ class VariableResolver : AstNodeVisitor<Unit> {
     }
 
     override fun visit(varAssign: AstNode.Assignment) {
+        varAssign.arrIndex?.let { resolve(it, varAssign) }
         resolve(varAssign.toAssign, varAssign)
         if (varAssign.name.from != null) {
             resolve(varAssign.name.from!!, varAssign.name)
@@ -82,7 +81,9 @@ class VariableResolver : AstNodeVisitor<Unit> {
             varAssign.index = -1
             return
         }
-        if (varDeclarations[index].isConst) throw RuntimeException("Tried to assign to const ${varAssign.name.name.lexeme}")
+        if (varDeclarations[index].isConst && varAssign.arrIndex == null) {
+            throw RuntimeException("Tried to assign to const ${varAssign.name.name.lexeme}")
+        }
         varAssign.index = index
     }
 
@@ -132,13 +133,6 @@ class VariableResolver : AstNodeVisitor<Unit> {
         for (field in clazz.staticFields) resolve(field, clazz)
         for (func in clazz.staticFuncs) resolve(func, clazz)
         for (func in clazz.funcs) resolve(func, clazz)
-    }
-
-    override fun visit(walrus: AstNode.WalrusAssign) {
-        resolve(walrus.toAssign, walrus)
-        if (walrus.name.from != null) return
-        val index = curVars.indexOf(walrus.name.name.lexeme)
-        walrus.index = index
     }
 
     override fun visit(get: AstNode.Get) {

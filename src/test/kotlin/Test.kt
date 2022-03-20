@@ -60,7 +60,7 @@ object Test {
         println("done\n")
 
         println("Compiling into dir: $outDir/tmp")
-        compiler.Compiler().compile(program, "$outDir/tmp", "Test")
+        compiler.Compiler().compileProgram(program, "$outDir/tmp", "Test")
         println("done\n")
 
         println("Creating jar Test.jar")

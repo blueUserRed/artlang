@@ -100,7 +100,7 @@ object Main {
         Files.delete(Paths.get("$outDir/tmp"))
 
         if (Settings.verbose) println("Compiling into dir: $outDir/tmp")
-        Compiler().compile(program, "$outDir/tmp", fileName)
+        Compiler().compileProgram(program, "$outDir/tmp", fileName)
         if (Settings.verbose) println("done\n")
 
         if (Settings.verbose) println("creating jar $fileName.jar")

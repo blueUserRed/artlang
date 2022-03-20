@@ -132,10 +132,6 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
         return ControlFlowState()
     }
 
-    override fun visit(walrus: AstNode.WalrusAssign): ControlFlowState {
-        return ControlFlowState()
-    }
-
     override fun visit(get: AstNode.Get): ControlFlowState {
         return ControlFlowState()
     }

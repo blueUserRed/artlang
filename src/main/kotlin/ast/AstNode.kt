@@ -162,7 +162,7 @@ abstract class AstNode {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
-    class Assignment(var name: Get, var toAssign: AstNode) : AstNode() {
+    class Assignment(var name: Get, var toAssign: AstNode, val isWalrus: Boolean) : AstNode() {
 
         var index: Int = -1
         var arrIndex: AstNode? = null
@@ -332,18 +332,6 @@ abstract class AstNode {
                 return
             }
             throw CantSwapException()
-        }
-
-        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
-    }
-
-    class WalrusAssign(val name: Get, var toAssign: AstNode) : AstNode() {
-
-        var index: Int = 0
-
-        override fun swap(orig: AstNode, to: AstNode) {
-            if (toAssign !== orig) throw CantSwapException()
-            toAssign = to
         }
 
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)

@@ -195,7 +195,8 @@ object Parser {
                     variable,
                     Token(TokenType.STAR, "*=", null, op.file, op.pos),
                     num
-                )
+                ),
+                false
             )
             TokenType.SLASH_EQ -> return AstNode.Assignment(
                 variable,
@@ -203,7 +204,8 @@ object Parser {
                     variable,
                     Token(TokenType.SLASH, "/=", null, op.file, op.pos),
                     num
-                )
+                ),
+                false
             )
             TokenType.PLUS_EQ -> {
                 if (num is AstNode.Literal && num.literal.literal is Int && num.literal.literal in Byte.MIN_VALUE..Byte.MAX_VALUE) {
@@ -215,7 +217,8 @@ object Parser {
                         variable,
                         Token(TokenType.PLUS, "+=", null, op.file, op.pos),
                         num
-                    )
+                    ),
+                    false
                 )
             }
             TokenType.MINUS_EQ -> {
@@ -228,7 +231,8 @@ object Parser {
                         variable,
                         Token(TokenType.MINUS, "-=", null, op.file, op.pos),
                         num
-                    )
+                    ),
+                    false
                 )
             }
             else -> throw RuntimeException("unreachable")
@@ -296,11 +300,11 @@ object Parser {
     private fun parseAssignment(): AstNode {
         val left = parseBooleanComparison()
         if (match(TokenType.EQ)) {
-            if (left is AstNode.Get) return AstNode.Assignment(left, parseStatement())
+            if (left is AstNode.Get) return AstNode.Assignment(left, parseStatement(), false).apply { arrIndex = left.arrIndex }
             else throw RuntimeException("expected variable before Assignment")
         }
         if (match(TokenType.WALRUS)) {
-            if (left is AstNode.Get) return AstNode.WalrusAssign(left, parseStatement())
+            if (left is AstNode.Get) return AstNode.Assignment(left, parseStatement(), true).apply { arrIndex = left.arrIndex }
             else throw RuntimeException("expected variable before Assignment")
         }
         if (match(TokenType.PLUS_EQ, TokenType.MINUS_EQ, TokenType.STAR_EQ, TokenType.SLASH_EQ)) {

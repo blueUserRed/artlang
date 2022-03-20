@@ -209,18 +209,54 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     }
 
     override fun visit(varAssign: AstNode.Assignment): Datatype {
+        varAssign.arrIndex?.let { check(it, varAssign) }
         val typeToAssign = check(varAssign.toAssign, varAssign)
         if (varAssign.name.from == null) {
             if (varAssign.index != -1) {
                 val varType = vars[varAssign.index] ?: throw RuntimeException("unreachable")
+                varAssign.name.type = varType
+
+                if (varAssign.arrIndex != null) {
+                    if (varAssign.arrIndex!!.type != Datatype.Integer()) {
+                        throw RuntimeException("array can only be indexed by integer")
+                    }
+                    if (!varType.matches(Datakind.ARRAY)) {
+                        throw RuntimeException("can only get from array")
+                    }
+                    varType as Datatype.ArrayType
+                    if (varType.type != typeToAssign) {
+                        throw RuntimeException("incompatible types in array set: ${varType.type} and $typeToAssign")
+                    }
+                    varAssign.type = if (varAssign.isWalrus) varType.type else Datatype.Void()
+                    return varAssign.type
+                }
+
                 if (typeToAssign != varType) throw RuntimeException("tried to assign $typeToAssign to $varType")
-                return Datatype.Void()
+                varAssign.type = if (varAssign.isWalrus) varType else Datatype.Void()
+                return varAssign.type
             }
             for (field in curProgram.fields) if (field.name.lexeme == varAssign.name.name.lexeme) {
                 varAssign.name.fieldDef = field
-                varAssign.type = Datatype.Void()
                 varAssign.name.type = field.fieldType
-                return Datatype.Void()
+
+                if (varAssign.arrIndex != null) {
+                    if (varAssign.arrIndex!!.type != Datatype.Integer()) {
+                        throw RuntimeException("array can only be indexed by integer")
+                    }
+                    if (!field.fieldType.matches(Datakind.ARRAY)) {
+                        throw RuntimeException("can only get from array")
+                    }
+                    if ((field.fieldType as Datatype.ArrayType).type != typeToAssign) {
+                        throw RuntimeException("incompatible types in array set:" +
+                                "${(field.fieldType as Datatype.ArrayType).type} and $typeToAssign")
+                    }
+                    varAssign.type = if (varAssign.isWalrus) (field.fieldType as Datatype.ArrayType).type
+                        else Datatype.Void()
+                    return varAssign.type
+                }
+
+                varAssign.type =  if (varAssign.isWalrus) field.fieldType else Datatype.Void()
+                return varAssign.type
             }
             throw RuntimeException("cant find variable ${varAssign.name.name.lexeme}")
         }
@@ -237,8 +273,25 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                     }
                     varAssign.name.fieldDef = field
                     varAssign.name.type = field.fieldType
-                    varAssign.type = Datatype.Void()
-                    return Datatype.Void()
+
+                    if (varAssign.arrIndex != null) {
+                        if (varAssign.arrIndex!!.type != Datatype.Integer()) {
+                            throw RuntimeException("array can only be indexed by integer")
+                        }
+                        if (!field.fieldType.matches(Datakind.ARRAY)) {
+                            throw RuntimeException("can only get from array")
+                        }
+                        if ((field.fieldType as Datatype.ArrayType).type != typeToAssign) {
+                            throw RuntimeException("incompatible types in array set:" +
+                                    "${(field.fieldType as Datatype.ArrayType).type} and $typeToAssign")
+                        }
+                        varAssign.type = if (varAssign.isWalrus) (field.fieldType as Datatype.ArrayType).type
+                        else Datatype.Void()
+                        return varAssign.type
+                    }
+
+                    varAssign.type = if (varAssign.isWalrus) field.fieldType else Datatype.Void()
+                    return varAssign.type
                 }
             }
 
@@ -251,8 +304,25 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                     }
                     varAssign.name.fieldDef = field
                     varAssign.name.type = field.fieldType
-                    varAssign.type = Datatype.Void()
-                    return Datatype.Void()
+
+                    if (varAssign.arrIndex != null) {
+                        if (varAssign.arrIndex!!.type != Datatype.Integer()) {
+                            throw RuntimeException("array can only be indexed by integer")
+                        }
+                        if (!field.fieldType.matches(Datakind.ARRAY)) {
+                            throw RuntimeException("can only get from array")
+                        }
+                        if ((field.fieldType as Datatype.ArrayType).type != typeToAssign) {
+                            throw RuntimeException("incompatible types in array set:" +
+                                    "${(field.fieldType as Datatype.ArrayType).type} and $typeToAssign")
+                        }
+                        varAssign.type = if (varAssign.isWalrus) (field.fieldType as Datatype.ArrayType).type
+                        else Datatype.Void()
+                        return varAssign.type
+                    }
+
+                    varAssign.type = if (varAssign.isWalrus) field.fieldType else Datatype.Void()
+                    return varAssign.type
                 }
             }
             else -> TODO("getting is only implemented for classes and objects")
@@ -396,7 +466,8 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                 AstNode.Literal(
                     Token(TokenType.INT, "+=", varInc.toAdd.toInt(), varInc.name.name.file, varInc.name.name.pos)
                 )
-            )
+            ),
+            false
         )
         check(toSwap, null)
         swap = toSwap
@@ -412,12 +483,6 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         for (func in clazz.funcs) check(func, clazz)
         curClass = tmp
         return Datatype.Void()
-    }
-
-    override fun visit(walrus: AstNode.WalrusAssign): Datatype {
-        val type = check(walrus.toAssign, walrus) //TODO: figure out how this code didn't break by now
-        walrus.type = type
-        return type
     }
 
     override fun visit(get: AstNode.Get): Datatype {

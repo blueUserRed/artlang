@@ -8,7 +8,6 @@ interface AstNodeVisitor<T> {
     fun visit(group: AstNode.Group): T
     fun visit(unary: AstNode.Unary): T
     fun visit(funcCall: AstNode.FunctionCall): T
-    fun visit(walrus: AstNode.WalrusAssign): T
     fun visit(exprStmt: AstNode.ExpressionStatement): T
     fun visit(function: AstNode.Function): T
     fun visit(program: AstNode.Program): T

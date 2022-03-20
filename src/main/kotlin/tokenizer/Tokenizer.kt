@@ -226,6 +226,7 @@ object Tokenizer {
 
     private fun lineComment() {
         while (consume() != '\n' && !end());
+        emit(TokenType.SOFT_BREAK, "\n", null)
     }
 
     private fun blockComment() {

@@ -24,12 +24,6 @@ class Compiler : AstNodeVisitor<Unit> {
     private var curClassName: String = ""
     private var isTopLevel: Boolean = false
 
-//    private var stack: Stack<VerificationTypeInfo> = Stack()
-//    private var maxStack: Int = 0
-//    private var locals: MutableList<VerificationTypeInfo?> = mutableListOf()
-//
-//    private var lastStackMapFrameOffset: Int = 0
-
     private var method: MethodEmitter? = null
     private lateinit var file: ClassFileBuilder
     private lateinit var clinit: MethodEmitter
@@ -44,7 +38,7 @@ class Compiler : AstNodeVisitor<Unit> {
 
     private lateinit var curProgram: AstNode.Program
 
-    fun compile(program: AstNode.Program, outdir: String, name: String) {
+    fun compileProgram(program: AstNode.Program, outdir: String, name: String) {
         this.outdir = outdir
         this.topLevelName = "$name\$\$ArtTopLevel"
         originFileName = name
@@ -63,8 +57,8 @@ class Compiler : AstNodeVisitor<Unit> {
             return
         }
 
-        comp(binary.left)
-        comp(binary.right)
+        compile(binary.left)
+        compile(binary.right)
 
         when (binary.operator.tokenType) {
             TokenType.PLUS -> {
@@ -133,10 +127,10 @@ class Compiler : AstNodeVisitor<Unit> {
         emit(invokespecial, *Utils.getLastTwoBytes(initMethodInfo))
         decStack()
 
-        comp(exp.left)
+        compile(exp.left)
         emit(invokevirtual, *Utils.getLastTwoBytes(appendMethodInfo))
         decStack()
-        comp(exp.right)
+        compile(exp.right)
         emit(invokevirtual, *Utils.getLastTwoBytes(appendMethodInfo))
         decStack()
         emit(invokevirtual, *Utils.getLastTwoBytes(toStringMethodInfo))
@@ -146,14 +140,14 @@ class Compiler : AstNodeVisitor<Unit> {
 
     private fun doBooleanComparison(exp: AstNode.Binary) {
         val isAnd = exp.operator.tokenType == TokenType.D_AND
-        comp(exp.left)
+        compile(exp.left)
         emit(dup)
         incStack(Datatype.Bool())
         if (isAnd) emit(ifeq) else emit(ifne)
         decStack()
         emit(0x00.toByte(), 0x00.toByte())
         val jmpAddrPos = emitterTarget.curCodeOffset - 2
-        comp(exp.right)
+        compile(exp.right)
         if (isAnd) emit(iand) else emit(ior)
         decStack()
         emitStackMapFrame()
@@ -175,7 +169,7 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     override fun visit(exprStmt: AstNode.ExpressionStatement) {
-        comp(exprStmt.exp)
+        compile(exprStmt.exp)
         if (exprStmt.exp is AstNode.FunctionCall && exprStmt.exp.type == Datatype.Void()) return
         emit(pop)
         decStack()
@@ -208,7 +202,7 @@ class Compiler : AstNodeVisitor<Unit> {
         methodBuilder.descriptor = function.functionDescriptor.getDescriptorString()
         methodBuilder.name = function.name.lexeme
 
-        comp(function.statements)
+        compile(function.statements)
 
         if (methodBuilder.name == "main") {
             methodBuilder.descriptor = "([Ljava/lang/String;)V"
@@ -264,7 +258,7 @@ class Compiler : AstNodeVisitor<Unit> {
         doStaticFields(program.fields)
 
         isTopLevel = true
-        for (func in program.funcs) comp(func)
+        for (func in program.funcs) compile(func)
         isTopLevel = false
 
         if (clinit.curCodeOffset != 0) {
@@ -307,8 +301,8 @@ class Compiler : AstNodeVisitor<Unit> {
         doNonStaticFields(clazz.fields)
         doStaticFields(clazz.staticFields)
 
-        for (func in clazz.staticFuncs) comp(func)
-        for (func in clazz.funcs) comp(func)
+        for (func in clazz.staticFuncs) compile(func)
+        for (func in clazz.funcs) compile(func)
 
         if (clinit.curCodeOffset != 0) {
             clinit.emitByteCode(_return)
@@ -325,13 +319,13 @@ class Compiler : AstNodeVisitor<Unit> {
     private fun doNonStaticFields(fields: List<AstNode.FieldDeclaration>) {
         if (fields.isEmpty()) return
         emitterTarget = init
-        for (field in fields) comp(field)
+        for (field in fields) compile(field)
     }
 
     private fun doStaticFields(fields: List<AstNode.FieldDeclaration>) {
         if (fields.isEmpty()) return
         emitterTarget = clinit
-        for (field in fields) comp(field)
+        for (field in fields) compile(field)
     }
 
     override fun visit(print: AstNode.Print) {
@@ -344,10 +338,11 @@ class Compiler : AstNodeVisitor<Unit> {
             )
         )))
         incStack(getObjVerificationType("java/io/PrintStream"))
-        comp(print.toPrint)
+        compile(print.toPrint)
         emit(invokevirtual)
 
-        val dataTypeToPrint = print.toPrint.type.descriptorType
+        val dataTypeToPrint = if (print.toPrint.type.matches(Datakind.OBJECT)) "Ljava/lang/Object;"
+                                else print.toPrint.type.descriptorType
 
         emit(*Utils.getLastTwoBytes(file.methodRefInfo(
             file.classInfo(file.utf8Info("java/io/PrintStream")),
@@ -378,7 +373,7 @@ class Compiler : AstNodeVisitor<Unit> {
 
         emitObjectVarLoad(variable.index)
         incStack(emitterTarget.locals[variable.index]!!)
-        comp(variable.arrIndex!!)
+        compile(variable.arrIndex!!)
         emitALoad(variable.type)
         decStack()
         decStack()
@@ -386,7 +381,7 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     override fun visit(varDec: AstNode.VariableDeclaration) {
-        comp(varDec.initializer)
+        compile(varDec.initializer)
         when (varDec.varType.kind) {
             Datakind.INT, Datakind.BOOLEAN -> {
                 emitterTarget.locals[varDec.index] = VerificationTypeInfo.Integer()
@@ -412,35 +407,17 @@ class Compiler : AstNodeVisitor<Unit> {
 
     override fun visit(varAssign: AstNode.Assignment) {
         if (varAssign.index != -1) {
-            comp(varAssign.toAssign)
-            when (varAssign.toAssign.type) {
-                Datatype.Integer() -> emitIntVarStore(varAssign.index)
-                Datatype.Str() -> emitObjectVarStore(varAssign.index)
-                Datatype.Bool() -> emitIntVarStore(varAssign.index)
-                else -> TODO("not yet implemented")
-            }
-            decStack()
+            doVarAssignForLocal(varAssign)
             return
         }
 
         if (varAssign.name.fieldDef!!.isStatic || varAssign.name.fieldDef!!.isTopLevel) {
-            comp(varAssign.toAssign)
-            emit(putstatic)
-            val fieldRef = file.fieldRefInfo(
-                file.classInfo(file.utf8Info(varAssign.name.fieldDef!!.clazz?.name?.lexeme ?: topLevelName)),
-                file.nameAndTypeInfo(
-                    file.utf8Info(varAssign.name.name.lexeme),
-                    file.utf8Info(varAssign.name.fieldDef!!.fieldType.descriptorType)
-                )
-            )
-            emit(*Utils.getLastTwoBytes(fieldRef))
-            decStack()
+            doVarAssignForStaticField(varAssign)
             return
         }
 
-        comp(varAssign.name.from!!)
-        comp(varAssign.toAssign)
-        emit(putfield)
+        //non static field
+
         val fieldRef = file.fieldRefInfo(
             file.classInfo(file.utf8Info(varAssign.name.fieldDef!!.clazz?.name?.lexeme ?: topLevelName)),
             file.nameAndTypeInfo(
@@ -448,9 +425,108 @@ class Compiler : AstNodeVisitor<Unit> {
                 file.utf8Info(varAssign.name.fieldDef!!.fieldType.descriptorType)
             )
         )
+
+        if (varAssign.arrIndex != null) {
+            compile(varAssign.name.from!!)
+            emit(getfield)
+            emit(*Utils.getLastTwoBytes(fieldRef))
+            incStack(varAssign.name.fieldDef!!.type)
+            compile(varAssign.arrIndex!!)
+            compile(varAssign.toAssign)
+            if (varAssign.isWalrus) {
+                emit(dup_x2)
+                incStack(varAssign.toAssign.type)
+            }
+            emitAStore(varAssign.toAssign.type)
+            decStack()
+            decStack()
+            decStack()
+            return
+        }
+
+        compile(varAssign.name.from!!)
+        compile(varAssign.toAssign)
+
+        if (varAssign.isWalrus) {
+            emit(dup_x1)
+            incStack(emitterTarget.stack[emitterTarget.stack.size - 1])
+        }
+
+        emit(putfield)
+
         emit(*Utils.getLastTwoBytes(fieldRef))
         decStack()
         decStack()
+    }
+
+    private fun doVarAssignForStaticField(varAssign: AstNode.Assignment) {
+
+        val fieldRef = file.fieldRefInfo(
+            file.classInfo(file.utf8Info(varAssign.name.fieldDef!!.clazz?.name?.lexeme ?: topLevelName)),
+            file.nameAndTypeInfo(
+                file.utf8Info(varAssign.name.name.lexeme),
+                file.utf8Info(varAssign.name.fieldDef!!.fieldType.descriptorType)
+            )
+        )
+
+        if (varAssign.arrIndex != null) {
+            emit(getstatic)
+            emit(*Utils.getLastTwoBytes(fieldRef))
+            incStack(varAssign.name.type)
+            compile(varAssign.arrIndex!!)
+            compile(varAssign.toAssign)
+            if (varAssign.isWalrus) {
+                emit(dup_x2)
+                incStack(varAssign.toAssign.type)
+            }
+            emitAStore(varAssign.toAssign.type)
+            decStack()
+            decStack()
+            decStack()
+            return
+        }
+
+        compile(varAssign.toAssign)
+        if (varAssign.isWalrus) {
+            emit(dup)
+            incStack(emitterTarget.stack.peek())
+        }
+        emit(putstatic)
+        emit(*Utils.getLastTwoBytes(fieldRef))
+        decStack()
+        return
+    }
+
+    private fun doVarAssignForLocal(varAssign: AstNode.Assignment) {
+        if (varAssign.arrIndex != null) {
+            emitObjectVarLoad(varAssign.index)
+            incStack(varAssign.name.type)
+            compile(varAssign.arrIndex!!)
+            compile(varAssign.toAssign)
+            if (varAssign.isWalrus) {
+                emit(dup_x2)
+                incStack(varAssign.toAssign.type)
+            }
+            emitAStore(varAssign.toAssign.type)
+            decStack()
+            decStack()
+            decStack()
+            return
+        }
+
+        compile(varAssign.toAssign)
+        if (varAssign.isWalrus) {
+            emit(dup)
+            incStack(emitterTarget.stack.peek())
+        }
+        when (varAssign.toAssign.type) {
+            Datatype.Integer() -> emitIntVarStore(varAssign.index)
+            Datatype.Str() -> emitObjectVarStore(varAssign.index)
+            Datatype.Bool() -> emitIntVarStore(varAssign.index)
+            else -> TODO("not yet implemented")
+        }
+        decStack()
+        return
     }
 
     override fun visit(loop: AstNode.Loop) {
@@ -458,7 +534,7 @@ class Compiler : AstNodeVisitor<Unit> {
         val before = emitterTarget.curCodeOffset
         loopContinueAddress = before
         loopBreakAddressesToOverwrite = mutableListOf()
-        comp(loop.body)
+        compile(loop.body)
         val absOffset = (before - emitterTarget.curCodeOffset)
         emitGoto(absOffset)
         emitStackMapFrame()
@@ -471,7 +547,7 @@ class Compiler : AstNodeVisitor<Unit> {
     override fun visit(block: AstNode.Block) {
         val before = emitterTarget.locals.toMutableList()
         for (s in block.statements) {
-            comp(s)
+            compile(s)
             if (emitterTarget.stack.size != 0) {
                 println(emitterTarget.stack.size)
                 emit(pop)
@@ -484,13 +560,13 @@ class Compiler : AstNodeVisitor<Unit> {
     override fun visit(ifStmt: AstNode.If) {
         val hasElse = ifStmt.elseStmt != null
 
-        comp(ifStmt.condition)
+        compile(ifStmt.condition)
         emit(ifeq, 0x00.toByte(), 0x00.toByte())
         decStack()
         val jmpAddrOffset = emitterTarget.curCodeOffset - 2
 
         wasReturn = false
-        comp(ifStmt.ifStmt)
+        compile(ifStmt.ifStmt)
         val skipGoto = wasReturn
         wasReturn = false
 
@@ -499,18 +575,18 @@ class Compiler : AstNodeVisitor<Unit> {
         val jmpAddr = emitterTarget.curCodeOffset - (jmpAddrOffset - 1)
         overwriteByteCode(jmpAddrOffset, *Utils.getLastTwoBytes(jmpAddr))
         if (hasElse) emitStackMapFrame()
-        if (hasElse) comp(ifStmt.elseStmt!!)
+        if (hasElse) compile(ifStmt.elseStmt!!)
         val elseJmpAddr = emitterTarget.curCodeOffset - (elseJmpAddrOffset - 1)
         if (hasElse && !skipGoto) overwriteByteCode(elseJmpAddrOffset, *Utils.getLastTwoBytes(elseJmpAddr))
         emitStackMapFrame()
     }
 
     override fun visit(group: AstNode.Group) {
-        comp(group.grouped)
+        compile(group.grouped)
     }
 
     override fun visit(unary: AstNode.Unary) {
-        comp(unary.on)
+        compile(unary.on)
         when (unary.operator.tokenType) {
             TokenType.MINUS -> emit(ineg)
             TokenType.NOT -> {
@@ -531,11 +607,11 @@ class Compiler : AstNodeVisitor<Unit> {
         val startOffset = emitterTarget.curCodeOffset
         loopContinueAddress = startOffset
         emitStackMapFrame()
-        comp(whileStmt.condition)
+        compile(whileStmt.condition)
         emit(ifeq, 0x00.toByte(), 0x00.toByte())
         decStack()
         val jmpAddrOffset = emitterTarget.curCodeOffset - 2
-        comp(whileStmt.body)
+        compile(whileStmt.body)
         emit(_goto, *Utils.getShortAsBytes((startOffset - emitterTarget.curCodeOffset).toShort()))
         val jmpAddr = emitterTarget.curCodeOffset - (jmpAddrOffset - 1)
         overwriteByteCode(jmpAddrOffset, *Utils.getLastTwoBytes(jmpAddr))
@@ -548,7 +624,7 @@ class Compiler : AstNodeVisitor<Unit> {
 
     override fun visit(funcCall: AstNode.FunctionCall) {
         if (funcCall.definition.isStatic || funcCall.definition.isTopLevel) {
-            for (arg in funcCall.arguments) comp(arg)
+            for (arg in funcCall.arguments) compile(arg)
             emit(invokestatic)
             val funcRef = file.methodRefInfo(
                 file.classInfo(file.utf8Info(
@@ -565,8 +641,8 @@ class Compiler : AstNodeVisitor<Unit> {
             return
         }
 
-        comp(funcCall.func.from!!)
-        for (arg in funcCall.arguments) comp(arg)
+        compile(funcCall.func.from!!)
+        for (arg in funcCall.arguments) compile(arg)
         emit(invokevirtual)
         val funcRef = file.methodRefInfo(
             file.classInfo(file.utf8Info(funcCall.definition.clazz!!.name.lexeme)),
@@ -587,7 +663,7 @@ class Compiler : AstNodeVisitor<Unit> {
             return
         }
 
-        comp(returnStmt.toReturn!!)
+        compile(returnStmt.toReturn!!)
 
         if (returnStmt.toReturn!!.type.matches(Datakind.STRING)) emit(areturn)
         else if (returnStmt.toReturn!!.type.matches(Datakind.INT, Datakind.STRING)) emit(ireturn)
@@ -600,19 +676,6 @@ class Compiler : AstNodeVisitor<Unit> {
 
     override fun visit(varInc: AstNode.VarIncrement) {
         emit(iinc, (varInc.index and 0xFF).toByte(), varInc.toAdd)
-    }
-
-    override fun visit(walrus: AstNode.WalrusAssign) {
-        comp(walrus.toAssign)
-        emit(dup)
-        incStack(emitterTarget.stack.peek())
-        when (walrus.type) {
-            Datatype.Integer() -> emitIntVarStore(walrus.index)
-            Datatype.Str() -> emitObjectVarStore(walrus.index)
-            Datatype.Bool() -> emitIntVarStore(walrus.index)
-            else -> TODO("not yet implemented")
-        }
-        decStack()
     }
 
     override fun visit(get: AstNode.Get) {
@@ -628,7 +691,7 @@ class Compiler : AstNodeVisitor<Unit> {
             emit(*Utils.getLastTwoBytes(fieldRef))
             incStack(get.fieldDef!!.fieldType)
             if (get.arrIndex == null) return
-            comp(get.arrIndex!!)
+            compile(get.arrIndex!!)
             emitALoad(get.type)
             decStack()
             decStack()
@@ -648,7 +711,7 @@ class Compiler : AstNodeVisitor<Unit> {
             emit(*Utils.getLastTwoBytes(fieldRef))
             incStack(get.fieldDef!!.fieldType)
             if (get.arrIndex == null) return
-            comp(get.arrIndex!!)
+            compile(get.arrIndex!!)
             emitALoad(get.type)
             decStack()
             decStack()
@@ -656,7 +719,7 @@ class Compiler : AstNodeVisitor<Unit> {
             return
         }
 
-        comp(get.from!!)
+        compile(get.from!!)
         emit(getfield)
 
         val fieldRef = file.fieldRefInfo(
@@ -670,7 +733,7 @@ class Compiler : AstNodeVisitor<Unit> {
         decStack()
         incStack(get.fieldDef!!.fieldType)
         if (get.arrIndex == null) return
-        comp(get.arrIndex!!)
+        compile(get.arrIndex!!)
         emitALoad(get.type)
         decStack()
         decStack()
@@ -736,7 +799,7 @@ class Compiler : AstNodeVisitor<Unit> {
             incStack(getObjVerificationType(curClassName))
         }
 
-        comp(field.initializer)
+        compile(field.initializer)
 
         val fieldRefIndex = file.fieldRefInfo(
             file.classInfo(file.utf8Info(curClassName)),
@@ -755,13 +818,13 @@ class Compiler : AstNodeVisitor<Unit> {
     override fun visit(arr: AstNode.ArrayCreate) {
         when (val kind = (arr.type as Datatype.ArrayType).type.kind) {
             Datakind.INT -> {
-                comp(arr.amount)
+                compile(arr.amount)
                 emit(newarray, getAType(kind))
                 decStack()
                 incStack(arr.type)
             }
             Datakind.STRING -> {
-                comp(arr.amount)
+                compile(arr.amount)
                 emit(anewarray, *Utils.getLastTwoBytes(file.classInfo(file.utf8Info("java/lang/String"))))
                 decStack()
                 incStack(arr.type)
@@ -783,7 +846,7 @@ class Compiler : AstNodeVisitor<Unit> {
                     incStack(emitterTarget.stack.peek())
                     emitIntLoad(i)
                     incStack(Datatype.Integer())
-                    comp(arr.elements[i])
+                    compile(arr.elements[i])
                     emit(iastore)
                     decStack()
                     decStack()
@@ -801,7 +864,7 @@ class Compiler : AstNodeVisitor<Unit> {
                     incStack(emitterTarget.stack.peek())
                     emitIntLoad(i)
                     incStack(Datatype.Integer())
-                    comp(arr.elements[i])
+                    compile(arr.elements[i])
                     emit(aastore)
                     decStack()
                     decStack()
@@ -923,7 +986,7 @@ class Compiler : AstNodeVisitor<Unit> {
     private fun emitStringLoad(s: String) = emitLdc(file.stringInfo(file.utf8Info(s)))
 
 
-    private fun comp(node: AstNode) {
+    private fun compile(node: AstNode) {
         node.accept(this)
     }
 
@@ -1061,6 +1124,8 @@ class Compiler : AstNodeVisitor<Unit> {
         const val pop: Byte = 0x57.toByte()
         const val pop2: Byte = 0x58.toByte()
         const val dup: Byte = 0x59.toByte()
+        const val dup_x1: Byte = 0x5A.toByte()
+        const val dup_x2: Byte = 0x5B.toByte()
 
         const val _goto: Byte = 0xA7.toByte()
         const val goto_w: Byte = 0xC8.toByte()
@@ -1101,11 +1166,10 @@ class Compiler : AstNodeVisitor<Unit> {
         const val aaload: Byte = 0x32.toByte()
         const val aastore: Byte = 0x53.toByte()
         const val anewarray: Byte = 0xBD.toByte()
-
-        const val iastore: Byte = 0x4F.toByte()
-        const val iaload: Byte = 0x2E.toByte()
-
-        const val newarray: Byte = 0xBC.toByte()
         const val multianewarray: Byte = 0xC5.toByte()
+        const val iastore: Byte = 0x4F.toByte()
+
+        const val iaload: Byte = 0x2E.toByte()
+        const val newarray: Byte = 0xBC.toByte()
     }
 }
