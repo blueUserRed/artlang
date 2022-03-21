@@ -184,15 +184,7 @@ class Compiler : AstNodeVisitor<Unit> {
         emitterTarget.locals = MutableList(function.amountLocals) { null }
 
         for (i in function.functionDescriptor.args.indices) {
-            emitterTarget.locals[i] = when (val arg = function.functionDescriptor.args[i].second) {
-                Datatype.Integer(), Datatype.Bool() -> VerificationTypeInfo.Integer()
-                Datatype.Float() -> VerificationTypeInfo.Float()
-                Datatype.Str() -> getObjVerificationType("java/lang/String")
-                else -> {
-                    if (arg.matches(Datakind.OBJECT)) getObjVerificationType((arg as Datatype.Object).name)
-                    else TODO("not yet implemented")
-                }
-            }
+            putTypeInLocals(i, function.functionDescriptor.args[i].second)
         }
 
         emitterTarget.maxStack = 0
@@ -364,7 +356,7 @@ class Compiler : AstNodeVisitor<Unit> {
         if (variable.arrIndex == null) {
             when (variable.type.kind) {
                 Datakind.INT, Datakind.BOOLEAN -> emitIntVarLoad(variable.index)
-                Datakind.STRING, Datakind.OBJECT -> emitObjectVarLoad(variable.index)
+                Datakind.STRING, Datakind.OBJECT, Datakind.ARRAY -> emitObjectVarLoad(variable.index)
                 else -> TODO("variable load type not implemented")
             }
             incStack(variable.type)
@@ -382,27 +374,29 @@ class Compiler : AstNodeVisitor<Unit> {
 
     override fun visit(varDec: AstNode.VariableDeclaration) {
         compile(varDec.initializer)
-        when (varDec.varType.kind) {
-            Datakind.INT, Datakind.BOOLEAN -> {
-                emitterTarget.locals[varDec.index] = VerificationTypeInfo.Integer()
-                emitIntVarStore(varDec.index)
-            }
-            Datakind.STRING -> {
-                emitterTarget.locals[varDec.index] = getObjVerificationType("java/lang/String")
-                emitObjectVarStore(varDec.index)
-            }
-            Datakind.OBJECT -> {
-                emitterTarget.locals[varDec.index] =
-                    getObjVerificationType((varDec.varType as Datatype.Object).clazz.name.lexeme)
-                emitObjectVarStore(varDec.index)
-            }
-            Datakind.ARRAY -> {
-                emitterTarget.locals[varDec.index] = getObjVerificationType(varDec.varType.descriptorType)
-                emitObjectVarStore(varDec.index)
-            }
-            else -> TODO("not yet implemented")
-        }
+        putTypeInLocals(varDec.index, varDec.varType)
         decStack()
+    }
+
+    private fun putTypeInLocals(index: Int, type: Datatype) = when (type.kind) {
+        Datakind.INT, Datakind.BOOLEAN -> {
+            emitterTarget.locals[index] = VerificationTypeInfo.Integer()
+            emitIntVarStore(index)
+        }
+        Datakind.STRING -> {
+            emitterTarget.locals[index] = getObjVerificationType("java/lang/String")
+            emitObjectVarStore(index)
+        }
+        Datakind.OBJECT -> {
+            emitterTarget.locals[index] =
+                getObjVerificationType((type as Datatype.Object).clazz.name.lexeme)
+            emitObjectVarStore(index)
+        }
+        Datakind.ARRAY -> {
+            emitterTarget.locals[index] = getObjVerificationType(type.descriptorType)
+            emitObjectVarStore(index)
+        }
+        else -> TODO("not yet implemented")
     }
 
     override fun visit(varAssign: AstNode.Assignment) {
@@ -665,10 +659,11 @@ class Compiler : AstNodeVisitor<Unit> {
 
         compile(returnStmt.toReturn!!)
 
-        if (returnStmt.toReturn!!.type.matches(Datakind.STRING)) emit(areturn)
-        else if (returnStmt.toReturn!!.type.matches(Datakind.INT, Datakind.STRING)) emit(ireturn)
-        else if (returnStmt.toReturn!!.type.matches(Datakind.OBJECT)) emit(areturn)
-        else TODO("not yet implemented")
+        when (returnStmt.toReturn!!.type.kind) {
+            Datakind.STRING, Datakind.OBJECT, Datakind.ARRAY -> emit(areturn)
+            Datakind.INT -> emit(ireturn)
+            else -> TODO("returning ${returnStmt.type.kind} is not yet implemented")
+        }
 
         decStack()
         wasReturn = true
@@ -829,7 +824,15 @@ class Compiler : AstNodeVisitor<Unit> {
                 decStack()
                 incStack(arr.type)
             }
-            else -> TODO("only int and string arrs are implemented")
+            Datakind.OBJECT -> {
+                compile(arr.amount)
+                emit(anewarray, *Utils.getLastTwoBytes(file.classInfo(file.utf8Info(
+                    ((arr.type as Datatype.ArrayType).type as Datatype.Object).clazz.name.lexeme
+                ))))
+                decStack()
+                incStack(arr.type)
+            }
+            else -> TODO("only int, string and object arrs are implemented")
         }
     }
 
@@ -871,7 +874,27 @@ class Compiler : AstNodeVisitor<Unit> {
                     decStack()
                 }
             }
-            else -> TODO("only int and string arrays are implemented")
+            Datakind.OBJECT -> {
+                emitIntLoad(arr.elements.size)
+                incStack(Datatype.Integer())
+                emit(anewarray, *Utils.getLastTwoBytes(file.classInfo(file.utf8Info(
+                    ((arr.type as Datatype.ArrayType).type as Datatype.Object).clazz.name.lexeme
+                ))))
+                decStack()
+                incStack(arr.type)
+                for (i in arr.elements.indices) {
+                    emit(dup)
+                    incStack(emitterTarget.stack.peek())
+                    emitIntLoad(i)
+                    incStack(Datatype.Integer())
+                    compile(arr.elements[i])
+                    emit(aastore)
+                    decStack()
+                    decStack()
+                    decStack()
+                }
+            }
+            else -> TODO("only int, string and object arrays are implemented")
         }
     }
 
@@ -895,6 +918,8 @@ class Compiler : AstNodeVisitor<Unit> {
             invokespecial,
             *Utils.getLastTwoBytes(objConstructorIndex),
         )
+        incStack(VerificationTypeInfo.UninitializedThis())
+        decStack()
     }
 
     private fun doCompare(compareInstruction: Byte) {

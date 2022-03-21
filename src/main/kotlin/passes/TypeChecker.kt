@@ -116,7 +116,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         for (clazz in clazzes) {
             if (clazz.name.lexeme in names) throw RuntimeException("duplicate definition of class ${clazz.name.lexeme}")
             names.add(clazz.name.lexeme)
-            preCalcFields(clazz.fields, clazz) //TODO: Either always loop in preCalc or never
+            preCalcFields(clazz.fields, clazz)
             preCalcFields(clazz.staticFields, clazz)
             preCalcFuncs(clazz.staticFuncs, clazz)
             preCalcFuncs(clazz.funcs, clazz)
@@ -126,7 +126,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     private fun preCalcFuncs(funcs: List<AstNode.Function>, clazz: AstNode.ArtClass?) {
         for (func in funcs) {
             curFunction = func
-
+            func.clazz = clazz
             val args = mutableListOf<Pair<String, Datatype>>()
             if (func.hasThis) args.add(Pair("this", Datatype.Object(clazz!!.name.lexeme, clazz)))
             for (arg in func.args) args.add(Pair(arg.first.lexeme, typeNodeToDataType(arg.second)))
@@ -406,8 +406,6 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
         when (from.kind) {
 
-            //TODO: func_refs needed? do lookup here
-
             Datakind.STAT_CLASS -> {
                 from as Datatype.StatClass
                 for (func in from.clazz.staticFuncs) if (func.name.lexeme == funcCall.func.name.lexeme) {
@@ -497,7 +495,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
                 if (arrIndexType != null) {
                     val toSwap = AstNode.ArrayCreate(AstNode.ObjectTypeNode(get.name), get.arrIndex!!)
-                    toSwap.type = Datatype.ArrayType(get.arrIndex!!.type)
+                    toSwap.type = Datatype.ArrayType(typeNodeToDataType(toSwap.typeNode))
                     swap = toSwap
                     return toSwap.type
                 }
@@ -620,6 +618,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     override fun visit(arr: AstNode.ArrayLiteral): Datatype {
         if (arr.elements.isEmpty()) throw RuntimeException("array literal is empty")
         val type = check(arr.elements[0], arr)
+        if (type.matches(Datakind.STAT_CLASS)) throw RuntimeException("expected value in array literal")
         for (i in 1 until arr.elements.size) {
             val res = check(arr.elements[i], arr)
             if (type != res) throw RuntimeException("incompatible types in array initializer: $type and $res")
@@ -646,9 +645,9 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     }
 
     private fun typeNodeToDataType(node: AstNode.DatatypeNode): Datatype = when (node.kind) {
-        Datakind.BOOLEAN -> Datatype.Bool()
-        Datakind.INT -> Datatype.Integer()
-        Datakind.STRING -> Datatype.Str()
+        Datakind.BOOLEAN -> if (node.isArray) Datatype.ArrayType(Datatype.Bool()) else Datatype.Bool()
+        Datakind.INT -> if (node.isArray) Datatype.ArrayType(Datatype.Integer()) else Datatype.Integer()
+        Datakind.STRING -> if (node.isArray) Datatype.ArrayType(Datatype.Str()) else Datatype.Str()
         Datakind.OBJECT -> {
             node as AstNode.ObjectTypeNode
             var toRet: Datatype? = null
@@ -656,6 +655,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                 toRet = Datatype.Object(c.name.lexeme, c)
             }
             toRet ?: throw RuntimeException("unknown Type: ${node.identifier.lexeme}")
+            if (node.isArray) Datatype.ArrayType(toRet) else toRet
         }
         else -> throw RuntimeException("invalid type")
     }

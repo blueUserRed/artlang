@@ -1,9 +1,11 @@
+import ast.AstNode
 import ast.AstPrinter
 import compiler.Compiler
 import parser.Parser
 import passes.ControlFlowChecker
 import passes.TypeChecker
 import passes.VariableResolver
+import tokenizer.Token
 import tokenizer.Tokenizer
 import java.io.File
 import java.io.IOException
@@ -16,7 +18,7 @@ object Main {
 
     @JvmStatic
     fun main(args: Array<String>) {
-
+        println("\n")
         val instructions = Settings.parseArgs(args)
 
         if (instructions.isEmpty()) {
@@ -47,6 +49,9 @@ object Main {
         val code: String
         val fileName: String
 
+        val stopwatch = Stopwatch()
+        stopwatch.start()
+
         try {
             val srcFile = Paths.get(file).toFile()
             fileName = srcFile.nameWithoutExtension
@@ -62,7 +67,9 @@ object Main {
             println("------------------------------------\n\n")
         }
 
-        val tokens = Tokenizer.tokenize(code, file)
+        var tokens: List<Token>
+        val tokenizationTime = Stopwatch.time { tokens = Tokenizer.tokenize(code, file) }
+        if (Settings.verbose) println("tokenization took ${tokenizationTime}ms\n")
 
         if (Settings.printTokens) {
             println("---------------tokens---------------")
@@ -70,7 +77,9 @@ object Main {
             println("------------------------------------\n\n")
         }
 
-        val program = Parser.parse(tokens)
+        val program: AstNode.Program
+        val parseTime = Stopwatch.time { program = Parser.parse(tokens) }
+        if (Settings.verbose) println("parsing took ${parseTime}ms\n")
 
         if (Settings.printAst) {
             println("----------------AST-----------------")
@@ -79,16 +88,16 @@ object Main {
         }
 
         if (Settings.verbose) println("running variable resolver")
-        program.accept(VariableResolver())
-        if (Settings.verbose) println("done\n")
+        val variableResolverTime = Stopwatch.time { program.accept(VariableResolver()) }
+        if (Settings.verbose) println("done in ${variableResolverTime}ms\n")
 
         if (Settings.verbose) println("running type checker")
-        program.accept(TypeChecker())
-        if (Settings.verbose) println("done\n")
+        val typeCheckingTime = Stopwatch.time { program.accept(TypeChecker()) }
+        if (Settings.verbose) println("done in ${typeCheckingTime}ms\n")
 
         if (Settings.verbose) println("running controlFlow checker")
-        program.accept(ControlFlowChecker())
-        if (Settings.verbose) println("done\n")
+        val controlFlowCheckingTime = Stopwatch.time { program.accept(ControlFlowChecker()) }
+        if (Settings.verbose) println("done in ${controlFlowCheckingTime}ms\n")
 
         if (Settings.printAst) {
             println("------------revised AST-------------")
@@ -100,21 +109,26 @@ object Main {
         Files.delete(Paths.get("$outDir/tmp"))
 
         if (Settings.verbose) println("Compiling into dir: $outDir/tmp")
-        Compiler().compileProgram(program, "$outDir/tmp", fileName)
-        if (Settings.verbose) println("done\n")
+        val compilationTime = Stopwatch.time { Compiler().compileProgram(program, "$outDir/tmp", fileName) }
+        if (Settings.verbose) println("done in ${compilationTime}ms\n")
 
         if (Settings.verbose) println("creating jar $fileName.jar")
-        createJar(
-            Paths.get("$outDir/tmp").toAbsString(),
-            "$fileName.jar",
-            "$fileName\$\$ArtTopLevel"
-        )
-        if (Settings.verbose) println("done")
+        val jarCreationTime = Stopwatch.time {
+            createJar(
+                Paths.get("$outDir/tmp").toAbsString(),
+                "$fileName.jar",
+                "$fileName\$\$ArtTopLevel"
+            )
+        }
+        if (Settings.verbose) println("done in ${jarCreationTime}ms\n")
 
         if (!Settings.leaveTmp) {
             Files.walk(Paths.get("$outDir/tmp/")).skip(1).forEach(Files::delete)
             Files.delete(Paths.get("$outDir/tmp"))
         }
+
+        stopwatch.stop()
+        println("\nCompilation took ${stopwatch.time}ms in total")
     }
 
     private fun createJar(fromDir: String, name: String, entryPoint: String) {

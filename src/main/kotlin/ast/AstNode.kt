@@ -452,6 +452,7 @@ abstract class AstNode {
     }
 
     abstract class DatatypeNode(val kind: Datakind) {
+        var isArray: Boolean = false
         abstract override fun toString(): String
     }
     class PrimitiveTypeNode(kind: Datakind) : DatatypeNode(kind) {

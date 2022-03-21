@@ -7,7 +7,7 @@ import kotlin.RuntimeException
 class VariableResolver : AstNodeVisitor<Unit> {
 
     private var curVars: MutableList<String> = mutableListOf()
-    private var varDeclarations: MutableList<AstNode.VariableDeclaration> = mutableListOf()
+    private var varDeclarations: MutableList<AstNode.VariableDeclaration?> = mutableListOf()
     private var maxLocals: Int = 0
 
     private var swap: AstNode? = null
@@ -32,9 +32,15 @@ class VariableResolver : AstNodeVisitor<Unit> {
 
     override fun visit(function: AstNode.Function) {
         val vars = mutableListOf<String>()
-        if (function.hasThis) vars.add("this")
+        val varDecs = mutableListOf<AstNode.VariableDeclaration?>()
+        if (function.hasThis) {
+            vars.add("this")
+            varDecs.add(null)
+        }
         for (arg in function.args) vars.add(arg.first.lexeme)
+        for (arg in function.args) varDecs.add(null)
         curVars = vars
+        varDeclarations = varDecs
         maxLocals = vars.size
         resolve(function.statements, function)
         function.amountLocals = maxLocals
@@ -81,7 +87,8 @@ class VariableResolver : AstNodeVisitor<Unit> {
             varAssign.index = -1
             return
         }
-        if (varDeclarations[index].isConst && varAssign.arrIndex == null) {
+        // if varDeclarations[index] == null the variable is a function arg or 'this', which is const
+        if (varDeclarations[index]?.isConst ?: true && varAssign.arrIndex == null) {
             throw RuntimeException("Tried to assign to const ${varAssign.name.name.lexeme}")
         }
         varAssign.index = index

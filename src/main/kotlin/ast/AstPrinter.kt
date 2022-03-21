@@ -20,7 +20,7 @@ class AstPrinter : AstNodeVisitor<String> {
 
     override fun visit(function: AstNode.Function): String {
         val builder = StringBuilder("\n")
-        for (modifier in function.modifiers) builder.append(modifier).append(" ")
+        for (modifier in function.modifiers) builder.append(modifier.lexeme).append(" ")
         builder.append("fn ").append(function.name.lexeme).append("() {\n")
         for (s in function.statements.statements) builder.append(s.accept(this)).append("\n")
         builder.append("}\n")

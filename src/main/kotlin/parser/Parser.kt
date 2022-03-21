@@ -471,9 +471,19 @@ object Parser {
                 TokenType.T_STRING -> Datakind.STRING
                 TokenType.T_BOOLEAN -> Datakind.BOOLEAN
                 else -> throw RuntimeException("unreachable")
-            })
+            }).apply {
+                if (matchNSFB(TokenType.L_BRACKET)) {
+                    consumeOrError(TokenType.R_BRACKET, "expected closing bracket")
+                    isArray = true
+                }
+            }
         }
         consumeOrError(TokenType.IDENTIFIER, "Expected Type")
+        val token = last()
+        if (matchNSFB(TokenType.L_BRACKET)) {
+            consumeOrError(TokenType.R_BRACKET, "expected closing bracket")
+            return AstNode.ObjectTypeNode(token).apply { isArray = true }
+        }
         return AstNode.ObjectTypeNode(last())
     }
 
