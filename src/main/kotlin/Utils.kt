@@ -1,13 +1,15 @@
-import java.nio.file.Files
-import java.nio.file.Paths
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
 
+/**
+ * Object containing utility functions
+ */
 object Utils {
 
+    /**
+     * Object containing constants for ANSI-colors
+     */
     object Ansi {
         const val reset = "\u001B[0m"
         const val yellow = "\u001B[33m"
@@ -16,10 +18,9 @@ object Utils {
         const val white = "\u001B[37m"
     }
 
-    fun readFile(file: String): String {
-        return Paths.get(file).toFile().readText(Charsets.UTF_8)
-    }
-
+    /**
+     * concatenates multiple arrays
+     */
     fun arrayConcat(vararg byteArrs: ByteArray): ByteArray {
         var length = 0
         for (byteArr in byteArrs) length += byteArr.size
@@ -34,11 +35,17 @@ object Utils {
         return result
     }
 
+    /**
+     * returns the last two bytes of an int
+     */
     fun getLastTwoBytes(i: Int): ByteArray = arrayOf(
         ((i shr 8) and 0x00FF).toByte(),
         (i and 0x00FF).toByte()
     ).toByteArray()
 
+    /**
+     * returns an int as byte array
+     */
     fun getIntAsBytes(i: Int): ByteArray = arrayOf(
         ((i shr 24) and 0xFF).toByte(),
         ((i shr 16) and 0xFF).toByte(),
@@ -46,28 +53,19 @@ object Utils {
         ((i shr 0) and 0xFF).toByte(),
     ).toByteArray()
 
+    /**
+     * returns a short as byte array
+     */
     fun getShortAsBytes(s: Short): ByteArray = arrayOf(
         ((s.toInt() shr 8) and 0xFF).toByte(),
         ((s.toInt() shr 0) and 0xFF).toByte(),
     ).toByteArray()
 
-    fun zipDirectory(directory: String, target: String) {
-        val src = Paths.get(directory).toFile()
-        val zipOutput = ZipOutputStream(Files.newOutputStream(Paths.get(target)))
-        Files
-            .walk(src.toPath())
-            .filter { file -> !Files.isDirectory(file) }
-            .filter { file -> !file.fileName.startsWith(".")}
-            .forEach { path ->
-                val zipEntry = ZipEntry("${src.toPath().relativize(path)}")
-                zipOutput.putNextEntry(zipEntry)
-                Files.copy(path, zipOutput)
-                zipOutput.closeEntry()
-            }
-        zipOutput.close()
-    }
 }
 
+/**
+ * a class that can contain either one value or another
+ */
 sealed class Either<out A, out B> {
     class Left<out T> (val value: T) : Either<T, Nothing>()
     class Right<out T> (val value: T) : Either<Nothing, T>()

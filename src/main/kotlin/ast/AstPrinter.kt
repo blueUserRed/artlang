@@ -1,8 +1,10 @@
 package ast
 
-import passes.TypeChecker
 import tokenizer.TokenType
 
+/**
+ * Converts the AST into a string representation
+ */
 class AstPrinter : AstNodeVisitor<String> {
 
     override fun visit(binary: AstNode.Binary): String {

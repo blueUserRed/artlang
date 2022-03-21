@@ -166,9 +166,20 @@ object Main {
      */
     private fun printHelp() {
         println("Usage: artlang <subcommand> <options>")
+        println("")
         println("Subcommands:")
+        println("-------------------------------------------------------------------------------------------")
         println("compile <file>     Compile a file")
         println("help               Display this message (hint: any invalid subcommand will also display it)")
+        println("")
+        println("Options:")
+        println("-------------------------------------------------------------------------------------------")
+        println("-leaveTmp          Don't delete the tmp directory after compiling")
+        println("-verbose (-v)      Print additional output")
+        println("-printAst          Print the Abstract Syntax Tree")
+        println("-printTokens       Print the Tokens")
+        println("-printCode         Print the Code")
+        println("-help --help -h    Print this message")
     }
 
     /**

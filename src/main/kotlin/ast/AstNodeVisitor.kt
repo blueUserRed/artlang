@@ -1,5 +1,10 @@
 package ast
 
+/**
+ * The visitor-interface for the AST
+ *
+ * [Visitor Pattern](https://en.wikipedia.org/wiki/Visitor_pattern)
+ */
 interface AstNodeVisitor<T> {
 
     fun visit(binary: AstNode.Binary): T
