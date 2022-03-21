@@ -75,6 +75,10 @@ sealed class Either<out A, out B> {
 
 /**
  * stops time
+ *
+ * if stopped/started paused/unpaused in the wrong order, the StopWatch will not throw an Exception, but may return null
+ * when the time-property is accessed
+ *
  * (copied from another project)
  */
 class Stopwatch {

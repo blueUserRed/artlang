@@ -43,13 +43,18 @@ object Main {
         }
     }
 
+    /**
+     * compiles a given file, generates console output
+     *
+     * assumes outdir is ./out
+     */
     private fun compile(file: String) {
-        val outDir = "./out"
+        val outdir = "./out"
 
         val code: String
         val fileName: String
 
-        val stopwatch = Stopwatch()
+        val stopwatch = Stopwatch() //times the whole compilation
         stopwatch.start()
 
         try {
@@ -105,17 +110,17 @@ object Main {
             println("------------------------------------\n\n")
         }
 
-        Files.walk(Paths.get("$outDir/tmp/")).skip(1).forEach(Files::delete)
-        Files.delete(Paths.get("$outDir/tmp"))
+        Files.walk(Paths.get("$outdir/tmp/")).skip(1).forEach(Files::delete)
+        Files.delete(Paths.get("$outdir/tmp"))
 
-        if (Settings.verbose) println("Compiling into dir: $outDir/tmp")
-        val compilationTime = Stopwatch.time { Compiler().compileProgram(program, "$outDir/tmp", fileName) }
+        if (Settings.verbose) println("Compiling into dir: $outdir/tmp")
+        val compilationTime = Stopwatch.time { Compiler().compileProgram(program, "$outdir/tmp", fileName) }
         if (Settings.verbose) println("done in ${compilationTime}ms\n")
 
         if (Settings.verbose) println("creating jar $fileName.jar")
         val jarCreationTime = Stopwatch.time {
             createJar(
-                Paths.get("$outDir/tmp").toAbsString(),
+                Paths.get("$outdir/tmp").toAbsString(),
                 "$fileName.jar",
                 "$fileName\$\$ArtTopLevel"
             )
@@ -123,14 +128,22 @@ object Main {
         if (Settings.verbose) println("done in ${jarCreationTime}ms\n")
 
         if (!Settings.leaveTmp) {
-            Files.walk(Paths.get("$outDir/tmp/")).skip(1).forEach(Files::delete)
-            Files.delete(Paths.get("$outDir/tmp"))
+            Files.walk(Paths.get("$outdir/tmp/")).skip(1).forEach(Files::delete)
+            Files.delete(Paths.get("$outdir/tmp"))
         }
 
         stopwatch.stop()
         println("\nCompilation took ${stopwatch.time}ms in total")
     }
 
+    /**
+     * uses the
+     * [jar-utility](https://docs.oracle.com/javase/7/docs/technotes/tools/windows/jar.html#:~:text=J%20and%20option\).-,DESCRIPTION,applications%20into%20a%20single%20archive.)
+     * included in the jdk to generate a jar-file from a direcory
+     * @param fromDir the directory containing the .class files which will be bundled to a jar
+     * @param name The name of the jar file that is created
+     * @param entryPoint the class-file which contains the main method and serves as the entry point to the program
+     */
     private fun createJar(fromDir: String, name: String, entryPoint: String) {
         val builder = ProcessBuilder("jar", "cfe", "../$name", entryPoint)
 
@@ -139,6 +152,7 @@ object Main {
             .filter { path -> !path.toFile().isDirectory }
             .forEach { path -> builder.command().add(Paths.get(fromDir).relativize(path).toString()) }
 
+        //redirect input/output of the jar command to stdout and stdin of this program
         builder.redirectOutput(ProcessBuilder.Redirect.INHERIT)
         builder.redirectError(ProcessBuilder.Redirect.INHERIT)
         builder.directory(File(fromDir))
@@ -147,12 +161,18 @@ object Main {
         if (process.exitValue() != 0) throw RuntimeException("creating jar failed")
     }
 
+    /**
+     * prints the help-information for the command
+     */
     private fun printHelp() {
         println("Usage: artlang <subcommand> <options>")
         println("Subcommands:")
         println("compile <file>     Compile a file")
-
+        println("help               Display this message (hint: any invalid subcommand will also display it)")
     }
 
+    /**
+     * returns the absolute path as a string
+     */
     private fun Path.toAbsString(): String = this.toAbsolutePath().toString()
 }

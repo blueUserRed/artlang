@@ -124,7 +124,7 @@ object Parser {
             throw RuntimeException("expected function or field declaration in class body")
         }
 
-        return AstNode.ArtClass(name, staticFuncs, funcs, fields, staticFields)
+        return AstNode.ArtClass(name, staticFuncs, funcs, staticFields, fields)
     }
 
     private fun parseModifiers(): List<Token> {
