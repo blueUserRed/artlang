@@ -3,13 +3,30 @@ package tokenizer
 import java.lang.RuntimeException
 import kotlin.math.pow
 
+/**
+ * separates a string in a list of tokens
+ */
 object Tokenizer {
 
+    /**
+     * the current character
+     */
     private var cur: Int = 0
+
     private var code: String = ""
     private var tokens: MutableList<Token> = mutableListOf()
+
+    /**
+     * the path to the source-file
+     */
     private var path: String = ""
 
+    /**
+     * tokenizes a String
+     * @param s the string
+     * @param file the source fiel
+     * @return the tokens
+     */
     fun tokenize(s: String, file: String): List<Token> {
         cur = 0
         code = s
@@ -180,6 +197,9 @@ object Tokenizer {
         return tokens
     }
 
+    /**
+     * emits an identifier, if this identifier is a keyword it emits a keyword instead
+     */
     private fun identifier() {
         val start = cur
         var next = current()
@@ -194,7 +214,6 @@ object Tokenizer {
             "class" -> emit(TokenType.K_CLASS, "class", null, start)
             "let" -> emit(TokenType.K_LET, "let", null, start)
             "const" -> emit(TokenType.K_CONST, "const", null, start)
-//            "private" -> emit(TokenType.K_PRIVATE, "private", null, start)
             "for" -> emit(TokenType.K_FOR, "for", null, start)
             "loop" -> emit(TokenType.K_LOOP, "loop", null, start)
             "if" -> emit(TokenType.K_IF, "if", null, start)
@@ -212,6 +231,10 @@ object Tokenizer {
         }
     }
 
+    /**
+     * tokenizes a string
+     * @param endChar the character that ends the string
+     */
     private fun string(endChar: Char) {
         val start = cur
         consume() //consume initial " or '
@@ -224,16 +247,25 @@ object Tokenizer {
         emit(TokenType.STRING, string, string, start)
     }
 
+    /**
+     * skips to the next line, emits a soft break
+     */
     private fun lineComment() {
         while (consume() != '\n' && !end());
         emit(TokenType.SOFT_BREAK, "\n", null)
     }
 
+    /**
+     * skips all characters until a `*`/ is encountered
+     */
     private fun blockComment() {
         consume(); consume()
         while (!end()) if (tryConsume('*') && tryConsume('/')) break else consume()
     }
 
+    /**
+     * tokenizes a number
+     */
     private fun number() {
 
         val start = cur
@@ -257,7 +289,6 @@ object Tokenizer {
                 val decNum = num / radix
                 emit(TokenType.INT, code.substring(start until cur), decNum.toInt(), start)
                 return
-//                return OnjToken(OnjTokenType.INT, if (negative) -decNum else decNum, start)
             }
         }
         cur--
@@ -266,7 +297,6 @@ object Tokenizer {
             emit(TokenType.INT, code.substring(start until cur), num.toInt(), start)
             return
         }
-//            return OnjToken(OnjTokenType.INT, if (negative) -num else num, start)
 
         var afterComma = 0.0
         var numIts = 1
@@ -275,22 +305,44 @@ object Tokenizer {
             numIts++
         }
         val commaNum = (num + afterComma)
-//        return OnjToken(OnjTokenType.FLOAT, if (negative) -commaNum else commaNum, start)
         emit (TokenType.FLOAT, code.substring(start until cur), commaNum.toFloat(), start)
     }
 
+    /**
+     * the current character
+     */
     private fun current(): Char = code[cur]
 
+    /**
+     * return the current character and move on
+     */
     private fun consume(): Char = code[cur++]
 
+    /**
+     * returns the next character
+     */
     private fun peek(): Char = code[cur + 1]
 
+    /**
+     * true if the end is reached
+     */
     private fun end(): Boolean = cur >= code.length
 
+    /**
+     * true if a call to [peek] is possible without an IndexOutOfBoundException
+     */
     private fun canPeek(): Boolean = cur < code.length - 1
 
+    /**
+     * returns the last character
+     */
     private fun last(): Char = code[cur - 1]
 
+    /**
+     * consumes the current character if it is equal to [c]
+     * @param c the character that should be consumed
+     * @return true if the character was consumed
+     */
     private fun tryConsume(c: Char): Boolean {
         return if (current() == c) {
             consume()
@@ -298,6 +350,13 @@ object Tokenizer {
         } else false
     }
 
+    /**
+     * emits a token
+     * @param type the TokenType
+     * @param lexeme the lexeme of the token
+     * @param literal the literal of the token
+     * @param position the position of the first character of the token, default is [cur]
+     */
     private fun emit(type: TokenType, lexeme: String, literal: Any?, position: Int = cur) {
         tokens.add(Token(type, lexeme, literal, path, position))
     }

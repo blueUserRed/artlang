@@ -22,7 +22,7 @@ object Main {
         val instructions = Settings.parseArgs(args)
 
         if (instructions.isEmpty()) {
-            println("Please specify a subcommand")
+            println("Please specify a subcommand\n")
             printHelp()
             return
         }

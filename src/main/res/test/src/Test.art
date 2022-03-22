@@ -1,36 +1,41 @@
-const field numHiSayers: int = 10
 
 fn main() {
-    const hiSayerFactory = HiSayerFactory()
-    hiSayerFactory.numInstances = numHiSayers
-    const hiSayers = hiSayerFactory.getInstances()
-    let i = -1
-    while ((i := i + 1) < numHiSayers) hiSayers[i].sayHi()
+    A().test()
 }
 
-class HiSayerFactory {
-    public field numInstances: int = 1
-
-    public fn getInstances(): HiSayer[] {
-        const toRet = HiSayer[this.numInstances]
-        let i = -1
-        while ((i := i + 1) < this.numInstances) toRet[i] = HiSayer()
-        return toRet
+class A {
+    public static field x: int = 4
+    public fn test() {
+        print x
     }
 }
 
-class HiSayer {
-    public fn sayHi() {
-        print "Hi"
-    }
-}
-
-fn testGetIntsPlusOne(ints: int[], length: int): int[] {
-    const toRet = int[length]
-    let i = -1
-    while ((i := i + 1) < length) toRet[i] = ints[i] + 1
-    return toRet
-}
+//const field numHiSayers: int = 10
+//
+//fn main() {
+//    const hiSayerFactory = HiSayerFactory()
+//    hiSayerFactory.numInstances = numHiSayers
+//    const hiSayers = hiSayerFactory.getInstances()
+//    let i = -1
+//    while ((i := i + 1) < numHiSayers) hiSayers[i].sayHi()
+//}
+//
+//class HiSayerFactory {
+//    public field numInstances: int = 1
+//
+//    public fn getInstances(): HiSayer[] {
+//        const toRet = HiSayer[this.numInstances]
+//        let i = -1
+//        while ((i := i + 1) < this.numInstances) toRet[i] = HiSayer()
+//        return toRet
+//    }
+//}
+//
+//class HiSayer {
+//    public fn sayHi() {
+//        print "Hi"
+//    }
+//}
 
 //
 //
