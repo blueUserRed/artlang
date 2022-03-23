@@ -822,6 +822,15 @@ class Compiler : AstNodeVisitor<Unit> {
             return
         }
 
+        if (get.from!!.type.matches(Datakind.ARRAY) && get.name.lexeme == "size") {
+            //special case for array size
+            compile(get.from!!)
+            emit(arraylength)
+            decStack()
+            incStack(Datatype.Integer())
+            return
+        }
+
         if (get.fieldDef!!.isStatic || get.fieldDef!!.isTopLevel) {
             //reference to static or top level field with a from specified
             emit(getstatic)
@@ -1443,6 +1452,7 @@ class Compiler : AstNodeVisitor<Unit> {
         const val anewarray: Byte = 0xBD.toByte()
         const val multianewarray: Byte = 0xC5.toByte()
         const val iastore: Byte = 0x4F.toByte()
+        const val arraylength: Byte = 0xBE.toByte()
 
         const val iaload: Byte = 0x2E.toByte()
         const val newarray: Byte = 0xBC.toByte()

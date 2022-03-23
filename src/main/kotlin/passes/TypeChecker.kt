@@ -7,6 +7,7 @@ import ast.FunctionDescriptor
 import tokenizer.TokenType
 import passes.TypeChecker.Datatype
 import tokenizer.Token
+import javax.xml.crypto.Data
 import kotlin.RuntimeException
 
 class TypeChecker : AstNodeVisitor<Datatype> {
@@ -536,6 +537,11 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         }
 
         val from = check(get.from!!, get)
+
+        if (from.matches(Datakind.ARRAY) && get.name.lexeme == "size") {
+            get.type = Datatype.Integer()
+            return Datatype.Integer()
+        }
 
         when (from.kind) {
 
