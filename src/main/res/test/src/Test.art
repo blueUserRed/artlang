@@ -1,6 +1,7 @@
 const field numHiSayers: int = 10
 
 fn main() {
+    const myString = "sdfjsdflsjl"
     const hiSayerFactory = HiSayerFactory()
     hiSayerFactory.numInstances = numHiSayers
     const hiSayers = hiSayerFactory.getInstances()

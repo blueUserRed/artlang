@@ -74,15 +74,15 @@ object Test {
         println("Running program")
         println("Program output: ")
         val out = runProgram()
-        println(Utils.Ansi.yellow + out + Utils.Ansi.reset)
+        println(Ansi.yellow + out + Ansi.reset)
         println("Sample output: ")
         val sampleOutput = Files.readAllLines(
                 Paths.get(sampleOutDir
                         + artFile.name.split(".")[0])
         ).toString().removePrefix("[").removeSuffix("]")
-        println(Utils.Ansi.yellow
+        println(Ansi.yellow
                 + sampleOutput
-                + Utils.Ansi.reset
+                + Ansi.reset
                 + "\n"
         )
 

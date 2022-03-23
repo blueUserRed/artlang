@@ -1,6 +1,7 @@
 import ast.AstNode
 import ast.AstPrinter
 import compiler.Compiler
+import errors.ErrorPool
 import parser.Parser
 import passes.ControlFlowChecker
 import passes.TypeChecker
@@ -72,8 +73,17 @@ object Main {
             println("------------------------------------\n\n")
         }
 
+        var lastErrors = 0
+
         var tokens: List<Token>
         val tokenizationTime = Stopwatch.time { tokens = Tokenizer.tokenize(code, file) }
+        if (ErrorPool.errors.size != lastErrors) {
+            if (Settings.verbose) {
+                println("${Ansi.yellow}Accumulated ${ErrorPool.errors.size - lastErrors} error(s)" +
+                        " during tokenization${Ansi.reset}")
+            }
+            lastErrors = ErrorPool.errors.size
+        }
         if (Settings.verbose) println("tokenization took ${tokenizationTime}ms\n")
 
         if (Settings.printTokens) {
@@ -84,6 +94,13 @@ object Main {
 
         val program: AstNode.Program
         val parseTime = Stopwatch.time { program = Parser.parse(tokens) }
+        if (ErrorPool.errors.size != lastErrors) {
+            if (Settings.verbose) {
+                println("${Ansi.yellow}Accumulated ${ErrorPool.errors.size - lastErrors} error(s)" +
+                        " during parsing${Ansi.reset}")
+            }
+            lastErrors = ErrorPool.errors.size
+        }
         if (Settings.verbose) println("parsing took ${parseTime}ms\n")
 
         if (Settings.printAst) {
@@ -94,14 +111,31 @@ object Main {
 
         if (Settings.verbose) println("running variable resolver")
         val variableResolverTime = Stopwatch.time { program.accept(VariableResolver()) }
+        if (ErrorPool.errors.size != lastErrors) {
+            if (Settings.verbose) {
+                println("${Ansi.yellow}Accumulated ${ErrorPool.errors.size - lastErrors} errors${Ansi.reset}")
+            }
+            lastErrors = ErrorPool.errors.size
+        }
         if (Settings.verbose) println("done in ${variableResolverTime}ms\n")
 
         if (Settings.verbose) println("running type checker")
         val typeCheckingTime = Stopwatch.time { program.accept(TypeChecker()) }
+        if (ErrorPool.errors.size != lastErrors) {
+            if (Settings.verbose) {
+                println("${Ansi.yellow}Accumulated ${ErrorPool.errors.size - lastErrors} errors${Ansi.reset}")
+            }
+            lastErrors = ErrorPool.errors.size
+        }
         if (Settings.verbose) println("done in ${typeCheckingTime}ms\n")
 
         if (Settings.verbose) println("running controlFlow checker")
         val controlFlowCheckingTime = Stopwatch.time { program.accept(ControlFlowChecker()) }
+        if (ErrorPool.errors.size != lastErrors) {
+            if (Settings.verbose) {
+                println("${Ansi.yellow}Accumulated ${ErrorPool.errors.size - lastErrors} errors${Ansi.reset}")
+            }
+        }
         if (Settings.verbose) println("done in ${controlFlowCheckingTime}ms\n")
 
         if (Settings.printAst) {
@@ -110,8 +144,18 @@ object Main {
             println("------------------------------------\n\n")
         }
 
-        Files.walk(Paths.get("$outdir/tmp/")).skip(1).forEach(Files::delete)
-        Files.delete(Paths.get("$outdir/tmp"))
+        if (Files.exists(Paths.get("$outdir/tmp"))) {
+            Files.walk(Paths.get("$outdir/tmp/")).skip(1).forEach(Files::delete)
+            Files.delete(Paths.get("$outdir/tmp"))
+        }
+
+        if (ErrorPool.hasErrors()) {
+            println("${Ansi.yellow}Accumulated ${ErrorPool.errors.size} errors, skipping Compilation${Ansi.reset}")
+            stopwatch.stop()
+            println("\nTook ${stopwatch.time}ms in total\n")
+            ErrorPool.printErrors()
+            return
+        }
 
         if (Settings.verbose) println("Compiling into dir: $outdir/tmp")
         val compilationTime = Stopwatch.time { Compiler().compileProgram(program, "$outdir/tmp", fileName) }
@@ -133,7 +177,7 @@ object Main {
         }
 
         stopwatch.stop()
-        println("\nCompilation took ${stopwatch.time}ms in total")
+        println("\nTook ${stopwatch.time}ms in total")
     }
 
     /**

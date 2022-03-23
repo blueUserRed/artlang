@@ -461,9 +461,11 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             varInc.name,
             AstNode.Binary(
                 varInc.name,
-                Token(TokenType.PLUS, "+=", null, varInc.name.name.file, varInc.name.name.pos),
+                Token(TokenType.PLUS, "+=", null, varInc.name.name.file,
+                    varInc.name.name.pos, varInc.name.name.line),
                 AstNode.Literal(
-                    Token(TokenType.INT, "+=", varInc.toAdd.toInt(), varInc.name.name.file, varInc.name.name.pos)
+                    Token(TokenType.INT, "+=", varInc.toAdd.toInt(), varInc.name.name.file,
+                        varInc.name.name.pos, varInc.name.name.line)
                 )
             ),
             false

@@ -8,17 +8,6 @@ import kotlin.contracts.contract
 object Utils {
 
     /**
-     * Object containing constants for ANSI-colors
-     */
-    object Ansi {
-        const val reset = "\u001B[0m"
-        const val yellow = "\u001B[33m"
-        const val red = "\u001B[31m"
-        const val blue = "\u001B[34m"
-        const val white = "\u001B[37m"
-    }
-
-    /**
      * concatenates multiple arrays
      */
     fun arrayConcat(vararg byteArrs: ByteArray): ByteArray {
@@ -61,6 +50,25 @@ object Utils {
         ((s.toInt() shr 0) and 0xFF).toByte(),
     ).toByteArray()
 
+
+    /**
+     * returns a given line form a string
+     */
+    fun getLine(s: String, line: Int): String {
+        var curLine = 1
+        var lineStart = -1
+        if (line == 1) lineStart = 0
+        for (i in s.toCharArray().indices) {
+            if (s[i] != '\n') continue
+            if (lineStart != -1) {
+                return s.substring((lineStart)..(i - System.lineSeparator().length))
+            }
+            curLine++
+            if (curLine == line) lineStart = i + 1
+        }
+        return ""
+    }
+
 }
 
 /**
@@ -69,6 +77,17 @@ object Utils {
 sealed class Either<out A, out B> {
     class Left<out T> (val value: T) : Either<T, Nothing>()
     class Right<out T> (val value: T) : Either<Nothing, T>()
+}
+
+/**
+ * Object containing constants for ANSI-colors
+ */
+object Ansi {
+    const val reset = "\u001B[0m"
+    const val yellow = "\u001B[33m"
+    const val red = "\u001B[31m"
+    const val blue = "\u001B[34m"
+    const val white = "\u001B[37m"
 }
 
 /**

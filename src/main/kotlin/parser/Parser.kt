@@ -193,7 +193,7 @@ object Parser {
                 variable,
                 AstNode.Binary(
                     variable,
-                    Token(TokenType.STAR, "*=", null, op.file, op.pos),
+                    Token(TokenType.STAR, "*=", null, op.file, op.pos, op.line),
                     num
                 ),
                 false
@@ -202,7 +202,7 @@ object Parser {
                 variable,
                 AstNode.Binary(
                     variable,
-                    Token(TokenType.SLASH, "/=", null, op.file, op.pos),
+                    Token(TokenType.SLASH, "/=", null, op.file, op.pos, op.line),
                     num
                 ),
                 false
@@ -215,7 +215,7 @@ object Parser {
                     variable,
                     AstNode.Binary(
                         variable,
-                        Token(TokenType.PLUS, "+=", null, op.file, op.pos),
+                        Token(TokenType.PLUS, "+=", null, op.file, op.pos, op.line),
                         num
                     ),
                     false
@@ -229,7 +229,7 @@ object Parser {
                     variable,
                     AstNode.Binary(
                         variable,
-                        Token(TokenType.MINUS, "-=", null, op.file, op.pos),
+                        Token(TokenType.MINUS, "-=", null, op.file, op.pos, op.line),
                         num
                     ),
                     false

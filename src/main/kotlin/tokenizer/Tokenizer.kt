@@ -1,5 +1,7 @@
 package tokenizer
 
+import errors.Errors
+import errors.artError
 import java.lang.RuntimeException
 import kotlin.math.pow
 
@@ -12,6 +14,9 @@ object Tokenizer {
      * the current character
      */
     private var cur: Int = 0
+
+    private var lastLineBreakPos: Int = 0
+    private var curLine: Int = 1
 
     private var code: String = ""
     private var tokens: MutableList<Token> = mutableListOf()
@@ -44,7 +49,12 @@ object Tokenizer {
             '%' -> { emit(TokenType.MOD, "%", null); consume() }
             ',' -> { emit(TokenType.COMMA, ",", null); consume() }
             '.' -> { emit(TokenType.DOT, ".", null); consume() }
-            '\n' -> { emit(TokenType.SOFT_BREAK, "\n", null); consume() }
+            '\n' -> {
+                emit(TokenType.SOFT_BREAK, "\n", null)
+                consume()
+                lastLineBreakPos = cur
+                curLine++
+            }
             '"' -> string('"')
             '\'' -> string('\'')
             ' ', '\t', '\r' -> consume()
@@ -63,25 +73,25 @@ object Tokenizer {
 
                 if (current == '&' && canPeek() && peek() == '&') {
                     consume(); consume()
-                    emit(TokenType.D_AND, "&&", null, cur - 2)
+                    emit(TokenType.D_AND, "&&", null, cur - lastLineBreakPos - 2)
                     continue
                 }
 
                 if (current == '|' && canPeek() && peek() == '|') {
                     consume(); consume()
-                    emit(TokenType.D_OR, "||", null, cur - 2)
+                    emit(TokenType.D_OR, "||", null, cur - lastLineBreakPos - 2)
                     continue
                 }
 
                 if (current == '+') {
                     if (canPeek() && peek() == '+') {
                         consume(); consume()
-                        emit(TokenType.D_PLUS, "++", null, cur - 2)
+                        emit(TokenType.D_PLUS, "++", null, cur - lastLineBreakPos - 2)
                         continue
                     }
                     if (canPeek() && peek() == '=') {
                         consume(); consume()
-                        emit(TokenType.PLUS_EQ, "+=", null, cur - 2)
+                        emit(TokenType.PLUS_EQ, "+=", null, cur - lastLineBreakPos - 2)
                         continue
                     }
                     emit(TokenType.PLUS, "+", null)
@@ -92,12 +102,12 @@ object Tokenizer {
                 if (current == '-') {
                     if (canPeek() && peek() == '-') {
                         consume(); consume()
-                        emit(TokenType.D_MINUS, "--", null, cur - 2)
+                        emit(TokenType.D_MINUS, "--", null, cur - lastLineBreakPos - 2)
                         continue
                     }
                     if (canPeek() && peek() == '=') {
                         consume(); consume()
-                        emit(TokenType.MINUS_EQ, "-=", null, cur - 2)
+                        emit(TokenType.MINUS_EQ, "-=", null, cur - lastLineBreakPos - 2)
                         continue
                     }
                     emit(TokenType.MINUS, "-", null)
@@ -108,7 +118,7 @@ object Tokenizer {
                 if (current == '*') {
                     if (canPeek() && peek() == '=') {
                         consume(); consume()
-                        emit(TokenType.STAR_EQ, "*=", null, cur - 2)
+                        emit(TokenType.STAR_EQ, "*=", null, cur - lastLineBreakPos - 2)
                         continue
                     }
                     emit(TokenType.STAR, "*", null)
@@ -119,7 +129,7 @@ object Tokenizer {
                 if (current == '/') {
                     if (canPeek() && peek() == '=') {
                         consume(); consume()
-                        emit(TokenType.SLASH_EQ, "/=", null, cur - 2)
+                        emit(TokenType.SLASH_EQ, "/=", null, cur - lastLineBreakPos - 2)
                         continue
                     }
                     if (canPeek() && peek() == '/') {
@@ -138,7 +148,7 @@ object Tokenizer {
                 if (current == '=') {
                     if (canPeek() && peek() == '=') {
                         consume(); consume()
-                        emit(TokenType.D_EQ, "==", null, cur - 2)
+                        emit(TokenType.D_EQ, "==", null, cur - lastLineBreakPos - 2)
                         continue
                     }
                     emit(TokenType.EQ, "=", null)
@@ -149,7 +159,7 @@ object Tokenizer {
                 if (current == '<') {
                     if (canPeek() && peek() == '=') {
                         consume(); consume()
-                        emit(TokenType.LT_EQ, "<=", null, cur - 2)
+                        emit(TokenType.LT_EQ, "<=", null, cur - lastLineBreakPos - 2)
                         continue
                     }
                     emit(TokenType.LT, "<", null)
@@ -160,7 +170,7 @@ object Tokenizer {
                 if (current == '>') {
                     if (canPeek() && peek() == '=') {
                         consume(); consume()
-                        emit(TokenType.GT_EQ, ">=", null, cur - 2)
+                        emit(TokenType.GT_EQ, ">=", null, cur - lastLineBreakPos - 2)
                         continue
                     }
                     emit(TokenType.GT, ">", null)
@@ -171,7 +181,7 @@ object Tokenizer {
                 if (current == '!') {
                     if (canPeek() && peek() == '=') {
                         consume(); consume()
-                        emit(TokenType.NOT_EQ, "!=", null, cur - 2)
+                        emit(TokenType.NOT_EQ, "!=", null, cur - lastLineBreakPos - 2)
                         continue
                     }
                     emit(TokenType.NOT, "!", null)
@@ -182,7 +192,7 @@ object Tokenizer {
                 if (current == ':') {
                     if (canPeek() && peek() == '=') {
                         consume(); consume()
-                        emit(TokenType.WALRUS, ":=", null, cur - 2)
+                        emit(TokenType.WALRUS, ":=", null, cur - lastLineBreakPos - 2)
                         continue
                     }
                     emit(TokenType.COLON, ":", null)
@@ -190,10 +200,10 @@ object Tokenizer {
                     continue
                 }
 
-                throw RuntimeException("Unknown char '$current'") //TODO: replace with other Exception, do error reporting
+                artError(Errors.UnknownCharacterError(consume(), cur - lastLineBreakPos - 1, curLine, code))
             }
         }
-        tokens.add(Token(TokenType.EOF, "", null, path, cur))
+        tokens.add(Token(TokenType.EOF, "", null, path, cur - lastLineBreakPos, curLine))
         return tokens
     }
 
@@ -209,25 +219,25 @@ object Tokenizer {
             next = current()
         }
         when (val identifier = code.substring(start until cur)) {
-            "fn" -> emit(TokenType.K_FN, "fn", null, start)
-            "print" -> emit(TokenType.K_PRINT, "print", null, start)
-            "class" -> emit(TokenType.K_CLASS, "class", null, start)
-            "let" -> emit(TokenType.K_LET, "let", null, start)
-            "const" -> emit(TokenType.K_CONST, "const", null, start)
-            "for" -> emit(TokenType.K_FOR, "for", null, start)
-            "loop" -> emit(TokenType.K_LOOP, "loop", null, start)
-            "if" -> emit(TokenType.K_IF, "if", null, start)
-            "else" -> emit(TokenType.K_ELSE, "else", null, start)
-            "while" -> emit(TokenType.K_WHILE, "while", null, start)
-            "true" -> emit(TokenType.BOOLEAN, "true", true, start)
-            "false" -> emit(TokenType.BOOLEAN, "false", false, start)
-            "int" -> emit(TokenType.T_INT, "int", null, start)
-            "str" -> emit(TokenType.T_STRING, "str", null, start)
-            "bool" -> emit(TokenType.T_BOOLEAN, "bool", null, start)
-            "return" -> emit(TokenType.K_RETURN, "return", null, start)
-            "break" -> emit(TokenType.K_BREAK, "break", null, start)
-            "continue" -> emit(TokenType.K_CONTINUE, "continue", null, start)
-            else -> emit(TokenType.IDENTIFIER, identifier, identifier, start)
+            "fn" -> emit(TokenType.K_FN, "fn", null, start - lastLineBreakPos)
+            "print" -> emit(TokenType.K_PRINT, "print", null, start - lastLineBreakPos)
+            "class" -> emit(TokenType.K_CLASS, "class", null, start - lastLineBreakPos)
+            "let" -> emit(TokenType.K_LET, "let", null, start - lastLineBreakPos)
+            "const" -> emit(TokenType.K_CONST, "const", null, start - lastLineBreakPos)
+            "for" -> emit(TokenType.K_FOR, "for", null, start - lastLineBreakPos)
+            "loop" -> emit(TokenType.K_LOOP, "loop", null, start - lastLineBreakPos)
+            "if" -> emit(TokenType.K_IF, "if", null, start - lastLineBreakPos)
+            "else" -> emit(TokenType.K_ELSE, "else", null, start - lastLineBreakPos)
+            "while" -> emit(TokenType.K_WHILE, "while", null, start - lastLineBreakPos)
+            "true" -> emit(TokenType.BOOLEAN, "true", true, start - lastLineBreakPos)
+            "false" -> emit(TokenType.BOOLEAN, "false", false, start - lastLineBreakPos)
+            "int" -> emit(TokenType.T_INT, "int", null, start - lastLineBreakPos)
+            "str" -> emit(TokenType.T_STRING, "str", null, start - lastLineBreakPos)
+            "bool" -> emit(TokenType.T_BOOLEAN, "bool", null, start - lastLineBreakPos)
+            "return" -> emit(TokenType.K_RETURN, "return", null, start - lastLineBreakPos)
+            "break" -> emit(TokenType.K_BREAK, "break", null, start - lastLineBreakPos)
+            "continue" -> emit(TokenType.K_CONTINUE, "continue", null, start - lastLineBreakPos)
+            else -> emit(TokenType.IDENTIFIER, identifier, identifier, start - lastLineBreakPos)
         }
     }
 
@@ -239,12 +249,20 @@ object Tokenizer {
         val start = cur
         consume() //consume initial " or '
         while (current() != endChar) {
+            if (last() == '\n') {
+                cur--
+                artError(Errors.UnterminatedStringError(start - lastLineBreakPos, curLine, code))
+                return
+            }
             consume()
-            if (end()) throw RuntimeException("Unterminated String")
+            if (end()) {
+                artError(Errors.UnterminatedStringError(start - lastLineBreakPos, curLine, code))
+                return
+            }
         }
         consume() //consume ending " or '
         val string = code.substring((start + 1)..(cur - 2))
-        emit(TokenType.STRING, string, string, start)
+        emit(TokenType.STRING, string, string, start - lastLineBreakPos)
     }
 
     /**
@@ -252,6 +270,8 @@ object Tokenizer {
      */
     private fun lineComment() {
         while (consume() != '\n' && !end());
+        curLine++
+        lastLineBreakPos = cur
         emit(TokenType.SOFT_BREAK, "\n", null)
     }
 
@@ -260,7 +280,13 @@ object Tokenizer {
      */
     private fun blockComment() {
         consume(); consume()
-        while (!end()) if (tryConsume('*') && tryConsume('/')) break else consume()
+        while (!end()) {
+            if (tryConsume('\n')) {
+                curLine++
+                lastLineBreakPos = cur
+            }
+            if (tryConsume('*') && tryConsume('/')) break else consume()
+        }
     }
 
     /**
@@ -276,7 +302,6 @@ object Tokenizer {
             else if (tryConsume('o')) radix = 8
             else if (tryConsume('x')) radix = 16
             else cur--
-
         }
 
         var num = 0L
@@ -287,14 +312,14 @@ object Tokenizer {
             } catch (e: NumberFormatException) {
                 cur--
                 val decNum = num / radix
-                emit(TokenType.INT, code.substring(start until cur), decNum.toInt(), start)
+                emit(TokenType.INT, code.substring(start until cur), decNum.toInt(), start - lastLineBreakPos)
                 return
             }
         }
         cur--
 
         if (end() || radix != 10 || !tryConsume('.')) {
-            emit(TokenType.INT, code.substring(start until cur), num.toInt(), start)
+            emit(TokenType.INT, code.substring(start until cur), num.toInt(), start - lastLineBreakPos)
             return
         }
 
@@ -305,7 +330,7 @@ object Tokenizer {
             numIts++
         }
         val commaNum = (num + afterComma)
-        emit (TokenType.FLOAT, code.substring(start until cur), commaNum.toFloat(), start)
+        emit(TokenType.FLOAT, code.substring(start until cur), commaNum.toFloat(), start - lastLineBreakPos)
     }
 
     /**
@@ -355,9 +380,15 @@ object Tokenizer {
      * @param type the TokenType
      * @param lexeme the lexeme of the token
      * @param literal the literal of the token
-     * @param position the position of the first character of the token, default is [cur]
+     * @param position the position of the first character of the token, default is [cur] - [lastLineBreakPos]
+     * @param line the line of the first character of the token, default is [curLine]
      */
-    private fun emit(type: TokenType, lexeme: String, literal: Any?, position: Int = cur) {
-        tokens.add(Token(type, lexeme, literal, path, position))
+    private fun emit(
+        type: TokenType,
+        lexeme: String,
+        literal: Any?,
+        position: Int = cur - lastLineBreakPos,
+        line: Int = curLine) {
+        tokens.add(Token(type, lexeme, literal, path, position, line))
     }
 }

@@ -7,9 +7,17 @@ package tokenizer
  * @param literal if the token is a literal (e.g an int (1, 2) or a string ("hello", "world")) it contains the value
  * of the token, else null
  * @param file the file the token originates from
- * @param pos the position of the first character of the lexeme in the file
+ * @param pos the position of the first character of the lexeme in the line
+ * @param line the line of the first character of the lexeme
  */
-data class Token(val tokenType: TokenType, val lexeme: String, val literal: Any?, val file: String, val pos: Int) {
+data class Token(
+    val tokenType: TokenType,
+    val lexeme: String,
+    val literal: Any?,
+    val file: String,
+    val pos: Int,
+    val line: Int
+) {
 
     override fun toString(): String {
         return "$tokenType(lexeme='${
