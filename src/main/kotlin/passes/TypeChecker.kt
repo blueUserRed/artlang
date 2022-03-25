@@ -388,14 +388,14 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             }
             if (curClass != null && funcCall.func.name.lexeme == curClass!!.name.lexeme) {
                 if (funcCall.arguments.size != 0) TODO("constructor calls with arguments are not yet implemented")
-                val toSwap = AstNode.ConstructorCall(curClass!!, funcCall.arguments)
+                val toSwap = AstNode.ConstructorCall(curClass!!, funcCall.arguments, funcCall.func)
                 toSwap.type = Datatype.Object(curClass!!.name.lexeme, curClass!!)
                 swap = toSwap
                 return toSwap.type
             }
             for (clazz in curProgram.classes) if (clazz.name.lexeme == funcCall.func.name.lexeme) {
                 if (funcCall.arguments.size != 0) TODO("constructor calls with arguments are not yet implemented")
-                val toSwap = AstNode.ConstructorCall(clazz, funcCall.arguments)
+                val toSwap = AstNode.ConstructorCall(clazz, funcCall.arguments, funcCall.func)
                 toSwap.type = Datatype.Object(clazz.name.lexeme, clazz)
                 swap = toSwap
                 return toSwap.type

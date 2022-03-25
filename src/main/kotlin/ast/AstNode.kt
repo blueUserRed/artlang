@@ -688,9 +688,8 @@ abstract class AstNode {
      * distinguish between array-accesses and array creations. This node is swapped into the tree by the TypeChecker
      * @param typeNode the type (node) of the array
      * @param amount the node that when evaluated results in the array size
-     * @param endToken the ']' token
      */
-    class ArrayCreate(val typeNode: DatatypeNode, var amount: AstNode, var endToken: Token) : AstNode() {
+    class ArrayCreate(val typeNode: DatatypeNode, var amount: AstNode) : AstNode() {
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (amount !== orig) throw CantSwapException()

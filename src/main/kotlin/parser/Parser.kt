@@ -469,7 +469,7 @@ object Parser {
                 TokenType.T_BOOLEAN -> Datakind.BOOLEAN
                 TokenType.T_STRING -> Datakind.STRING
                 else -> TODO("not yet implemented")
-            }), amount, endToken)
+            }), amount)
         }
         if (!match(TokenType.INT, TokenType.FLOAT, TokenType.STRING, TokenType.BOOLEAN)) {
             artError(Errors.SyntaxError(consume(), "Expected a statement, got ${last().lexeme}", srcCode))
