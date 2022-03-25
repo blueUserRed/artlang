@@ -221,8 +221,8 @@ object Parser {
         if (match(TokenType.K_IF)) return parseIf()
         if (match(TokenType.K_WHILE)) return parseWhileLoop()
         if (match(TokenType.K_RETURN)) return parseReturn()
-        if (match(TokenType.K_BREAK)) return AstNode.Break()
-        if (match(TokenType.K_CONTINUE)) return AstNode.Continue()
+        if (match(TokenType.K_BREAK)) return AstNode.Break(last())
+        if (match(TokenType.K_CONTINUE)) return AstNode.Continue(last())
 
         return parseAssignment()
     }
@@ -463,12 +463,13 @@ object Parser {
             consumeOrError(TokenType.L_BRACKET, "Expected array initializer")
             val amount = parseStatement()
             consumeOrError(TokenType.R_BRACKET, "Expected closing bracket for array initializer")
+            val endToken = last()
             return AstNode.ArrayCreate(AstNode.PrimitiveTypeNode(when (primitive.tokenType) {
                 TokenType.T_INT -> Datakind.INT
                 TokenType.T_BOOLEAN -> Datakind.BOOLEAN
                 TokenType.T_STRING -> Datakind.STRING
                 else -> TODO("not yet implemented")
-            }), amount)
+            }), amount, endToken)
         }
         if (!match(TokenType.INT, TokenType.FLOAT, TokenType.STRING, TokenType.BOOLEAN)) {
             artError(Errors.SyntaxError(consume(), "Expected a statement, got ${last().lexeme}", srcCode))
@@ -479,6 +480,7 @@ object Parser {
     }
 
     private fun parseArrayLiteral(): AstNode.ArrayLiteral {
+        val startToken = last()
         val elements = mutableListOf<AstNode>()
         while (!match(TokenType.R_BRACKET)) {
             elements.add(parseStatement())
@@ -487,7 +489,8 @@ object Parser {
                 break
             }
         }
-        return AstNode.ArrayLiteral(elements)
+        val endToken = last()
+        return AstNode.ArrayLiteral(elements, startToken, endToken)
     }
 
     private fun parseFunctionCall(func: AstNode): AstNode {
@@ -514,11 +517,11 @@ object Parser {
         while (!match(TokenType.R_BRACE)) {
             try {
                 statements.add(parseStatement())
+                consumeExpectingSoftBreakOrError("Expected line break or semicolon")
             } catch (e: ParserResyncException) {
                 resync()
                 continue
             }
-            consumeExpectingSoftBreakOrError("Expected line break or semicolon")
         }
         return AstNode.Block(statements.toTypedArray())
     }

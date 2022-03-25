@@ -12,15 +12,13 @@ class HiSayerFactory {
     public field numInstances: int = 0
 
     public fn getInstances(): HiSayer[] {
+        let x = 1 print "hi"
         const toRet = HiSayer[this.numInstances]
         let i = -1
         while ((i := i + 1) < this.numInstances) toRet[i] = HiSayer()
         return toRet
     }
 }
-
-
-field x: int = 0
 
 class HiSayer {
     public fn sayHi() {

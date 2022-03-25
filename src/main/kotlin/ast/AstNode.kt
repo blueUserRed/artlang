@@ -580,8 +580,9 @@ abstract class AstNode {
 
     /**
      * represents a break-statement
+     * @param breakToken the 'break' token
      */
-    class Break : AstNode() {
+    class Break(val breakToken: Token) : AstNode() {
 
         override fun swap(orig: AstNode, to: AstNode) = throw CantSwapException()
 
@@ -590,8 +591,9 @@ abstract class AstNode {
 
     /**
      * represents a continue-statement
+     * @param continueToken the 'continue' token
      */
-    class Continue : AstNode() {
+    class Continue(val continueToken: Token) : AstNode() {
 
         override fun swap(orig: AstNode, to: AstNode) = throw CantSwapException()
 
@@ -604,8 +606,9 @@ abstract class AstNode {
      * with this node
      * @param clazz the class to which the constructor refers to
      * @param arguments the list of arguments with which the constructor is called
+     * @param origFrom the get of the [FunctionCall] this ConstructorCall originated from
      */
-    class ConstructorCall(var clazz: ArtClass, val arguments: MutableList<AstNode>) : AstNode() {
+    class ConstructorCall(var clazz: ArtClass, val arguments: MutableList<AstNode>, val origFrom: Get) : AstNode() {
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (clazz === orig && to is ArtClass) {
@@ -684,9 +687,10 @@ abstract class AstNode {
      * represents an array-creation statement (e.g. int[4]). The Parser only emits array-gets, because it can't
      * distinguish between array-accesses and array creations. This node is swapped into the tree by the TypeChecker
      * @param typeNode the type (node) of the array
-     * @param amount
+     * @param amount the node that when evaluated results in the array size
+     * @param endToken the ']' token
      */
-    class ArrayCreate(val typeNode: DatatypeNode, var amount: AstNode) : AstNode() {
+    class ArrayCreate(val typeNode: DatatypeNode, var amount: AstNode, var endToken: Token) : AstNode() {
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (amount !== orig) throw CantSwapException()
@@ -699,8 +703,10 @@ abstract class AstNode {
     /**
      * represents an array literal (e.g. [1, 2, 3 ,4])
      * @param elements the elements of the literal
+     * @param startToken the '[' token
+     * @param endToken the ']' token
      */
-    class ArrayLiteral(val elements: MutableList<AstNode>) : AstNode() {
+    class ArrayLiteral(val elements: MutableList<AstNode>, val startToken: Token, val endToken: Token) : AstNode() {
 
         override fun swap(orig: AstNode, to: AstNode) {
             for (i in elements.indices) if (elements[i] === orig) {

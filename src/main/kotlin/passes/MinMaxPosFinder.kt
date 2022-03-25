@@ -2,6 +2,7 @@ package passes
 
 import ast.AstNode
 import ast.AstNodeVisitor
+import tokenizer.Token
 
 class MinMaxPosFinder : AstNodeVisitor<MutableMap<Int, Pair<Int, Int>>> {
 
@@ -10,13 +11,11 @@ class MinMaxPosFinder : AstNodeVisitor<MutableMap<Int, Pair<Int, Int>>> {
     }
 
     override fun visit(literal: AstNode.Literal): MutableMap<Int, Pair<Int, Int>> {
-        return mutableMapOf(literal.literal.line to
-                (literal.literal.pos to literal.literal.pos + literal.literal.lexeme.length))
+        return getMinMaxFor(literal.literal)
     }
 
     override fun visit(variable: AstNode.Variable): MutableMap<Int, Pair<Int, Int>> {
-        val nameMap = mutableMapOf(variable.name.line to
-                (variable.name.pos to variable.name.pos + variable.name.lexeme.length))
+        val nameMap = getMinMaxFor(variable.name)
         if (variable.arrIndex != null) {
             return combine(nameMap, find(variable.arrIndex!!))
         }
@@ -28,8 +27,7 @@ class MinMaxPosFinder : AstNodeVisitor<MutableMap<Int, Pair<Int, Int>>> {
     }
 
     override fun visit(unary: AstNode.Unary): MutableMap<Int, Pair<Int, Int>> {
-        return combine(mutableMapOf(unary.operator.line to
-                (unary.operator.pos to unary.operator.pos + unary.operator.lexeme.length)))
+        return combine(getMinMaxFor(unary.operator), find(unary.on))
     }
 
     override fun visit(funcCall: AstNode.FunctionCall): MutableMap<Int, Pair<Int, Int>> {
@@ -53,9 +51,7 @@ class MinMaxPosFinder : AstNodeVisitor<MutableMap<Int, Pair<Int, Int>>> {
     }
 
     override fun visit(print: AstNode.Print): MutableMap<Int, Pair<Int, Int>> {
-        val combined = mutableMapOf(print.printToken.line to
-                (print.printToken.pos to print.printToken.pos + print.printToken.lexeme.length))
-        return combine(combined, find(print.toPrint))
+        return combine(getMinMaxFor(print.printToken), find(print.toPrint))
     }
 
     override fun visit(block: AstNode.Block): MutableMap<Int, Pair<Int, Int>> {
@@ -63,9 +59,7 @@ class MinMaxPosFinder : AstNodeVisitor<MutableMap<Int, Pair<Int, Int>>> {
     }
 
     override fun visit(varDec: AstNode.VariableDeclaration): MutableMap<Int, Pair<Int, Int>> {
-        val combined = mutableMapOf(varDec.decToken.line to
-                (varDec.decToken.pos to varDec.decToken.pos + varDec.decToken.lexeme.length))
-        return combine(combined, find(varDec.initializer))
+        return combine(getMinMaxFor(varDec.decToken), find(varDec.initializer))
     }
 
     override fun visit(varAssign: AstNode.Assignment): MutableMap<Int, Pair<Int, Int>> {
@@ -85,9 +79,8 @@ class MinMaxPosFinder : AstNodeVisitor<MutableMap<Int, Pair<Int, Int>>> {
     }
 
     override fun visit(returnStmt: AstNode.Return): MutableMap<Int, Pair<Int, Int>> {
-        val combined = mutableMapOf(returnStmt.returnToken.line to
-                (returnStmt.returnToken.pos to returnStmt.returnToken.pos + returnStmt.returnToken.lexeme.length))
-        return if (returnStmt.toReturn == null) combined else combine(combined, find(returnStmt.toReturn!!))
+        val returnMap = getMinMaxFor(returnStmt.returnToken)
+        return if (returnStmt.toReturn == null) returnMap else combine(returnMap, find(returnStmt.toReturn!!))
     }
 
     override fun visit(varInc: AstNode.VarIncrement): MutableMap<Int, Pair<Int, Int>> {
@@ -95,37 +88,41 @@ class MinMaxPosFinder : AstNodeVisitor<MutableMap<Int, Pair<Int, Int>>> {
     }
 
     override fun visit(get: AstNode.Get): MutableMap<Int, Pair<Int, Int>> {
-        val combined = mutableMapOf(get.name.line to
-                (get.name.pos to get.name.pos + get.name.lexeme.length))
-        return if (get.from == null) combined else combine(combined, find(get.from!!))
+        val nameMap = getMinMaxFor(get.name)
+        return if (get.from == null) nameMap else combine(nameMap, find(get.from!!))
     }
 
     override fun visit(cont: AstNode.Continue): MutableMap<Int, Pair<Int, Int>> {
-        TODO("Not yet implemented")
+        return getMinMaxFor(cont.continueToken)
     }
 
     override fun visit(breac: AstNode.Break): MutableMap<Int, Pair<Int, Int>> {
-        TODO("Not yet implemented")
+        return getMinMaxFor(breac.breakToken)
     }
 
     override fun visit(constructorCall: AstNode.ConstructorCall): MutableMap<Int, Pair<Int, Int>> {
-        TODO("not yet implemented")
+        return combine(find(constructorCall.origFrom),
+            *Array(constructorCall.arguments.size) { find(constructorCall.arguments[it]) })
     }
 
     override fun visit(field: AstNode.FieldDeclaration): MutableMap<Int, Pair<Int, Int>> {
-        TODO("Not yet implemented")
+        return combine(*Array(field.modifiers.size) { getMinMaxFor(field.modifiers[it]) }, find(field.initializer))
     }
 
     override fun visit(arr: AstNode.ArrayCreate): MutableMap<Int, Pair<Int, Int>> {
-        TODO("Not yet implemented")
+        return getMinMaxFor(arr.endToken) //TODO: make better
     }
 
     override fun visit(arr: AstNode.ArrayLiteral): MutableMap<Int, Pair<Int, Int>> {
-        TODO("Not yet implemented")
+        return combine(getMinMaxFor(arr.startToken), getMinMaxFor(arr.endToken))
     }
 
     @Suppress("NOTHING_TO_INLINE")
     private inline fun find(node: AstNode): MutableMap<Int, Pair<Int, Int>> = node.accept(this)
+
+    private fun getMinMaxFor(token: Token): MutableMap<Int, Pair<Int, Int>> {
+        return mutableMapOf(token.line to (token.pos to token.pos + token.lexeme.length))
+    }
 
     private fun combine(vararg lists: MutableMap<Int, Pair<Int, Int>>): MutableMap<Int, Pair<Int, Int>> {
         val combined = mutableMapOf<Int, Pair<Int, Int>>()
