@@ -32,7 +32,7 @@ object Test {
     fun test(artFile: Path, sampleOutput: Path) {
         val code = Paths.get("$artFile").toFile().readText(Charsets.UTF_8)
         val tokens = Tokenizer.tokenize(code, artFile.toString())
-        val program = Parser.parse(tokens)
+        val program = Parser.parse(tokens, code)
         testNum++
 
         println("----------------code----------------")

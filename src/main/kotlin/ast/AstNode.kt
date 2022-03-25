@@ -210,8 +210,9 @@ abstract class AstNode {
     /**
      * represents a print statement
      * @param toPrint the node that should be printed
+     * @param printToken the 'print' token
      */
-    class Print(var toPrint: AstNode) : AstNode() {
+    class Print(var toPrint: AstNode, val printToken: Token) : AstNode() {
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (orig !== toPrint) throw CantSwapException()
@@ -243,11 +244,17 @@ abstract class AstNode {
      * @param name the name of the variable
      * @param initializer the node that initializes the variable (the part after the '=')
      * @param isConst true if the variable is constant
+     * @param decToken the token used to declare the variable (either let or const)
      */
-    class VariableDeclaration(val name: Token, var initializer: AstNode, val isConst: Boolean) : AstNode() {
+    class VariableDeclaration(
+        val name: Token,
+        var initializer: AstNode,
+        val isConst: Boolean,
+        val decToken: Token
+    ) : AstNode() {
 
         /**
-         * the local variable index; the index into the locals array of the jvm at which the variabl can be found
+         * the local variable index; the index into the locals array of the jvm at which the variable can be found
          *
          * set by the parser
          */
@@ -374,8 +381,9 @@ abstract class AstNode {
     /**
      * represents a return statement
      * @param toReturn the value that is returned; null if there is none
+     * @param returnToken the 'return' token
      */
-    class Return(var toReturn: AstNode?) : AstNode() {
+    class Return(var toReturn: AstNode?, val returnToken: Token) : AstNode() {
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (toReturn !== orig) throw CantSwapException()

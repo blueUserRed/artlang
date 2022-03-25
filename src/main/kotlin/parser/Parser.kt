@@ -2,49 +2,65 @@ package parser
 
 import ast.AstNode
 import ast.AstPrinter
+import errors.artError
 import tokenizer.Token
 import tokenizer.TokenType
 import passes.TypeChecker.Datakind
 import kotlin.RuntimeException
+import errors.Errors
 
 object Parser {
 
     private var cur: Int = 0
     private var tokens: List<Token> = listOf()
+    private var srcCode: String = ""
 
-    fun parse(tokens: List<Token>): AstNode.Program {
+    fun parse(tokens: List<Token>, code: String): AstNode.Program {
         cur = 0
         this.tokens = tokens
+        srcCode = code
 
         val functions = mutableListOf<AstNode.Function>()
         val classes = mutableListOf<AstNode.ArtClass>()
         val fields = mutableListOf<AstNode.FieldDeclaration>()
-        while (!match(TokenType.EOF)) {
+        while (!match(TokenType.EOF)) try {
+
             val modifiers = parseModifiers()
+            if (modifiers.isNotEmpty()) artError(Errors.ModifiersInTopLevelError(modifiers, srcCode))
+
             if (match(TokenType.K_FN)) {
-                if (modifiers.isNotEmpty()) throw RuntimeException("functions cant have modifiers in top level")
                 functions.add(parseFunc(listOf(), true))
                 continue
             }
             if (match(TokenType.K_CLASS)) {
-                if (modifiers.isNotEmpty()) throw RuntimeException("classes cant have modifiers in top level")
                 classes.add(parseClass(listOf()))
                 continue
             }
             if (matchIdent("field")) {
-                if (modifiers.isNotEmpty()) throw RuntimeException("fields cant have modifiers in top level")
+
                 fields.add(parseFieldDeclaration(listOf(), false, true))
                 continue
             }
             if (match(TokenType.K_CONST)) {
                 consumeIdentOrError("field", "Expected field declaration after const")
-                if (modifiers.isNotEmpty()) throw RuntimeException("classes cant have modifiers in top level")
                 fields.add(parseFieldDeclaration(listOf(),true, true))
                 continue
             }
-            throw RuntimeException("Expected function, class or field in global scope")
+
+            artError(Errors.SyntaxError(consume(), "Expected either a field, a class or a function in the " +
+                    "top level", srcCode))
+            resyncTopLevel()
+
+        } catch(e: ParserResyncException) {
+            resyncTopLevel()
+            continue
         }
         return AstNode.Program(functions, classes, fields)
+    }
+
+    fun resyncTopLevel() {
+        while (peek().tokenType !in arrayOf(TokenType.K_FN, TokenType.K_CLASS, TokenType.K_CONST, TokenType.EOF) &&
+            !(peek().tokenType == TokenType.IDENTIFIER && peek().lexeme == "field")) cur++
     }
 
     private fun parseFieldDeclaration(modifiers: List<Token>, isConst: Boolean, isTopLevel: Boolean)
@@ -63,8 +79,10 @@ object Parser {
         val funcName = last()
         consumeOrError(TokenType.L_PAREN, "Expected () after function name")
 
-        if (funcName.lexeme == "main" && modifiers.isNotEmpty())
-            throw RuntimeException("function main must not have access modifiers")
+        if (funcName.lexeme == "main" && modifiers.isNotEmpty()) {
+            artError(Errors.InvalidMainFunctionDeclarationError("main function must not have modifiers",
+                srcCode, modifiers))
+        }
 
         val args = mutableListOf<Pair<Token, AstNode.DatatypeNode>>()
 
@@ -83,7 +101,8 @@ object Parser {
 
         consumeOrError(TokenType.L_BRACE, "Expected code block after function declaration")
 
-        val function = AstNode.Function(parseBlock(), funcName, modifiers, isTopLevel)
+        val function = AstNode.Function(parseBlock(), funcName,
+            if (funcName.lexeme == "main") listOf() else modifiers, isTopLevel)
         function.args = args
         function.returnType = returnType
 
@@ -100,7 +119,7 @@ object Parser {
         val fields = mutableListOf<AstNode.FieldDeclaration>()
         val staticFields = mutableListOf<AstNode.FieldDeclaration>()
 
-        while (!match(TokenType.R_BRACE)) {
+        while (!match(TokenType.R_BRACE)) try {
             val modifiers = parseModifiers()
 
             if (match(TokenType.K_FN)) {
@@ -121,10 +140,19 @@ object Parser {
                 if (field.isStatic) staticFields.add(field) else fields.add(field)
                 continue
             }
-            throw RuntimeException("expected function or field declaration in class body")
+            artError(Errors.SyntaxError(consume(), "Expected a function or field declaration in class", srcCode))
+            resyncClass()
+        } catch (e: ParserResyncException) {
+            resyncClass()
+            continue
         }
 
         return AstNode.ArtClass(name, staticFuncs, funcs, staticFields, fields)
+    }
+
+    private fun resyncClass() {
+        while (peek().tokenType !in arrayOf(TokenType.K_FN, TokenType.K_CONST, TokenType.EOF) &&
+            !(peek().tokenType == TokenType.IDENTIFIER && peek().lexeme == "field")) cur++
     }
 
     private fun parseModifiers(): List<Token> {
@@ -136,7 +164,10 @@ object Parser {
     private fun validateModifiersForFunc(modifiers: List<Token>) {
         val had = mutableListOf<String>()
         for (modifier in modifiers) {
-            if (modifier.lexeme in had) throw RuntimeException("duplicate modifier ${modifier.lexeme}")
+            if (modifier.lexeme in had) {
+                artError(Errors.InvalidModifierError("duplicate modifier ${modifier.lexeme}", modifier, srcCode))
+                continue
+            }
             when (modifier.lexeme) {
                 "abstract" -> TODO("abstract functions are not yet implemented")
                 "public" -> had.add("public")
@@ -149,9 +180,15 @@ object Parser {
     private fun validateModifiersForField(modifiers: List<Token>) {
         val had = mutableListOf<String>()
         for (modifier in modifiers) {
-            if (modifier.lexeme in had) throw RuntimeException("duplicate modifier ${modifier.lexeme}")
+            if (modifier.lexeme in had) {
+                artError(Errors.InvalidModifierError("duplicate modifier ${modifier.lexeme}", modifier, srcCode))
+                continue
+            }
             when (modifier.lexeme) {
-                "abstract" -> throw RuntimeException("field cant be abstract")
+                "abstract" -> {
+                    artError(Errors.InvalidModifierError("Field cannot be abstract", modifier, srcCode))
+                    continue
+                }
                 "public" -> had.add("public")
                 "static" -> had.add("static")
                 else -> throw RuntimeException("unknown modifier ${modifier.lexeme}")
@@ -162,7 +199,10 @@ object Parser {
     private fun validateModifiersForClass(modifiers: List<Token>) {
         val had = mutableListOf<String>()
         for (modifier in modifiers) {
-            if (modifier.lexeme in had) throw RuntimeException("duplicate modifier ${modifier.lexeme}")
+            if (modifier.lexeme in had) {
+                artError(Errors.InvalidModifierError("duplicate modifier ${modifier.lexeme}", modifier, srcCode))
+                continue
+            }
             when (modifier.lexeme) {
                 "abstract" -> TODO("abstract classes are not implemented")
                 "public" -> throw RuntimeException("class cant be public")
@@ -240,9 +280,10 @@ object Parser {
     }
 
     private fun parseReturn(): AstNode.Return {
-        if (matchNSFB(TokenType.SOFT_BREAK)) return AstNode.Return(null)
+        val returnToken = last()
+        if (matchNSFB(TokenType.SOFT_BREAK)) return AstNode.Return(null, returnToken)
         val returnExpr = parseStatement()
-        return AstNode.Return(returnExpr)
+        return AstNode.Return(returnExpr, returnToken)
     }
 
     private fun parseWhileLoop(): AstNode {
@@ -251,8 +292,9 @@ object Parser {
         consumeOrError(TokenType.R_PAREN, "Expected closing Parenthesis after condition")
 
         val body = parseStatement()
-        if (body is AstNode.VariableDeclaration) throw RuntimeException("Cant declare variable in while unless it " +
-                "is wrapped in a block")
+        if (body is AstNode.VariableDeclaration) {
+            artError(Errors.VarDeclarationWithoutBlockError(body, srcCode))
+        }
 
         return AstNode.While(body, condition)
     }
@@ -264,35 +306,37 @@ object Parser {
         consumeOrError(TokenType.R_PAREN, "Expected closing Parenthesis after condition")
 
         val ifStmt = parseStatement()
-        if (ifStmt is AstNode.VariableDeclaration) throw RuntimeException("Cant declare variable in if unless it " +
-                "is wrapped in a block")
+        if (ifStmt is AstNode.VariableDeclaration) {
+            artError(Errors.VarDeclarationWithoutBlockError(ifStmt, srcCode))
+        }
 
         if (!match(TokenType.K_ELSE)) return AstNode.If(ifStmt, null, condition)
 
         val elseStmt = parseStatement()
-        if (elseStmt is AstNode.VariableDeclaration) throw RuntimeException("Cant declare variable in else unless it " +
-                "is wrapped in a block")
+        if (elseStmt is AstNode.VariableDeclaration) {
+            artError(Errors.VarDeclarationWithoutBlockError(elseStmt, srcCode))
+        }
 
         return AstNode.If(ifStmt, elseStmt, condition)
     }
 
     private fun parseLoop(): AstNode {
         val stmt = parseStatement()
-        if (stmt is AstNode.VariableDeclaration) throw RuntimeException("Cant declare variable in loop unless it " +
-                "is wrapped in a block")
+        if (stmt is AstNode.VariableDeclaration) {
+            artError(Errors.VarDeclarationWithoutBlockError(stmt, srcCode))
+        }
         return AstNode.Loop(stmt)
     }
 
     private fun parseVariableDeclaration(isConst: Boolean): AstNode.VariableDeclaration {
-        consumeOrError(TokenType.IDENTIFIER, "expected identifier after let")
+        val decToken = last()
+        consumeOrError(TokenType.IDENTIFIER, "expected identifier after let/const")
         val name = last()
         var type: AstNode.DatatypeNode? = null
         if (match(TokenType.COLON)) type = parseType()
         consumeOrError(TokenType.EQ, "initializer expected")
         val initializer = parseStatement()
-//        consumeOrError(TokenType.SEMICOLON, "Expected a Semicolon after variable Declaration")
-//        consumeSoftBreaks()
-        val stmt = AstNode.VariableDeclaration(name, initializer, isConst)
+        val stmt = AstNode.VariableDeclaration(name, initializer, isConst, decToken)
         stmt.explType = type
         return stmt
     }
@@ -300,15 +344,26 @@ object Parser {
     private fun parseAssignment(): AstNode {
         val left = parseBooleanComparison()
         if (match(TokenType.EQ)) {
-            if (left is AstNode.Get) return AstNode.Assignment(left, parseStatement(), false).apply { arrIndex = left.arrIndex }
-            else throw RuntimeException("expected variable before Assignment")
+            if (left is AstNode.Get) return AstNode.Assignment(left, parseStatement(), false)
+                .apply { arrIndex = left.arrIndex }
+            else {
+                artError(Errors.InvalidAssignmentTargetError(left, srcCode))
+                throw ParserResyncException()
+            }
         }
         if (match(TokenType.WALRUS)) {
-            if (left is AstNode.Get) return AstNode.Assignment(left, parseStatement(), true).apply { arrIndex = left.arrIndex }
-            else throw RuntimeException("expected variable before Assignment")
+            if (left is AstNode.Get) return AstNode.Assignment(left, parseStatement(), true)
+                .apply { arrIndex = left.arrIndex }
+            else {
+                artError(Errors.InvalidAssignmentTargetError(left, srcCode))
+                throw ParserResyncException()
+            }
         }
         if (match(TokenType.PLUS_EQ, TokenType.MINUS_EQ, TokenType.STAR_EQ, TokenType.SLASH_EQ)) {
-            if (left !is AstNode.Get) throw RuntimeException("expected variable before assignment")
+            if (left !is AstNode.Get) {
+                artError(Errors.InvalidAssignmentTargetError(left, srcCode))
+                throw ParserResyncException()
+            }
             return parseVarAssignShorthand(left, last(), parseStatement())
         }
         return left
@@ -374,19 +429,22 @@ object Parser {
                 left = parseFunctionCall(left)
             } else if (match(TokenType.D_PLUS)) {
                 if (left !is AstNode.Get) {
-                    throw RuntimeException("invalid increment target ${left.accept(AstPrinter())}")
+                    artError(Errors.InvalidIncrementTargetError(left, srcCode))
+                    throw ParserResyncException()
                 }
                 left = AstNode.VarIncrement(left, 1)
             } else if (match(TokenType.D_MINUS)) {
                 if (left !is AstNode.Get) {
-                    throw RuntimeException("invalid decrement target ${left.accept(AstPrinter())}")
+                    artError(Errors.InvalidIncrementTargetError(left, srcCode))
+                    throw ParserResyncException()
                 }
                 left = AstNode.VarIncrement(left, -1)
             } else if (match(TokenType.L_BRACKET)) {
                 val element = parseStatement()
                 consumeOrError(TokenType.R_BRACKET, "Expected right bracket")
                 if (left !is AstNode.Get) {
-                    throw RuntimeException("invalid Array-get target ${left.accept(AstPrinter())}")
+                    artError(Errors.InvalidArrayGetTargetError(left, srcCode))
+                    throw ParserResyncException()
                 }
                 left = AstNode.Get(left.name, left.from)
                 left.arrIndex = element
@@ -413,7 +471,8 @@ object Parser {
             }), amount)
         }
         if (!match(TokenType.INT, TokenType.FLOAT, TokenType.STRING, TokenType.BOOLEAN)) {
-            throw RuntimeException("Not a Statement")
+            artError(Errors.SyntaxError(consume(), "Expected a statement, got ${last().lexeme}", srcCode))
+            throw ParserResyncException()
         }
 
         return AstNode.Literal(last())
@@ -453,15 +512,25 @@ object Parser {
     private fun parseBlock(): AstNode.Block {
         val statements = mutableListOf<AstNode>()
         while (!match(TokenType.R_BRACE)) {
-            statements.add(parseStatement())
+            try {
+                statements.add(parseStatement())
+            } catch (e: ParserResyncException) {
+                resync()
+                continue
+            }
             consumeExpectingSoftBreakOrError("Expected line break or semicolon")
         }
         return AstNode.Block(statements.toTypedArray())
     }
 
+    private fun resync() {
+        while (!matchNSFB(TokenType.SOFT_BREAK, TokenType.SEMICOLON)) consume()
+    }
+
     private fun parsePrint(): AstNode {
+        val printToken = last()
         val exp = parseStatement()
-        return AstNode.Print(exp)
+        return AstNode.Print(exp, printToken)
     }
 
     private fun parseType(): AstNode.DatatypeNode {
@@ -524,29 +593,43 @@ object Parser {
         while (tokens[cur].tokenType == TokenType.SOFT_BREAK) cur++
     }
 
+    private fun consume(): Token {
+        consumeSoftBreaks()
+        cur++
+        return last()
+    }
+
     private fun consumeExpectingSoftBreakOrError(message: String) {
-        if (tokens[cur].tokenType !in arrayOf(TokenType.SOFT_BREAK, TokenType.SEMICOLON))
-            throw RuntimeException(message)
+        if (tokens[cur].tokenType !in arrayOf(TokenType.SOFT_BREAK, TokenType.SEMICOLON)) {
+            artError(Errors.SyntaxError(consume(), message, srcCode))
+            throw ParserResyncException()
+        }
         while (tokens[cur].tokenType in arrayOf(TokenType.SOFT_BREAK, TokenType.SEMICOLON)) cur++
     }
 
     private fun consumeOrError(type: TokenType, message: String) {
         while (tokens[cur].tokenType == TokenType.SOFT_BREAK) cur++
         if (tokens[cur].tokenType == type) cur++
-        else throw RuntimeException(message)
+        else {
+            artError(Errors.SyntaxError(consume(), message, srcCode))
+            throw ParserResyncException()
+        }
     }
 
     private fun consumeIdentOrError(identifier: String, message: String) {
         while (tokens[cur].tokenType == TokenType.SOFT_BREAK) cur++
         if (tokens[cur].tokenType == TokenType.IDENTIFIER && tokens[cur].lexeme == identifier) cur++
-        else throw RuntimeException(message)
+        else {
+            artError(Errors.SyntaxError(consume(), message, srcCode))
+            throw ParserResyncException()
+        }
     }
 
     private fun last(): Token {
         return tokens[cur - 1]
     }
 
-    private fun peek(): Token? {
+    private fun peek(): Token {
         return tokens[cur]
 //        return if (cur + 1 < tokens.size) tokens[cur + 1] else null
     }
@@ -561,5 +644,7 @@ object Parser {
         return ret
 //        return if (cur + 1 < tokens.size) tokens[cur + 1] else null
     }
+
+    class ParserResyncException : RuntimeException()
 
 }

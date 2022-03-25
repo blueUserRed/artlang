@@ -10,7 +10,7 @@ object ErrorPool {
 
     fun printErrors() { for (err in errors) {
         println(err.constructString())
-        println("\n\n")
+        println("\n")
     } }
 
 }
