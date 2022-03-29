@@ -2,7 +2,9 @@ package errors
 
 import ast.AstNode
 import passes.MinMaxPosFinder
+import passes.TypeChecker
 import tokenizer.Token
+import passes.TypeChecker.Datatype
 
 class Errors {
 
@@ -12,17 +14,22 @@ class Errors {
 
         fun constructString(): String {
             val builder = StringBuilder()
-            builder.append(Ansi.red).append(message).append(Ansi.white).append("\n")
+            builder
+                .append(Ansi.red)
+                .append(message)
+                .append(Ansi.white)
+                .append("\n")
             val (minLine, maxLine) = getMinAndMaxLine()
             val padAmount = getPadAmount(maxLine)
-            for (i in (minLine - 2)..(maxLine + 2)) if (i > 0) {
+            val lines = srcCode.lines()
+            for (i in (minLine - 2)..(maxLine + 2)) if (i > 0 && i <= lines.size) {
 
                 builder
                     .append(Ansi.blue)
                     .append(i.toString().padStart(padAmount, '0'))
                     .append(Ansi.reset)
                     .append("   ")
-                    .append(Utils.getLine(srcCode, i))
+                    .append(lines[i - 1])
                     .append("\n")
 
                 if (i in ranges.keys) {
@@ -31,7 +38,10 @@ class Errors {
                     builder.append(Ansi.red)
                     repeat(padAmount + 3) { builder.append(" ") }
                     for (cur in 0 until (until + 1)) builder.append(if (cur >= from) "~" else " ")
-                    builder.append(" <--------- here").append(Ansi.white).append("\n")
+                    builder
+                        .append(" <--------- here")
+                        .append(Ansi.white)
+                        .append("\n")
                 }
 
             }
@@ -158,6 +168,31 @@ class Errors {
             get() = "Invalid array-get target, expected variable or field"
         override val ranges: MutableMap<Int, Pair<Int, Int>>
             get() = arrayGetTarget.accept(MinMaxPosFinder())
+    }
+
+    class IllegalTypesInBinaryOperationError(
+        val operator: String,
+        val type1: Datatype,
+        val type2: Datatype,
+        val operation: AstNode,
+        srcCode: String
+    ) : ArtError(10, srcCode) {
+        override val message: String
+            get() = "Invalid types in binary operation '$operator': $type1 and $type2"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = operation.accept(MinMaxPosFinder())
+    }
+
+    class InvalidNumLiteralTypeIdentifier(
+        val pos: Int,
+        val line: Int,
+        val character: Char,
+        srcCode: String,
+    ) : ArtError(11, srcCode) {
+        override val message: String
+            get() = "Invalid literal type character: $character"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = mutableMapOf(line to (pos to pos))
     }
 
 }

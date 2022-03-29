@@ -463,7 +463,6 @@ object Parser {
             consumeOrError(TokenType.L_BRACKET, "Expected array initializer")
             val amount = parseStatement()
             consumeOrError(TokenType.R_BRACKET, "Expected closing bracket for array initializer")
-            val endToken = last()
             return AstNode.ArrayCreate(AstNode.PrimitiveTypeNode(when (primitive.tokenType) {
                 TokenType.T_INT -> Datakind.INT
                 TokenType.T_BOOLEAN -> Datakind.BOOLEAN
@@ -537,11 +536,25 @@ object Parser {
     }
 
     private fun parseType(): AstNode.DatatypeNode {
-        if (match(TokenType.T_INT, TokenType.T_STRING, TokenType.T_BOOLEAN)) {
+        val primitives = arrayOf(
+            TokenType.T_BYTE,
+            TokenType.T_SHORT,
+            TokenType.T_INT,
+            TokenType.T_LONG,
+            TokenType.T_FLOAT,
+            TokenType.T_LONG,
+            TokenType.T_BOOLEAN,
+            TokenType.T_STRING
+        )
+        if (match(*primitives)) {
             return AstNode.PrimitiveTypeNode(when (last().tokenType) {
+                TokenType.T_BYTE -> Datakind.BYTE
+                TokenType.T_SHORT -> Datakind.SHORT
                 TokenType.T_INT -> Datakind.INT
-                TokenType.T_STRING -> Datakind.STRING
+                TokenType.T_LONG -> Datakind.LONG
+                TokenType.T_FLOAT -> Datakind.FLOAT
                 TokenType.T_BOOLEAN -> Datakind.BOOLEAN
+                TokenType.T_STRING -> Datakind.STRING
                 else -> throw RuntimeException("unreachable")
             }).apply {
                 if (matchNSFB(TokenType.L_BRACKET)) {

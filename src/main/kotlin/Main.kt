@@ -120,7 +120,7 @@ object Main {
         if (Settings.verbose) println("done in ${variableResolverTime}ms\n")
 
         if (Settings.verbose) println("running type checker")
-        val typeCheckingTime = Stopwatch.time { program.accept(TypeChecker()) }
+        val typeCheckingTime = Stopwatch.time { program.accept(TypeChecker().apply { srcCode = code }) }
         if (ErrorPool.errors.size != lastErrors) {
             if (Settings.verbose) {
                 println("${Ansi.yellow}Accumulated ${ErrorPool.errors.size - lastErrors} errors${Ansi.reset}")

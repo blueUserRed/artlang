@@ -231,7 +231,12 @@ object Tokenizer {
             "while" -> emit(TokenType.K_WHILE, "while", null, start - lastLineBreakPos)
             "true" -> emit(TokenType.BOOLEAN, "true", true, start - lastLineBreakPos)
             "false" -> emit(TokenType.BOOLEAN, "false", false, start - lastLineBreakPos)
+            "byte" -> emit(TokenType.T_BYTE, "byte", null, start - lastLineBreakPos)
+            "short" -> emit(TokenType.T_SHORT, "short", null, start - lastLineBreakPos)
             "int" -> emit(TokenType.T_INT, "int", null, start - lastLineBreakPos)
+            "long" -> emit(TokenType.T_LONG, "long", null, start - lastLineBreakPos)
+            "float" -> emit(TokenType.T_FLOAT, "float", null, start - lastLineBreakPos)
+            "double" -> emit(TokenType.T_DOUBLE, "double", null, start - lastLineBreakPos)
             "str" -> emit(TokenType.T_STRING, "str", null, start - lastLineBreakPos)
             "bool" -> emit(TokenType.T_BOOLEAN, "bool", null, start - lastLineBreakPos)
             "return" -> emit(TokenType.K_RETURN, "return", null, start - lastLineBreakPos)
@@ -293,10 +298,10 @@ object Tokenizer {
      * tokenizes a number
      */
     private fun number() {
-
         val start = cur
 
         var radix = 10
+
         if (tryConsume('0')) {
             if (tryConsume('b')) radix = 2
             else if (tryConsume('o')) radix = 8
@@ -305,32 +310,119 @@ object Tokenizer {
         }
 
         var num = 0L
-        while(!end() && consume().isLetterOrDigit()) {
+
+        while (!end()) {
+            if (consume() == '_') continue
+            if (!last().isLetterOrDigit()) break
             num *= radix
             try {
                 num += last().digitToInt(radix)
             } catch (e: NumberFormatException) {
-                cur--
-                val decNum = num / radix
-                emit(TokenType.INT, code.substring(start until cur), decNum.toInt(), start - lastLineBreakPos)
-                return
+                break
             }
         }
+
         cur--
 
         if (end() || radix != 10 || !tryConsume('.')) {
-            emit(TokenType.INT, code.substring(start until cur), num.toInt(), start - lastLineBreakPos)
+            if (!tryConsume('#')) {
+                emit(TokenType.INT, code.substring(start until cur), num.toInt(), start - lastLineBreakPos)
+                return
+            }
+            if (tryConsume('i', 'I')) {
+                emit(TokenType.INT, code.substring(start until cur), num.toInt(), start - lastLineBreakPos)
+            } else if (tryConsume('b', 'B')) {
+                emit(TokenType.BYTE, code.substring(start until cur), num.toByte(), start - lastLineBreakPos)
+            } else if (tryConsume('s', 'S')) {
+                emit(TokenType.SHORT, code.substring(start until cur), num.toShort(), start - lastLineBreakPos)
+            } else if (tryConsume('l', 'L')) {
+                emit(TokenType.LONG, code.substring(start until cur), num, start - lastLineBreakPos)
+            } else if (tryConsume('f', 'F')) {
+                emit(TokenType.FLOAT, code.substring(start until cur), num.toFloat(), start - lastLineBreakPos)
+            } else if (tryConsume('d', 'D')) {
+                emit(TokenType.DOUBLE, code.substring(start until cur), num.toDouble(), start - lastLineBreakPos)
+            } else {
+                artError(Errors.InvalidNumLiteralTypeIdentifier(cur - lastLineBreakPos, curLine, consume(), code))
+            }
             return
         }
 
         var afterComma = 0.0
         var numIts = 1
-        while(!end() && consume().isDigit()) {
+        var isFirstIt = true
+        while(!end()) {
+            if (consume() == '_') continue
+            if (!last().isDigit()) {
+                if (isFirstIt) cur--
+                break
+            }
+            isFirstIt = false
             afterComma += last().digitToInt(10) / 10.0.pow(numIts)
             numIts++
         }
-        val commaNum = (num + afterComma)
-        emit(TokenType.FLOAT, code.substring(start until cur), commaNum.toFloat(), start - lastLineBreakPos)
+        cur--
+
+        val commaNum = num + afterComma
+        if (!tryConsume('#')) {
+            emit(TokenType.FLOAT, code.substring(start until cur), commaNum.toFloat(), start - lastLineBreakPos)
+            return
+        }
+        if (tryConsume('i', 'I')) {
+            emit(TokenType.INT, code.substring(start until cur), commaNum.toInt(), start - lastLineBreakPos)
+        } else if (tryConsume('b', 'B')) {
+            emit(TokenType.BYTE, code.substring(start until cur), commaNum.toInt().toByte(), start - lastLineBreakPos)
+        } else if (tryConsume('s', 'S')) {
+            emit(TokenType.SHORT, code.substring(start until cur), commaNum.toInt().toShort(), start - lastLineBreakPos)
+        } else if (tryConsume('l', 'L')) {
+            emit(TokenType.LONG, code.substring(start until cur), commaNum.toLong(), start - lastLineBreakPos)
+        } else if (tryConsume('f', 'F')) {
+            emit(TokenType.FLOAT, code.substring(start until cur), commaNum.toFloat(), start - lastLineBreakPos)
+        } else if (tryConsume('d', 'D')) {
+            emit(TokenType.DOUBLE, code.substring(start until cur), commaNum, start - lastLineBreakPos)
+        } else {
+            artError(Errors.InvalidNumLiteralTypeIdentifier(cur - lastLineBreakPos, curLine, consume(), code))
+        }
+
+
+
+//
+//        val start = cur
+//
+//        var radix = 10
+//        if (tryConsume('0')) {
+//            if (tryConsume('b')) radix = 2
+//            else if (tryConsume('o')) radix = 8
+//            else if (tryConsume('x')) radix = 16
+//            else cur--
+//        }
+//
+//        var num = 0L
+//        while(!end() && consume().isLetterOrDigit()) {
+//            num *= radix
+//            try {
+//                num += last().digitToInt(radix)
+//            } catch (e: NumberFormatException) {
+//                cur--
+//                val decNum = num / radix
+//                emit(TokenType.INT, code.substring(start until cur), decNum.toInt(), start - lastLineBreakPos)
+//                return
+//            }
+//        }
+//        cur--
+//
+//        if (end() || radix != 10 || !tryConsume('.')) {
+//            emit(TokenType.INT, code.substring(start until cur), num.toInt(), start - lastLineBreakPos)
+//            return
+//        }
+//
+//        var afterComma = 0.0
+//        var numIts = 1
+//        while(!end() && consume().isDigit()) {
+//            afterComma += last().digitToInt(10) / 10.0.pow(numIts)
+//            numIts++
+//        }
+//        val commaNum = num + afterComma
+//        emit(TokenType.FLOAT, code.substring(start until cur), commaNum.toFloat(), start - lastLineBreakPos)
     }
 
     /**
@@ -368,11 +460,12 @@ object Tokenizer {
      * @param c the character that should be consumed
      * @return true if the character was consumed
      */
-    private fun tryConsume(c: Char): Boolean {
-        return if (current() == c) {
+    private fun tryConsume(vararg cs: Char): Boolean {
+        for (c in cs) if (current() == c) {
             consume()
-            true
-        } else false
+            return true
+        }
+        return false
     }
 
     /**

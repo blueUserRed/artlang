@@ -1,0 +1,13 @@
+const field its: int = 100
+
+fn main() {
+    let i = -1
+    while ((i := i + 1) <= its) print recFibonacci(i)
+}
+
+/**
+* the most stupid possible implementation of fibonacci
+*/
+fn recFibonacci(pos: int): int {
+    if (pos < 2) return 1 else return recFibonacci(pos - 1) + recFibonacci(pos - 2)
+}

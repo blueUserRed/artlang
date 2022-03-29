@@ -4,10 +4,11 @@ import ast.AstNode
 import ast.AstNodeVisitor
 import ast.AstPrinter
 import ast.FunctionDescriptor
+import errors.Errors
+import errors.artError
 import tokenizer.TokenType
 import passes.TypeChecker.Datatype
 import tokenizer.Token
-import javax.xml.crypto.Data
 import kotlin.RuntimeException
 
 class TypeChecker : AstNodeVisitor<Datatype> {
@@ -19,6 +20,8 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
     private var swap: AstNode? = null
 
+    var srcCode: String = ""
+
     override fun visit(binary: AstNode.Binary): Datatype {
         val type1 = check(binary.left, binary)
         val type2 = check(binary.right, binary)
@@ -26,50 +29,88 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
         when (binary.operator.tokenType) {
             TokenType.PLUS -> {
-                if (type1 != type2 || !type1.matches(Datakind.INT, Datakind.STRING)) {
-                    throw RuntimeException("Illegal types in addition: $type1 and $type2")
+                if (type1 == type2 && type1 == Datatype.Str()) {
+                    resultType = type1
+                } else {
+                    if (!type1.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG,
+                            Datakind.FLOAT, Datakind.DOUBLE) ||
+                            !(type1.compatibleWith(type2) || type2.compatibleWith(type1))) {
+                        artError(Errors.IllegalTypesInBinaryOperationError(
+                            binary.operator.lexeme, type1, type2, binary, srcCode
+                        ))
+                        resultType = Datatype.ErrorType()
+                    } else {
+                        resultType = getHigherType(type1, type2) ?: throw RuntimeException("unreachable")
+                    }
                 }
-                resultType = type1
             }
             TokenType.MINUS -> {
-                if (type1 != type2 || !type1.matches(Datakind.INT)) {
-                    throw RuntimeException("Illegal types in subtraction: $type1 and $type2")
+                if (!type1.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG,
+                    Datakind.FLOAT, Datakind.DOUBLE) || !(type1.compatibleWith(type2) || type2.compatibleWith(type1))) {
+                    artError(Errors.IllegalTypesInBinaryOperationError(
+                        binary.operator.lexeme, type1, type2, binary, srcCode
+                    ))
+                    resultType = Datatype.ErrorType()
+                } else {
+                    resultType = getHigherType(type1, type2) ?: throw RuntimeException("unreachable")
                 }
-                resultType = type1
             }
-            TokenType.STAR -> {
-                if (type1 != type2 || !type1.matches(Datakind.INT)) {
-                    throw RuntimeException("Illegal types in multiplication: $type1 and $type2")
+            TokenType.STAR, TokenType.SLASH -> {
+                if (!type1.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG,
+                    Datakind.FLOAT, Datakind.DOUBLE) || !(type1.compatibleWith(type2) || type2.compatibleWith(type1))) {
+                    artError(Errors.IllegalTypesInBinaryOperationError(
+                        binary.operator.lexeme, type1, type2, binary, srcCode
+                    ))
+                    resultType = Datatype.ErrorType()
+                } else {
+                    resultType = getHigherType(type1, type2) ?: throw RuntimeException("unreachable")
                 }
-                resultType = type1
-            }
-            TokenType.SLASH -> {
-                if (type1 != type2 || !type1.matches(Datakind.INT)) {
-                    throw RuntimeException("Illegal types in division: $type1 and $type2")
-                }
-                resultType = type1
             }
             TokenType.MOD -> {
-                if (type1 != type2 || !type1.matches(Datakind.INT)) {
-                    throw RuntimeException("Illegal types in modulo: $type1 and $type2")
+                if (!type1.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG,
+                        Datakind.FLOAT, Datakind.DOUBLE) || !(type1.compatibleWith(type2) || type2.compatibleWith(type1))) {
+                    artError(Errors.IllegalTypesInBinaryOperationError(
+                        binary.operator.lexeme, type1, type2, binary, srcCode
+                    ))
+                    resultType = Datatype.ErrorType()
+                } else {
+                    resultType = getHigherType(type1, type2) ?: throw RuntimeException("unreachable")
                 }
-                resultType = type1
             }
             TokenType.D_EQ, TokenType.NOT_EQ -> {
-                if (type1 != type2) throw RuntimeException("Illegal types in equals: $type1 and $type2")
-                resultType = Datatype.Bool()
+                if (!type1.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG,
+                        Datakind.FLOAT, Datakind.DOUBLE) || type1 != type2) {
+                    artError(Errors.IllegalTypesInBinaryOperationError(
+                        binary.operator.lexeme, type1, type2, binary, srcCode
+                    ))
+                    resultType = Datatype.ErrorType()
+                } else {
+                    resultType = Datatype.Bool()
+                }
             }
             TokenType.D_AND, TokenType.D_OR -> {
                 if (type1 != type2 || !type1.matches(Datakind.BOOLEAN)) {
-                    throw RuntimeException("Illegal types in boolean comparison: $type1 and $type2")
-                }
-                resultType = Datatype.Bool()
+                    artError(Errors.IllegalTypesInBinaryOperationError(
+                        binary.operator.lexeme, type1, type2, binary, srcCode
+                    ))
+                    resultType = Datatype.ErrorType()
+                } else resultType = Datatype.Bool()
             }
             TokenType.GT, TokenType.GT_EQ, TokenType.LT, TokenType.LT_EQ -> {
-                if (type1 != type2 || !type1.matches(Datakind.INT)) {
-                    throw RuntimeException("Illegal types in comparison: $type1 and $type2")
+                if (!type1.matches(
+                        Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG,
+                        Datakind.FLOAT, Datakind.DOUBLE
+                    ) || !type1.compatibleWith(type2)
+                ) {
+                    artError(
+                        Errors.IllegalTypesInBinaryOperationError(
+                            binary.operator.lexeme, type1, type2, binary, srcCode
+                        )
+                    )
+                    resultType = Datatype.ErrorType()
+                } else {
+                    resultType = Datatype.Bool()
                 }
-                resultType = Datatype.Bool()
             }
             else -> throw RuntimeException("unreachable")
         }
@@ -654,7 +695,12 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
     private fun typeNodeToDataType(node: AstNode.DatatypeNode): Datatype = when (node.kind) {
         Datakind.BOOLEAN -> if (node.isArray) Datatype.ArrayType(Datatype.Bool()) else Datatype.Bool()
+        Datakind.BYTE -> if (node.isArray) Datatype.ArrayType(Datatype.Byte()) else Datatype.Byte()
+        Datakind.SHORT -> if (node.isArray) Datatype.ArrayType(Datatype.Short()) else Datatype.Short()
         Datakind.INT -> if (node.isArray) Datatype.ArrayType(Datatype.Integer()) else Datatype.Integer()
+        Datakind.LONG -> if (node.isArray) Datatype.ArrayType(Datatype.Long()) else Datatype.Long()
+        Datakind.FLOAT -> if (node.isArray) Datatype.ArrayType(Datatype.Float()) else Datatype.Float()
+        Datakind.DOUBLE -> if (node.isArray) Datatype.ArrayType(Datatype.Double()) else Datatype.Double()
         Datakind.STRING -> if (node.isArray) Datatype.ArrayType(Datatype.Str()) else Datatype.Str()
         Datakind.OBJECT -> {
             node as AstNode.ObjectTypeNode
@@ -676,9 +722,17 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         else -> throw RuntimeException("unreachable")
     }
 
+    private fun getHigherType(type1: Datatype, type2: Datatype): Datatype? {
+        if (type1.compatibleWith(type2)) return type2
+        if (type2.compatibleWith(type1)) return type1
+        return null
+    }
+
     abstract class Datatype(val kind: Datakind) {
 
         abstract val descriptorType: String
+
+        abstract fun compatibleWith(other: Datatype): Boolean
 
         abstract override fun equals(other: Any?): Boolean
         abstract override fun toString(): String
@@ -692,30 +746,76 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             override val descriptorType: String = "I"
             override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Integer::class
             override fun toString(): String = "int"
+            override fun compatibleWith(other: Datatype): Boolean {
+                return other.kind in arrayOf(Datakind.INT, Datakind.ERROR)
+            }
+        }
+        class Byte : Datatype(Datakind.BYTE) {
+            override val descriptorType: String = "B"
+            override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Byte::class
+            override fun toString(): String = "byte"
+            override fun compatibleWith(other: Datatype): Boolean {
+                return other.kind in arrayOf(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.ERROR)
+            }
+        }
+        class Short : Datatype(Datakind.SHORT) {
+            override val descriptorType: String = "S"
+            override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Short::class
+            override fun toString(): String = "short"
+            override fun compatibleWith(other: Datatype): Boolean {
+                return other.kind in arrayOf(Datakind.SHORT, Datakind.INT, Datakind.ERROR)
+            }
+        }
+        class Long : Datatype(Datakind.LONG) {
+            override val descriptorType: String = "J"
+            override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Long::class
+            override fun toString(): String = "long"
+            override fun compatibleWith(other: Datatype): Boolean {
+                return other.kind in arrayOf(Datakind.LONG, Datakind.ERROR)
+            }
         }
 
         class Float : Datatype(Datakind.FLOAT) {
             override val descriptorType: String = "F"
             override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Float::class
             override fun toString(): String = "float"
+            override fun compatibleWith(other: Datatype): Boolean {
+                return other.kind in arrayOf(Datakind.FLOAT, Datakind.ERROR)
+            }
         }
+        class Double : Datatype(Datakind.DOUBLE) {
+            override val descriptorType: String = "D"
+            override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Double::class
+            override fun toString(): String = "double"
+            override fun compatibleWith(other: Datatype): Boolean {
+                return other.kind in arrayOf(Datakind.DOUBLE, Datakind.ERROR)
+            }
+        }
+
 
         class Bool : Datatype(Datakind.BOOLEAN) {
             override val descriptorType: String = "Z"
             override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Bool::class
             override fun toString(): String = "bool"
+            override fun compatibleWith(other: Datatype): Boolean {
+                return other.kind in arrayOf(Datakind.BOOLEAN, Datakind.ERROR)
+            }
         }
 
         class Str: Datatype(Datakind.STRING) {
             override val descriptorType: String = "Ljava/lang/String;"
             override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Str::class
             override fun toString(): String = "str"
+            override fun compatibleWith(other: Datatype): Boolean {
+                return other.kind in arrayOf(Datakind.STRING, Datakind.ERROR)
+            }
         }
 
         class Void : Datatype(Datakind.VOID) {
             override val descriptorType: String = "V"
             override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Void::class
             override fun toString(): String = "void"
+            override fun compatibleWith(other: Datatype): Boolean = false
         }
 
         class Object(val name: String, val clazz: AstNode.ArtClass) : Datatype(Datakind.OBJECT) {
@@ -724,6 +824,9 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                 return if (other == null) false else other::class == Object::class && name == (other as Object).name
             }
             override fun toString(): String = name
+            override fun compatibleWith(other: Datatype): Boolean {
+                return other.kind in arrayOf(Datakind.OBJECT, Datakind.ERROR)
+            }
         }
 
         class StatClass(val clazz: AstNode.ArtClass) : Datatype(Datakind.STAT_CLASS) {
@@ -735,6 +838,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             }
 
             override fun toString(): String = "Class<${clazz.name.lexeme}>"
+            override fun compatibleWith(other: Datatype): Boolean = false
         }
 
         class ArrayType(val type: Datatype) : Datatype(Datakind.ARRAY) {
@@ -747,13 +851,27 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             override fun toString(): String {
                 return "Array<$type>"
             }
+            override fun compatibleWith(other: Datatype): Boolean {
+                if (other.matches(Datakind.ARRAY)) return type.compatibleWith((other as ArrayType).type)
+                return false
+            }
+        }
+
+        class ErrorType : Datatype(Datakind.ERROR) {
+            override val descriptorType: String = "--ERROR--"
+            override fun compatibleWith(other: Datatype): Boolean = true
+            override fun toString(): String = "--ERROR--"
+            override fun equals(other: Any?): Boolean {
+                return if (other == null) false else other::class == ErrorType::class
+            }
         }
 
     }
 
     enum class Datakind {
-        INT, FLOAT, STRING, VOID, BOOLEAN, OBJECT,
+        INT, LONG, BYTE, SHORT, FLOAT, DOUBLE, STRING, VOID, BOOLEAN, OBJECT,
         ARRAY,
-        STAT_CLASS, STAT_FUNC_REF, AMBIG_STAT_FUNC_REF, FUNC_REF, AMBIG_FUNC_REF
+        ERROR,
+        STAT_CLASS
     }
 }

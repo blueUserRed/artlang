@@ -28,12 +28,12 @@ data class Token(
 }
 
 /**
- * contains all the different type of tokens
+ * contains all the different types of tokens
  */
 enum class TokenType {
 
     //literals
-    INT, FLOAT, STRING, IDENTIFIER, BOOLEAN,
+    BYTE, SHORT, INT, LONG, DOUBLE, FLOAT, STRING, IDENTIFIER, BOOLEAN,
 
     //keywords
     K_FN, K_PRINT, K_CLASS, K_LET, K_CONST,
@@ -52,7 +52,7 @@ enum class TokenType {
 
     SOFT_BREAK, //line break
 
-    T_INT, T_STRING, T_BOOLEAN, //types
+    T_BYTE, T_SHORT, T_INT, T_LONG, T_FLOAT, T_DOUBLE, T_STRING, T_BOOLEAN, //types
 
     EOF
 

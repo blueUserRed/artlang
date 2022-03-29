@@ -50,25 +50,6 @@ object Utils {
         ((s.toInt() shr 0) and 0xFF).toByte(),
     ).toByteArray()
 
-
-    /**
-     * returns a given line form a string
-     */
-    fun getLine(s: String, line: Int): String {
-        var curLine = 1
-        var lineStart = -1
-        if (line == 1) lineStart = 0
-        for (i in s.toCharArray().indices) {
-            if (s[i] != '\n') continue
-            if (lineStart != -1) {
-                return s.substring((lineStart)..(i - System.lineSeparator().length))
-            }
-            curLine++
-            if (curLine == line) lineStart = i + 1
-        }
-        return ""
-    }
-
 }
 
 /**
