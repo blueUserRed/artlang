@@ -382,47 +382,6 @@ object Tokenizer {
         } else {
             artError(Errors.InvalidNumLiteralTypeIdentifier(cur - lastLineBreakPos, curLine, consume(), code))
         }
-
-
-
-//
-//        val start = cur
-//
-//        var radix = 10
-//        if (tryConsume('0')) {
-//            if (tryConsume('b')) radix = 2
-//            else if (tryConsume('o')) radix = 8
-//            else if (tryConsume('x')) radix = 16
-//            else cur--
-//        }
-//
-//        var num = 0L
-//        while(!end() && consume().isLetterOrDigit()) {
-//            num *= radix
-//            try {
-//                num += last().digitToInt(radix)
-//            } catch (e: NumberFormatException) {
-//                cur--
-//                val decNum = num / radix
-//                emit(TokenType.INT, code.substring(start until cur), decNum.toInt(), start - lastLineBreakPos)
-//                return
-//            }
-//        }
-//        cur--
-//
-//        if (end() || radix != 10 || !tryConsume('.')) {
-//            emit(TokenType.INT, code.substring(start until cur), num.toInt(), start - lastLineBreakPos)
-//            return
-//        }
-//
-//        var afterComma = 0.0
-//        var numIts = 1
-//        while(!end() && consume().isDigit()) {
-//            afterComma += last().digitToInt(10) / 10.0.pow(numIts)
-//            numIts++
-//        }
-//        val commaNum = num + afterComma
-//        emit(TokenType.FLOAT, code.substring(start until cur), commaNum.toFloat(), start - lastLineBreakPos)
     }
 
     /**

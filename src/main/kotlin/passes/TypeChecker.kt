@@ -32,9 +32,11 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                 if (type1 == type2 && type1 == Datatype.Str()) {
                     resultType = type1
                 } else {
-                    if (!type1.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG,
-                            Datakind.FLOAT, Datakind.DOUBLE) ||
-                            !(type1.compatibleWith(type2) || type2.compatibleWith(type1))) {
+                    if (
+                        !type1.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG,
+                        Datakind.FLOAT, Datakind.DOUBLE) ||
+                        !(type1.compatibleWith(type2) || type2.compatibleWith(type1))
+                    ) {
                         artError(Errors.IllegalTypesInBinaryOperationError(
                             binary.operator.lexeme, type1, type2, binary, srcCode
                         ))
@@ -240,12 +242,13 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     override fun visit(varDec: AstNode.VariableDeclaration): Datatype {
         val type = check(varDec.initializer, varDec)
         if (type == Datatype.Void()) throw RuntimeException("Expected Expression in var initializer")
+        var type2: Datatype? = null
         if (varDec.explType != null) {
-            val type2 = typeNodeToDataType(varDec.explType!!)
-            if (type2 != type) throw RuntimeException("Incompatible types in declaration: $type2 and $type")
+            type2 = typeNodeToDataType(varDec.explType!!)
+            if (!type.compatibleWith(type2)) throw RuntimeException("Incompatible types in declaration: $type2 and $type")
         }
-        vars[varDec.index] = type
-        varDec.varType = type
+        vars[varDec.index] = type2 ?: type
+        varDec.varType = type2 ?: type
 
         return Datatype.Void()
     }
@@ -266,7 +269,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                         throw RuntimeException("can only get from array")
                     }
                     varType as Datatype.ArrayType
-                    if (varType.type != typeToAssign) {
+                    if (!typeToAssign.compatibleWith(varType.type)) {
                         throw RuntimeException("incompatible types in array set: ${varType.type} and $typeToAssign")
                     }
                     varAssign.type = if (varAssign.isWalrus) varType.type else Datatype.Void()
@@ -483,7 +486,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
     override fun visit(returnStmt: AstNode.Return): Datatype {
         val type = returnStmt.toReturn?.let { check(it, returnStmt) } ?: Datatype.Void()
-        if (curFunction.functionDescriptor.returnType != type) {
+        if (!type.compatibleWith(curFunction.functionDescriptor.returnType)) {
             throw RuntimeException("incompatible return types: $type and ${curFunction.functionDescriptor.returnType}")
         }
         return type
@@ -715,9 +718,13 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     }
 
     private fun getDatatypeFromToken(token: TokenType) = when (token) {
+        TokenType.BYTE -> Datatype.Byte()
+        TokenType.SHORT -> Datatype.Short()
         TokenType.INT -> Datatype.Integer()
-        TokenType.STRING -> Datatype.Str()
+        TokenType.LONG -> Datatype.Long()
         TokenType.FLOAT -> Datatype.Float()
+        TokenType.DOUBLE -> Datatype.Double()
+        TokenType.STRING -> Datatype.Str()
         TokenType.BOOLEAN -> Datatype.Bool()
         else -> throw RuntimeException("unreachable")
     }
@@ -747,7 +754,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Integer::class
             override fun toString(): String = "int"
             override fun compatibleWith(other: Datatype): Boolean {
-                return other.kind in arrayOf(Datakind.INT, Datakind.ERROR)
+                return other.kind in arrayOf(Datakind.INT, Datakind.FLOAT, Datakind.ERROR)
             }
         }
         class Byte : Datatype(Datakind.BYTE) {
@@ -755,7 +762,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Byte::class
             override fun toString(): String = "byte"
             override fun compatibleWith(other: Datatype): Boolean {
-                return other.kind in arrayOf(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.ERROR)
+                return other.kind in arrayOf(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.FLOAT, Datakind.ERROR)
             }
         }
         class Short : Datatype(Datakind.SHORT) {
@@ -763,7 +770,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Short::class
             override fun toString(): String = "short"
             override fun compatibleWith(other: Datatype): Boolean {
-                return other.kind in arrayOf(Datakind.SHORT, Datakind.INT, Datakind.ERROR)
+                return other.kind in arrayOf(Datakind.SHORT, Datakind.INT, Datakind.FLOAT, Datakind.ERROR)
             }
         }
         class Long : Datatype(Datakind.LONG) {
@@ -852,7 +859,8 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                 return "Array<$type>"
             }
             override fun compatibleWith(other: Datatype): Boolean {
-                if (other.matches(Datakind.ARRAY)) return type.compatibleWith((other as ArrayType).type)
+                if (other.matches(Datakind.ERROR)) return true
+                if (other.matches(Datakind.ARRAY)) return type == (other as ArrayType).type
                 return false
             }
         }

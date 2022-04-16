@@ -458,19 +458,34 @@ object Parser {
         if (match(TokenType.IDENTIFIER)) return AstNode.Get(last(), null)
         if (match(TokenType.L_PAREN)) return groupExpression()
         if (match(TokenType.L_BRACKET)) return parseArrayLiteral()
-        if (match(TokenType.T_INT, TokenType.T_BOOLEAN, TokenType.T_BOOLEAN)) {
+
+        if (match(
+                TokenType.T_BYTE,
+                TokenType.T_SHORT,
+                TokenType.T_INT,
+                TokenType.T_LONG,
+                TokenType.T_FLOAT,
+                TokenType.T_DOUBLE,
+                TokenType.T_BOOLEAN,
+                TokenType.T_STRING
+        )) {
             val primitive = last()
             consumeOrError(TokenType.L_BRACKET, "Expected array initializer")
             val amount = parseStatement()
             consumeOrError(TokenType.R_BRACKET, "Expected closing bracket for array initializer")
-            return AstNode.ArrayCreate(AstNode.PrimitiveTypeNode(when (primitive.tokenType) {
-                TokenType.T_INT -> Datakind.INT
-                TokenType.T_BOOLEAN -> Datakind.BOOLEAN
-                TokenType.T_STRING -> Datakind.STRING
-                else -> TODO("not yet implemented")
-            }), amount)
+            return AstNode.ArrayCreate(AstNode.PrimitiveTypeNode(tokenTypeToDataKind(primitive.tokenType)), amount)
         }
-        if (!match(TokenType.INT, TokenType.FLOAT, TokenType.STRING, TokenType.BOOLEAN)) {
+
+        if (!match(
+                TokenType.BYTE,
+                TokenType.SHORT,
+                TokenType.INT,
+                TokenType.LONG,
+                TokenType.FLOAT,
+                TokenType.DOUBLE,
+                TokenType.STRING,
+                TokenType.BOOLEAN
+        )) {
             artError(Errors.SyntaxError(consume(), "Expected a statement, got ${last().lexeme}", srcCode))
             throw ParserResyncException()
         }
@@ -547,16 +562,7 @@ object Parser {
             TokenType.T_STRING
         )
         if (match(*primitives)) {
-            return AstNode.PrimitiveTypeNode(when (last().tokenType) {
-                TokenType.T_BYTE -> Datakind.BYTE
-                TokenType.T_SHORT -> Datakind.SHORT
-                TokenType.T_INT -> Datakind.INT
-                TokenType.T_LONG -> Datakind.LONG
-                TokenType.T_FLOAT -> Datakind.FLOAT
-                TokenType.T_BOOLEAN -> Datakind.BOOLEAN
-                TokenType.T_STRING -> Datakind.STRING
-                else -> throw RuntimeException("unreachable")
-            }).apply {
+            return AstNode.PrimitiveTypeNode(tokenTypeToDataKind(last().tokenType)).apply {
                 if (matchNSFB(TokenType.L_BRACKET)) {
                     consumeOrError(TokenType.R_BRACKET, "expected closing bracket")
                     isArray = true
@@ -570,6 +576,17 @@ object Parser {
             return AstNode.ObjectTypeNode(token).apply { isArray = true }
         }
         return AstNode.ObjectTypeNode(last())
+    }
+
+    private fun tokenTypeToDataKind(type: TokenType) = when (type) {
+        TokenType.T_BYTE -> Datakind.BYTE
+        TokenType.T_SHORT -> Datakind.SHORT
+        TokenType.T_INT -> Datakind.INT
+        TokenType.T_LONG -> Datakind.LONG
+        TokenType.T_FLOAT -> Datakind.FLOAT
+        TokenType.T_BOOLEAN -> Datakind.BOOLEAN
+        TokenType.T_STRING -> Datakind.STRING
+        else -> throw RuntimeException("invalid type")
     }
 
     private fun match(vararg types: TokenType): Boolean {

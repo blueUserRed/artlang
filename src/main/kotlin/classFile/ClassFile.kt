@@ -95,6 +95,17 @@ class ClassFileBuilder {
     }
 
     /**
+     * adds a float info to the constant pool and returns its index
+     */
+    fun floatInfo(f: Float): Int {
+        val toAdd = ConstantFloatInfo(f)
+        val find = findInfo(toAdd)
+        if (find != null) return find + 1
+        constantPool.add(toAdd)
+        return constantPool.size
+    }
+
+    /**
      * adds a fieldRef info to the constant pool and returns its index
      */
     fun fieldRefInfo(classIndex: Int, nameAndTypeIndex: Int): Int {
@@ -367,6 +378,23 @@ class ConstantIntegerInfo(val i: Int) : ConstantInfo(3) {
         if (other == null || this::class != other::class) return false
         other as ConstantIntegerInfo
         return other.i == this.i
+    }
+}
+
+/**
+ * represents a float info
+ */
+class ConstantFloatInfo(val f: Float) : ConstantInfo(4) {
+
+    override fun toBytes(): ByteArray = Utils.arrayConcat(
+        arrayOf(tag).toByteArray(),
+        Utils.getIntAsBytes(f.toRawBits())
+    )
+
+    override fun equals(other: Any?): Boolean {
+        if (other == null || this::class != other::class) return false
+        other as ConstantFloatInfo
+        return other.f == this.f
     }
 }
 
