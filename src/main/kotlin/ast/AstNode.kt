@@ -181,8 +181,12 @@ abstract class AstNode {
         val staticFuncs: MutableList<Function>,
         val funcs: MutableList<Function>,
         val staticFields: MutableList<FieldDeclaration>,
-        val fields: MutableList<FieldDeclaration>
+        val fields: MutableList<FieldDeclaration>,
+        val extends: Token?,
+        val interfaces: List<Token>
     ) : AstNode() {
+
+
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (to is Function) for (i in staticFuncs.indices) if (staticFuncs[i] === orig) {

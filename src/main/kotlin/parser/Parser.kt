@@ -112,6 +112,21 @@ object Parser {
     private fun parseClass(classModifiers: List<Token>): AstNode.ArtClass {
         consumeOrError(TokenType.IDENTIFIER, "Expected class name")
         val name = last()
+
+        var extends: Token? = null
+        if (match(TokenType.COLON)) {
+            consumeOrError(TokenType.IDENTIFIER, "Expected name of class to extend")
+            extends = last()
+        }
+
+        val interfaces = mutableListOf<Token>()
+        if (match(TokenType.TILDE)) {
+            while (match(TokenType.IDENTIFIER)) {
+                interfaces.add(last())
+                if (!match(TokenType.COMMA)) break
+            }
+        }
+
         consumeOrError(TokenType.L_BRACE, "Expected opening brace after class definition")
 
         val funcs = mutableListOf<AstNode.Function>()
@@ -147,7 +162,7 @@ object Parser {
             continue
         }
 
-        return AstNode.ArtClass(name, staticFuncs, funcs, staticFields, fields)
+        return AstNode.ArtClass(name, staticFuncs, funcs, staticFields, fields, extends, interfaces)
     }
 
     private fun resyncClass() {

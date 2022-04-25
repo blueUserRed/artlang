@@ -157,6 +157,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
     private fun preCalcClasses(clazzes: List<AstNode.ArtClass>) {
         val names = mutableListOf<String>()
+
         for (clazz in clazzes) {
             if (clazz.name.lexeme in names) throw RuntimeException("duplicate definition of class ${clazz.name.lexeme}")
             names.add(clazz.name.lexeme)
