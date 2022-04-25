@@ -167,7 +167,7 @@ class VariableResolver : AstNodeVisitor<Unit> {
         for (arg in constructorCall.arguments) resolve(arg, constructorCall)
     }
 
-    override fun visit(field: AstNode.FieldDeclaration) {
+    override fun visit(field: AstNode.Field) {
         resolve(field.initializer, field)
     }
 

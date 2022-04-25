@@ -1,9 +1,9 @@
 package ast
 
 import tokenizer.Token
-import passes.TypeChecker.Datatype
+import Datatype
+import Datakind
 import tokenizer.TokenType
-import passes.TypeChecker.Datakind
 
 /**
  * The **A**bstract **S**yntax **T**ree is an abstract representation of the program in form of tree. All nodes of the
@@ -49,19 +49,63 @@ abstract class AstNode {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
+    abstract class Function(
+
+    ) : AstNode() {
+
+        /**
+         * the name of the Function
+         */
+        abstract val name: String
+
+        /**
+         * The descriptor of the function containing the actual arg-types and the return type
+         */
+        abstract val functionDescriptor: FunctionDescriptor
+
+        /**
+         * true if the function is static
+         */
+        abstract val isStatic: Boolean
+
+        /**
+         * true if the function is defined in the topLevel
+         */
+        abstract val isTopLevel: Boolean
+
+        /**
+         * true if the function is private
+         */
+        abstract val isPrivate: Boolean
+
+        /**
+         * the class containing the function; null if the function is defined in the topLevel
+         */
+        abstract var clazz: ArtClass?
+    }
+
     /**
      * represents a function definition
      * @param statements the body of the function
-     * @param name the name of the function
      * @param modifiers the modifiers of the function
      * @param isTopLevel true if the function is defined in the toplevel
      */
-    class Function(
+    class FunctionDeclaration(
         var statements: Block,
-        val name: Token,
+        val nameToken: Token,
         val modifiers: List<Token>,
-        val isTopLevel: Boolean
-    ) : AstNode() {
+        override val isTopLevel: Boolean
+    ) : Function() {
+
+        override val name: String = nameToken.lexeme
+
+        /**
+         * used to set [functionDescriptor]
+         */
+        lateinit var _functionDescriptor: FunctionDescriptor
+
+        override val functionDescriptor: FunctionDescriptor
+            get() = _functionDescriptor
 
         /**
          * the maximum amount of locals used by the function (corresponds to the maxLocals property on the jvm)
@@ -87,25 +131,18 @@ abstract class AstNode {
         var returnType: DatatypeNode? = null
 
         /**
-         * The descriptor of the function containing the actual arg-types and the return type
-         * (instead of just type-nodes)
-         *
-         * set by the TypeChecker
-         */
-        lateinit var functionDescriptor: FunctionDescriptor
-
-        /**
          * the class in which the function is defined. null if the function is defined in the top level
          *
          * set by the variable resolver
          */
-        var clazz: ArtClass? = null
+        override var clazz: ArtClass? = null
 
         /**
          * true if the function is static
          */
-        val isStatic: Boolean
+        override val isStatic: Boolean
             get() {
+                if (isTopLevel) return true
                 for (modifier in modifiers) {
                     if (modifier.tokenType == TokenType.IDENTIFIER && modifier.lexeme == "static") return true
                 }
@@ -115,7 +152,7 @@ abstract class AstNode {
         /**
          * true if the function is private
          */
-        val isPrivate: Boolean
+        override val isPrivate: Boolean
             get() {
                 for (modifier in modifiers) {
                     if (modifier.tokenType == TokenType.IDENTIFIER && modifier.lexeme == "public") return false
@@ -127,7 +164,7 @@ abstract class AstNode {
          * true if the function has a this-argument
          */
         val hasThis: Boolean
-            get() = !isStatic && !isTopLevel
+            get() = !isStatic
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (statements !== orig || to !is Block) throw CantSwapException()
@@ -146,7 +183,7 @@ abstract class AstNode {
     class Program(
         val funcs: MutableList<Function>,
         val classes: MutableList<ArtClass>,
-        val fields: MutableList<FieldDeclaration>
+        val fields: MutableList<Field>
     ) : AstNode() {
 
         override fun swap(orig: AstNode, to: AstNode) {
@@ -158,7 +195,7 @@ abstract class AstNode {
                 classes[i] = to
                 return
             }
-            if (to is FieldDeclaration) for (i in fields.indices) if (fields[i] === orig) {
+            if (to is Field) for (i in fields.indices) if (fields[i] === orig) {
                 fields[i] = to
                 return
             }
@@ -169,24 +206,55 @@ abstract class AstNode {
     }
 
     /**
+     * @param staticFuncs the static functions that are contained in this class
+     * @param funcs the non-static functions that are contained in this class
+     * @param staticFields the static fields that are contained in this class
+     * @param fields the non-static fields that are contained in this class
+     */
+    abstract class ArtClass(
+        val staticFuncs: MutableList<Function>,
+        val funcs: MutableList<Function>,
+        val staticFields: MutableList<Field>,
+        val fields: MutableList<Field>,
+    ) : AstNode() {
+
+        /**
+         * the name of the class
+         */
+        abstract val name: String
+
+        /**
+         * the superClass of this class
+         */
+        abstract val extends: ArtClass?
+    }
+
+    /**
      * represents a class
      * @param name the name of the class
      * @param staticFuncs the static functions that are contained in this class
      * @param funcs the non-static functions that are contained in this class
      * @param staticFields the static fields that are contained in this class
      * @param fields the non-static fields that are contained in this class
+     * @param extendsToken the with the name of the extending class; null if none
+//     * @param interfaces the list containing all implemented interfaces
      */
-    class ArtClass(
-        val name: Token,
-        val staticFuncs: MutableList<Function>,
-        val funcs: MutableList<Function>,
-        val staticFields: MutableList<FieldDeclaration>,
-        val fields: MutableList<FieldDeclaration>,
-        val extends: Token?,
-        val interfaces: List<Token>
-    ) : AstNode() {
+    class ClassDefinition(
+        val nameToken: Token,
+        staticFuncs: MutableList<Function>,
+        funcs: MutableList<Function>,
+        staticFields: MutableList<Field>,
+        fields: MutableList<Field>,
+        val extendsToken: Token?,
+//        val interfaces: List<Token>
+    ) : ArtClass(staticFuncs, funcs, staticFields, fields) {
 
+        override val name: String = nameToken.lexeme
 
+        lateinit var _extends: ArtClass // necessary to allow setting extends
+
+        override val extends: ArtClass
+            get() = _extends
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (to is Function) for (i in staticFuncs.indices) if (staticFuncs[i] === orig) {
@@ -197,11 +265,11 @@ abstract class AstNode {
                 funcs[i] = to
                 return
             }
-            if (to is FieldDeclaration) for (i in fields.indices) if (fields[i] === orig) {
+            if (to is Field) for (i in fields.indices) if (fields[i] === orig) {
                 fields[i] = to
                 return
             }
-            if (to is FieldDeclaration) for (i in staticFields.indices) if (staticFields[i] === orig) {
+            if (to is Field) for (i in staticFields.indices) if (staticFields[i] === orig) {
                 staticFields[i] = to
                 return
             }
@@ -556,7 +624,7 @@ abstract class AstNode {
          *
          * set by the typeChecker
          */
-        var fieldDef: FieldDeclaration? = null
+        var fieldDef: Field? = null
 
         /**
          * if the get-target is array, this represents the index into the array
@@ -629,9 +697,46 @@ abstract class AstNode {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
+    abstract class Field : AstNode() {
+
+        /**
+         * the name of the field
+         */
+        abstract val name: String
+
+        /**
+         * true if the field is static
+         */
+        abstract val isStatic: Boolean
+
+        /**
+         * true if the field is private
+         */
+        abstract val isPrivate: Boolean
+
+        /**
+         * true if the field is defined in the topLevel
+         */
+        abstract val isTopLevel: Boolean
+
+        /**
+         * the type of the value stored in the field
+         */
+        abstract val fieldType: Datatype
+
+        /**
+         * true if the field is const and can't be reassigned
+         */
+        abstract val isConst: Boolean
+
+        /**
+         * the class in which the field is defined; null if it is defined in the top level
+         */
+        abstract var clazz: ArtClass?
+    }
+
     /**
      * represents a field declaration
-     * @param name the name of the field
      * @param explType the explicit type (node) of the field
      * @param initializer the initializer that initializes the field with a value
      * @param isConst true if the field is constant
@@ -639,18 +744,17 @@ abstract class AstNode {
      * @param isTopLevel true if the field was declared in the top level
      */
     class FieldDeclaration(
-        val name: Token,
+        val nameToken: Token,
         val explType: DatatypeNode,
         var initializer: AstNode,
-        val isConst: Boolean,
+        override val isConst: Boolean,
         val modifiers: List<Token>,
-        val isTopLevel: Boolean
-    ) : AstNode() {
+        override val isTopLevel: Boolean
+    ) : Field() {
 
-        /**
-         * true if the field is static
-         */
-        val isStatic: Boolean
+        override val name: String = nameToken.lexeme
+
+        override val isStatic: Boolean
             get() {
                 for (modifier in modifiers) {
                     if (modifier.tokenType == TokenType.IDENTIFIER && modifier.lexeme == "static") return true
@@ -658,10 +762,7 @@ abstract class AstNode {
                 return false
             }
 
-        /**
-         * true if the field is private
-         */
-        val isPrivate: Boolean
+        override val isPrivate: Boolean
             get() {
                 for (modifier in modifiers) {
                     if (modifier.tokenType == TokenType.IDENTIFIER && modifier.lexeme == "public") return false
@@ -669,15 +770,12 @@ abstract class AstNode {
                 return true
             }
 
-        /**
-         * the type of the field
-         */
-        var fieldType: Datatype = Datatype.Void()
+        lateinit var _fieldType: Datatype
 
-        /**
-         * the class in which the field is defined; null if it is defined in the top level
-         */
-        var clazz: ArtClass? = null
+        override val fieldType: Datatype
+            get() = _fieldType
+
+        override var clazz: ArtClass? = null
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (initializer !== orig) throw CantSwapException()
@@ -780,6 +878,12 @@ data class FunctionDescriptor(val args: MutableList<Pair<String, Datatype>>, val
     fun matches(desc: FunctionDescriptor): Boolean {
         if (desc.args.size != args.size) return false
         for (i in desc.args.indices) if (desc.args[i].second != args[i].second) return false
+        return true
+    }
+
+    fun matches(other: List<Datatype>): Boolean {
+        if (other.size != args.size) return false
+        for (i in other.indices) if (other[i] != args[i].second) return false
         return true
     }
 

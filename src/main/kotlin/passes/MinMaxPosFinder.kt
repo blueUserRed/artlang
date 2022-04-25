@@ -105,7 +105,7 @@ class MinMaxPosFinder : AstNodeVisitor<MutableMap<Int, Pair<Int, Int>>> {
             *Array(constructorCall.arguments.size) { find(constructorCall.arguments[it]) })
     }
 
-    override fun visit(field: AstNode.FieldDeclaration): MutableMap<Int, Pair<Int, Int>> {
+    override fun visit(field: AstNode.Field): MutableMap<Int, Pair<Int, Int>> {
         return combine(*Array(field.modifiers.size) { getMinMaxFor(field.modifiers[it]) }, find(field.initializer))
     }
 

@@ -13,7 +13,6 @@ import passes.TypeChecker.Datatype
 import tokenizer.TokenType
 import java.io.File
 import java.util.*
-import javax.xml.crypto.Data
 
 /**
  * compiles the AST into a binary class file
@@ -492,7 +491,7 @@ class Compiler : AstNodeVisitor<Unit> {
     /**
      * compiles the non-static fields of the current class. Sets [init]
      */
-    private fun doNonStaticFields(fields: List<AstNode.FieldDeclaration>) {
+    private fun doNonStaticFields(fields: List<AstNode.Field>) {
         if (fields.isEmpty()) return
         emitterTarget = init
         for (field in fields) compile(field, true)
@@ -501,7 +500,7 @@ class Compiler : AstNodeVisitor<Unit> {
     /**
      * compiles the non-static fields of the current class. Sets [clinit]
      */
-    private fun doStaticFields(fields: List<AstNode.FieldDeclaration>) {
+    private fun doStaticFields(fields: List<AstNode.Field>) {
         if (fields.isEmpty()) return
         emitterTarget = clinit
         for (field in fields) compile(field, true)
@@ -1035,7 +1034,7 @@ class Compiler : AstNodeVisitor<Unit> {
     /**
      * assumes [emitterTarget] is set correctly
      */
-    override fun visit(field: AstNode.FieldDeclaration) {
+    override fun visit(field: AstNode.Field) {
         val fieldToAdd = Field(
             file.utf8Info(field.name.lexeme),
             file.utf8Info(field.fieldType.descriptorType)

@@ -22,7 +22,7 @@ object Parser {
 
         val functions = mutableListOf<AstNode.Function>()
         val classes = mutableListOf<AstNode.ArtClass>()
-        val fields = mutableListOf<AstNode.FieldDeclaration>()
+        val fields = mutableListOf<AstNode.Field>()
         while (!match(TokenType.EOF)) try {
 
             val modifiers = parseModifiers()
@@ -64,14 +64,14 @@ object Parser {
     }
 
     private fun parseFieldDeclaration(modifiers: List<Token>, isConst: Boolean, isTopLevel: Boolean)
-    : AstNode.FieldDeclaration {
+    : AstNode.Field {
         consumeOrError(TokenType.IDENTIFIER, "expected name")
         val name = last()
         consumeOrError(TokenType.COLON, "Field-definitions always require a explicit type")
         val type = parseType()
         consumeOrError(TokenType.EQ, "")
         val initializer = parseStatement()
-        return AstNode.FieldDeclaration(name, type, initializer, isConst, modifiers, isTopLevel)
+        return AstNode.Field(name, type, initializer, isConst, modifiers, isTopLevel)
     }
 
     private fun parseFunc(modifiers: List<Token>, isTopLevel: Boolean): AstNode.Function {
@@ -131,8 +131,8 @@ object Parser {
 
         val funcs = mutableListOf<AstNode.Function>()
         val staticFuncs = mutableListOf<AstNode.Function>()
-        val fields = mutableListOf<AstNode.FieldDeclaration>()
-        val staticFields = mutableListOf<AstNode.FieldDeclaration>()
+        val fields = mutableListOf<AstNode.Field>()
+        val staticFields = mutableListOf<AstNode.Field>()
 
         while (!match(TokenType.R_BRACE)) try {
             val modifiers = parseModifiers()

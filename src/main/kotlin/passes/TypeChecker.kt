@@ -1,13 +1,11 @@
 package passes
 
-import ast.AstNode
-import ast.AstNodeVisitor
-import ast.AstPrinter
-import ast.FunctionDescriptor
+import Datatype
+import Datakind
+import ast.*
 import errors.Errors
 import errors.artError
 import tokenizer.TokenType
-import passes.TypeChecker.Datatype
 import tokenizer.Token
 import kotlin.RuntimeException
 
@@ -133,10 +131,12 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     }
 
     override fun visit(function: AstNode.Function): Datatype {
+        function as AstNode.FunctionDeclaration
+
         curFunction = function
 
         val newVars = mutableMapOf<Int, Datatype>()
-        if (function.hasThis) newVars[0] = Datatype.Object(curClass!!.name.lexeme, curClass!!)
+        if (function.hasThis) newVars[0] = Datatype.Object(curClass!!.name, curClass!!)
         for (i in function.functionDescriptor.args.indices) newVars[i] = function.functionDescriptor.args[i].second
         vars = newVars
         function.clazz = curClass
@@ -158,9 +158,9 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     private fun preCalcClasses(clazzes: List<AstNode.ArtClass>) {
         val names = mutableListOf<String>()
 
-        for (clazz in clazzes) {
-            if (clazz.name.lexeme in names) throw RuntimeException("duplicate definition of class ${clazz.name.lexeme}")
-            names.add(clazz.name.lexeme)
+        for (clazz in clazzes) if (clazz !is SyntClass) {
+            if (clazz.name in names) throw RuntimeException("duplicate definition of class ${clazz.name}")
+            names.add(clazz.name)
             preCalcFields(clazz.fields, clazz)
             preCalcFields(clazz.staticFields, clazz)
             preCalcFuncs(clazz.staticFuncs, clazz)
@@ -169,16 +169,17 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     }
 
     private fun preCalcFuncs(funcs: List<AstNode.Function>, clazz: AstNode.ArtClass?) {
-        for (func in funcs) {
+        for (func in funcs) if (func !is SyntheticNode) {
+            func as AstNode.FunctionDeclaration
             curFunction = func
             func.clazz = clazz
             val args = mutableListOf<Pair<String, Datatype>>()
-            if (func.hasThis) args.add(Pair("this", Datatype.Object(clazz!!.name.lexeme, clazz)))
+            if (func.hasThis) args.add(Pair("this", Datatype.Object(clazz!!.name, clazz)))
             for (arg in func.args) args.add(Pair(arg.first.lexeme, typeNodeToDataType(arg.second)))
 
             val returnType = func.returnType?.let { typeNodeToDataType(it) } ?: Datatype.Void()
-            func.functionDescriptor = FunctionDescriptor(args, returnType)
-            if (func.name.lexeme == "main") {
+            func._functionDescriptor = FunctionDescriptor(args, returnType)
+            if (func.name == "main") {
                 if (clazz != null) throw RuntimeException("main function can only be in top level")
                 if (func.functionDescriptor.args.isNotEmpty()) {
                     throw RuntimeException("main function cant take any arguments")
@@ -189,21 +190,22 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             }
         }
         for (func1 in funcs) for (func2 in funcs) if (func1 !== func2) {
-            if (func1.name.lexeme == func2.name.lexeme && func1.functionDescriptor.matches(func2.functionDescriptor)) {
-                throw RuntimeException("Duplicate definiation of function ${func1.name.lexeme}" +
+            if (func1.name == func2.name && func1.functionDescriptor.matches(func2.functionDescriptor)) {
+                throw RuntimeException("Duplicate definiation of function ${func1.name}" +
                         func1.functionDescriptor.getDescriptorString()
                 )
             }
         }
     }
 
-    private fun preCalcFields(fields: List<AstNode.FieldDeclaration>, clazz: AstNode.ArtClass?) {
+    private fun preCalcFields(fields: List<AstNode.Field>, clazz: AstNode.ArtClass?) {
         val names = mutableListOf<String>()
-        for (field in fields) {
-            if (field.name.lexeme in names) throw RuntimeException("duplicate definition of field ${field.name.lexeme}")
-            names.add(field.name.lexeme)
+        for (field in fields) if (field !is SyntheticNode) {
+            field as AstNode.FieldDeclaration
+            if (field.name in names) throw RuntimeException("duplicate definition of field ${field.name}")
+            names.add(field.name)
             val explType = typeNodeToDataType(field.explType)
-            field.fieldType = explType
+            field._fieldType = explType
             field.clazz = clazz
         }
     }
@@ -281,7 +283,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                 varAssign.type = if (varAssign.isWalrus) varType else Datatype.Void()
                 return varAssign.type
             }
-            for (field in curProgram.fields) if (field.name.lexeme == varAssign.name.name.lexeme) {
+            for (field in curProgram.fields) if (field.name == varAssign.name.name.lexeme) {
                 varAssign.name.fieldDef = field
                 varAssign.name.type = field.fieldType
 
@@ -312,10 +314,10 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
             Datakind.STAT_CLASS -> {
                 from as Datatype.StatClass
-                for (field in from.clazz.staticFields) if (field.name.lexeme == varAssign.name.name.lexeme) {
-                    if (field.isConst) throw RuntimeException("tried to assign to constant field ${field.name.lexeme}")
+                for (field in from.clazz.staticFields) if (field.name == varAssign.name.name.lexeme) {
+                    if (field.isConst) throw RuntimeException("tried to assign to constant field ${field.name}")
                     if (field.isPrivate && curClass !== field.clazz) {
-                        throw RuntimeException("field ${field.name.lexeme} is private")
+                        throw RuntimeException("field ${field.name} is private")
                     }
                     varAssign.name.fieldDef = field
                     varAssign.name.type = field.fieldType
@@ -343,10 +345,10 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
             Datakind.OBJECT -> {
                 from as Datatype.Object
-                for (field in from.clazz.fields) if (field.name.lexeme == varAssign.name.name.lexeme) {
-                    if (field.isConst) throw RuntimeException("tried to assign to constant field ${field.name.lexeme}")
+                for (field in from.clazz.fields) if (field.name == varAssign.name.name.lexeme) {
+                    if (field.isConst) throw RuntimeException("tried to assign to constant field ${field.name}")
                     if (field.isPrivate && curClass !== field.clazz) {
-                        throw RuntimeException("field ${field.name.lexeme} is private")
+                        throw RuntimeException("field ${field.name} is private")
                     }
                     varAssign.name.fieldDef = field
                     varAssign.name.type = field.fieldType
@@ -419,29 +421,29 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
         if (funcCall.func.from == null) {
             if (curClass != null) for (func in curClass!!.staticFuncs) {
-                if (func.name.lexeme != funcCall.func.name.lexeme) continue
+                if (func.name != funcCall.func.name.lexeme) continue
                 if (!doFuncSigsMatch(thisSig, func.functionDescriptor.args)) continue
                 funcCall.definition = func
                 funcCall.type = func.functionDescriptor.returnType
                 return funcCall.type
             }
-            for (func in curProgram.funcs) if (func.name.lexeme == funcCall.func.name.lexeme) {
+            for (func in curProgram.funcs) if (func.name == funcCall.func.name.lexeme) {
                 if (!doFuncSigsMatch(thisSig, func.functionDescriptor.args)) continue
                 funcCall.definition = func
                 funcCall.type = func.functionDescriptor.returnType
                 return funcCall.type
             }
-            if (curClass != null && funcCall.func.name.lexeme == curClass!!.name.lexeme) {
+            if (curClass != null && funcCall.func.name.lexeme == curClass!!.name) {
                 if (funcCall.arguments.size != 0) TODO("constructor calls with arguments are not yet implemented")
                 val toSwap = AstNode.ConstructorCall(curClass!!, funcCall.arguments, funcCall.func)
-                toSwap.type = Datatype.Object(curClass!!.name.lexeme, curClass!!)
+                toSwap.type = Datatype.Object(curClass!!.name, curClass!!)
                 swap = toSwap
                 return toSwap.type
             }
-            for (clazz in curProgram.classes) if (clazz.name.lexeme == funcCall.func.name.lexeme) {
+            for (clazz in curProgram.classes) if (clazz.name == funcCall.func.name.lexeme) {
                 if (funcCall.arguments.size != 0) TODO("constructor calls with arguments are not yet implemented")
                 val toSwap = AstNode.ConstructorCall(clazz, funcCall.arguments, funcCall.func)
-                toSwap.type = Datatype.Object(clazz.name.lexeme, clazz)
+                toSwap.type = Datatype.Object(clazz.name, clazz)
                 swap = toSwap
                 return toSwap.type
             }
@@ -454,10 +456,10 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
             Datakind.STAT_CLASS -> {
                 from as Datatype.StatClass
-                for (func in from.clazz.staticFuncs) if (func.name.lexeme == funcCall.func.name.lexeme) {
+                for (func in from.clazz.staticFuncs) if (func.name == funcCall.func.name.lexeme) {
                     if (!doFuncSigsMatch(thisSig, func.functionDescriptor.args)) continue
                     if (func.isPrivate && curClass !== func.clazz) {
-                        throw RuntimeException("cant call private function ${func.name.lexeme}")
+                        throw RuntimeException("cant call private function ${func.name}")
                     }
                     funcCall.definition = func
                     funcCall.type = func.functionDescriptor.returnType
@@ -468,10 +470,10 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
             Datakind.OBJECT -> {
                 from as Datatype.Object
-                for (func in from.clazz.funcs) if (func.name.lexeme == funcCall.func.name.lexeme) {
+                for (func in from.clazz.funcs) if (func.name == funcCall.func.name.lexeme) {
                     if (!doFuncSigsMatch(thisSig, func.functionDescriptor.args)) continue
                     if (func.isPrivate && curClass !== func.clazz) {
-                        throw RuntimeException("cant call private function ${func.name.lexeme}")
+                        throw RuntimeException("cant call private function ${func.name}")
                     }
                     funcCall.definition = func
                     funcCall.type = func.functionDescriptor.returnType
@@ -539,7 +541,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         }
 
         if (get.from == null) {
-            for (c in curProgram.classes) if (c.name.lexeme == get.name.lexeme) {
+            for (c in curProgram.classes) if (c.name == get.name.lexeme) {
 
                 if (arrIndexType != null) {
                     val toSwap = AstNode.ArrayCreate(AstNode.ObjectTypeNode(get.name), get.arrIndex!!)
@@ -551,7 +553,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                 get.type = Datatype.StatClass(c)
                 return get.type
             }
-            for (field in curProgram.fields) if (field.name.lexeme == get.name.lexeme) {
+            for (field in curProgram.fields) if (field.name == get.name.lexeme) {
                 get.fieldDef = field
 
                 if (arrIndexType != null) {
@@ -566,7 +568,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                 return get.type
             }
             if (curClass != null) for (field in curClass!!.staticFields) {
-                if (field.name.lexeme != get.name.lexeme) continue
+                if (field.name != get.name.lexeme) continue
                 get.fieldDef = field
 
                 if (arrIndexType != null) {
@@ -594,9 +596,9 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
             Datakind.STAT_CLASS -> {
                 from as Datatype.StatClass
-                for (field in from.clazz.staticFields) if (field.name.lexeme == get.name.lexeme) {
+                for (field in from.clazz.staticFields) if (field.name == get.name.lexeme) {
                     if (field.isPrivate && curClass !== field.clazz) {
-                        throw RuntimeException("static field ${field.name.lexeme} is private")
+                        throw RuntimeException("static field ${field.name} is private")
                     }
                     get.fieldDef = field
 
@@ -611,14 +613,14 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                     get.type = field.fieldType
                     return get.type
                 }
-                throw RuntimeException("cant get ${get.name.lexeme} from class ${from.clazz.name.lexeme}")
+                throw RuntimeException("cant get ${get.name.lexeme} from class ${from.clazz.name}")
             }
 
             Datakind.OBJECT -> {
                 from as Datatype.Object
-                for (field in from.clazz.fields) if (field.name.lexeme == get.name.lexeme) {
+                for (field in from.clazz.fields) if (field.name == get.name.lexeme) {
                     if (field.isPrivate && curClass !== field.clazz) {
-                        throw RuntimeException("field ${field.name.lexeme} is private")
+                        throw RuntimeException("field ${field.name} is private")
                     }
                     get.fieldDef = field
 
@@ -633,7 +635,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                     get.type = field.fieldType
                     return get.type
                 }
-                throw RuntimeException("cant get ${get.name.lexeme} from ${from.clazz.name.lexeme}")
+                throw RuntimeException("cant get ${get.name.lexeme} from ${from.clazz.name}")
             }
 
             else -> throw RuntimeException("cant get any field from $from")
@@ -652,7 +654,8 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         throw RuntimeException("unreachable")
     }
 
-    override fun visit(field: AstNode.FieldDeclaration): Datatype {
+    override fun visit(field: AstNode.Field): Datatype {
+        field as AstNode.FieldDeclaration
         check(field.initializer, field)
         if (field.fieldType != field.initializer.type) {
             throw RuntimeException("incompatible types in field declaration ${field.fieldType} and ${field.initializer.type}")
@@ -709,8 +712,8 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         Datakind.OBJECT -> {
             node as AstNode.ObjectTypeNode
             var toRet: Datatype? = null
-            for (c in curProgram.classes) if (c.name.lexeme == node.identifier.lexeme) {
-                toRet = Datatype.Object(c.name.lexeme, c)
+            for (c in curProgram.classes) if (c.name == node.identifier.lexeme) {
+                toRet = Datatype.Object(c.name, c)
             }
             toRet ?: throw RuntimeException("unknown Type: ${node.identifier.lexeme}")
             if (node.isArray) Datatype.ArrayType(toRet) else toRet
@@ -734,153 +737,5 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         if (type1.compatibleWith(type2)) return type2
         if (type2.compatibleWith(type1)) return type1
         return null
-    }
-
-    abstract class Datatype(val kind: Datakind) {
-
-        abstract val descriptorType: String
-
-        abstract fun compatibleWith(other: Datatype): Boolean
-
-        abstract override fun equals(other: Any?): Boolean
-        abstract override fun toString(): String
-
-        fun matches(vararg kinds: Datakind): Boolean {
-            for (kind in kinds) if (kind == this.kind) return true
-            return false
-        }
-
-        class Integer : Datatype(Datakind.INT) {
-            override val descriptorType: String = "I"
-            override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Integer::class
-            override fun toString(): String = "int"
-            override fun compatibleWith(other: Datatype): Boolean {
-                return other.kind in arrayOf(Datakind.INT, Datakind.FLOAT, Datakind.ERROR)
-            }
-        }
-        class Byte : Datatype(Datakind.BYTE) {
-            override val descriptorType: String = "B"
-            override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Byte::class
-            override fun toString(): String = "byte"
-            override fun compatibleWith(other: Datatype): Boolean {
-                return other.kind in arrayOf(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.FLOAT, Datakind.ERROR)
-            }
-        }
-        class Short : Datatype(Datakind.SHORT) {
-            override val descriptorType: String = "S"
-            override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Short::class
-            override fun toString(): String = "short"
-            override fun compatibleWith(other: Datatype): Boolean {
-                return other.kind in arrayOf(Datakind.SHORT, Datakind.INT, Datakind.FLOAT, Datakind.ERROR)
-            }
-        }
-        class Long : Datatype(Datakind.LONG) {
-            override val descriptorType: String = "J"
-            override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Long::class
-            override fun toString(): String = "long"
-            override fun compatibleWith(other: Datatype): Boolean {
-                return other.kind in arrayOf(Datakind.LONG, Datakind.ERROR)
-            }
-        }
-
-        class Float : Datatype(Datakind.FLOAT) {
-            override val descriptorType: String = "F"
-            override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Float::class
-            override fun toString(): String = "float"
-            override fun compatibleWith(other: Datatype): Boolean {
-                return other.kind in arrayOf(Datakind.FLOAT, Datakind.ERROR)
-            }
-        }
-        class Double : Datatype(Datakind.DOUBLE) {
-            override val descriptorType: String = "D"
-            override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Double::class
-            override fun toString(): String = "double"
-            override fun compatibleWith(other: Datatype): Boolean {
-                return other.kind in arrayOf(Datakind.DOUBLE, Datakind.ERROR)
-            }
-        }
-
-
-        class Bool : Datatype(Datakind.BOOLEAN) {
-            override val descriptorType: String = "Z"
-            override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Bool::class
-            override fun toString(): String = "bool"
-            override fun compatibleWith(other: Datatype): Boolean {
-                return other.kind in arrayOf(Datakind.BOOLEAN, Datakind.ERROR)
-            }
-        }
-
-        class Str: Datatype(Datakind.STRING) {
-            override val descriptorType: String = "Ljava/lang/String;"
-            override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Str::class
-            override fun toString(): String = "str"
-            override fun compatibleWith(other: Datatype): Boolean {
-                return other.kind in arrayOf(Datakind.STRING, Datakind.ERROR)
-            }
-        }
-
-        class Void : Datatype(Datakind.VOID) {
-            override val descriptorType: String = "V"
-            override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Void::class
-            override fun toString(): String = "void"
-            override fun compatibleWith(other: Datatype): Boolean = false
-        }
-
-        class Object(val name: String, val clazz: AstNode.ArtClass) : Datatype(Datakind.OBJECT) {
-            override val descriptorType: String = "L$name;"
-            override fun equals(other: Any?): Boolean {
-                return if (other == null) false else other::class == Object::class && name == (other as Object).name
-            }
-            override fun toString(): String = name
-            override fun compatibleWith(other: Datatype): Boolean {
-                return other.kind in arrayOf(Datakind.OBJECT, Datakind.ERROR)
-            }
-        }
-
-        class StatClass(val clazz: AstNode.ArtClass) : Datatype(Datakind.STAT_CLASS) {
-
-            override val descriptorType: String = "Ljava/lang/Class;"
-
-            override fun equals(other: Any?): Boolean {
-                return if (other == null) false else other::class == StatClass::class && clazz === (other as StatClass).clazz
-            }
-
-            override fun toString(): String = "Class<${clazz.name.lexeme}>"
-            override fun compatibleWith(other: Datatype): Boolean = false
-        }
-
-        class ArrayType(val type: Datatype) : Datatype(Datakind.ARRAY) {
-            override val descriptorType: String = "[${type.descriptorType}"
-
-            override fun equals(other: Any?): Boolean {
-                return if (other == null) false else other::class == ArrayType::class && (other as ArrayType).type == type
-            }
-
-            override fun toString(): String {
-                return "Array<$type>"
-            }
-            override fun compatibleWith(other: Datatype): Boolean {
-                if (other.matches(Datakind.ERROR)) return true
-                if (other.matches(Datakind.ARRAY)) return type == (other as ArrayType).type
-                return false
-            }
-        }
-
-        class ErrorType : Datatype(Datakind.ERROR) {
-            override val descriptorType: String = "--ERROR--"
-            override fun compatibleWith(other: Datatype): Boolean = true
-            override fun toString(): String = "--ERROR--"
-            override fun equals(other: Any?): Boolean {
-                return if (other == null) false else other::class == ErrorType::class
-            }
-        }
-
-    }
-
-    enum class Datakind {
-        INT, LONG, BYTE, SHORT, FLOAT, DOUBLE, STRING, VOID, BOOLEAN, OBJECT,
-        ARRAY,
-        ERROR,
-        STAT_CLASS
     }
 }

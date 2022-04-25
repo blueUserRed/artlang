@@ -155,7 +155,7 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
         return ControlFlowState()
     }
 
-    override fun visit(field: AstNode.FieldDeclaration): ControlFlowState {
+    override fun visit(field: AstNode.Field): ControlFlowState {
         check(field.initializer)
         return ControlFlowState()
     }
