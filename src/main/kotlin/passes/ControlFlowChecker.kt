@@ -3,6 +3,7 @@ package passes
 import ast.AstNode
 import ast.AstNodeVisitor
 import Datatype
+import ast.SyntheticNode
 import java.lang.RuntimeException
 import passes.ControlFlowChecker.ControlFlowState
 
@@ -48,9 +49,9 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
     }
 
     override fun visit(program: AstNode.Program): ControlFlowState {
-        for (field in program.fields) check(field)
-        for (func in program.funcs) check(func)
-        for (c in program.classes) check(c)
+        for (field in program.fields) if (field !is SyntheticNode) check(field)
+        for (func in program.funcs) if (func !is SyntheticNode) check(func)
+        for (c in program.classes) if (c !is SyntheticNode) check(c)
         return ControlFlowState()
     }
 

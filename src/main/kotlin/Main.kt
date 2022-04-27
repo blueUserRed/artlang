@@ -1,5 +1,6 @@
 import ast.AstNode
 import ast.AstPrinter
+import ast.SyntheticAst
 import compiler.Compiler
 import errors.ErrorPool
 import parser.Parser
@@ -102,6 +103,8 @@ object Main {
             lastErrors = ErrorPool.errors.size
         }
         if (Settings.verbose) println("parsing took ${parseTime}ms\n")
+
+        SyntheticAst.addSyntheticTreeParts(program)
 
         if (Settings.printAst) {
             println("----------------AST-----------------")

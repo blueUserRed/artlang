@@ -18,50 +18,38 @@ abstract class Datatype(val kind: Datakind) {
         override val descriptorType: String = "I"
         override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Integer::class
         override fun toString(): String = "int"
-        override fun compatibleWith(other: Datatype): Boolean {
-            return other.kind in arrayOf(Datakind.INT, Datakind.FLOAT, Datakind.ERROR)
-        }
+        override fun compatibleWith(other: Datatype): Boolean = other.kind == Datakind.ERROR
     }
     class Byte : Datatype(Datakind.BYTE) {
         override val descriptorType: String = "B"
         override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Byte::class
         override fun toString(): String = "byte"
-        override fun compatibleWith(other: Datatype): Boolean {
-            return other.kind in arrayOf(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.FLOAT, Datakind.ERROR)
-        }
+        override fun compatibleWith(other: Datatype): Boolean = other.kind == Datakind.ERROR
     }
     class Short : Datatype(Datakind.SHORT) {
         override val descriptorType: String = "S"
         override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Short::class
         override fun toString(): String = "short"
-        override fun compatibleWith(other: Datatype): Boolean {
-            return other.kind in arrayOf(Datakind.SHORT, Datakind.INT, Datakind.FLOAT, Datakind.ERROR)
-        }
+        override fun compatibleWith(other: Datatype): Boolean = other.kind == Datakind.ERROR
     }
     class Long : Datatype(Datakind.LONG) {
         override val descriptorType: String = "J"
         override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Long::class
         override fun toString(): String = "long"
-        override fun compatibleWith(other: Datatype): Boolean {
-            return other.kind in arrayOf(Datakind.LONG, Datakind.ERROR)
-        }
+        override fun compatibleWith(other: Datatype): Boolean = other.kind == Datakind.ERROR
     }
 
     class Float : Datatype(Datakind.FLOAT) {
         override val descriptorType: String = "F"
         override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Float::class
         override fun toString(): String = "float"
-        override fun compatibleWith(other: Datatype): Boolean {
-            return other.kind in arrayOf(Datakind.FLOAT, Datakind.ERROR)
-        }
+        override fun compatibleWith(other: Datatype): Boolean = other.kind == Datakind.ERROR
     }
     class Double : Datatype(Datakind.DOUBLE) {
         override val descriptorType: String = "D"
         override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Double::class
         override fun toString(): String = "double"
-        override fun compatibleWith(other: Datatype): Boolean {
-            return other.kind in arrayOf(Datakind.DOUBLE, Datakind.ERROR)
-        }
+        override fun compatibleWith(other: Datatype): Boolean = other.kind == Datakind.ERROR
     }
 
 
@@ -90,15 +78,15 @@ abstract class Datatype(val kind: Datakind) {
         override fun compatibleWith(other: Datatype): Boolean = false
     }
 
-    class Object(val name: String, val clazz: AstNode.ArtClass) : Datatype(Datakind.OBJECT) {
+    class Object(val clazz: AstNode.ArtClass) : Datatype(Datakind.OBJECT) {
 
-        override val descriptorType: String = "L$name;"
+        override val descriptorType: String = "L${clazz.jvmName};"
 
         override fun equals(other: Any?): Boolean {
-            return if (other == null) false else other::class == Object::class && name == (other as Object).name
+            return if (other == null) false else other::class == Object::class && clazz.jvmName == (other as Object).clazz.jvmName
         }
 
-        override fun toString(): String = name
+        override fun toString(): String = clazz.name
 
         override fun compatibleWith(other: Datatype): Boolean {
             return other.kind in arrayOf(Datakind.OBJECT, Datakind.ERROR)
@@ -106,11 +94,13 @@ abstract class Datatype(val kind: Datakind) {
 
         fun lookupFunc(name: String, sig: List<Datatype>): AstNode.Function? {
             for (func in clazz.funcs) if (func.name == name && func.functionDescriptor.matches(sig)) return func
+            if (clazz.extends != null) return Object(clazz.extends!!).lookupFunc(name, sig)
             return null
         }
 
         fun lookupField(name: String): AstNode.Field? {
             for (field in clazz.fields) if (field.name == name) return field
+            if (clazz.extends != null) return Object(clazz.extends!!).lookupField(name)
             return null
         }
 
@@ -132,6 +122,12 @@ abstract class Datatype(val kind: Datakind) {
         fun lookupField(name: String): AstNode.Field? {
             for (field in clazz.staticFields) if (field.name == name) return field
             return null
+        }
+
+        fun isSuperClassOf(other: AstNode.ArtClass): Boolean {
+            if (other.extends == null) return false
+            if (other.extends === clazz) return true
+            return isSuperClassOf(other.extends!!)
         }
 
         override fun toString(): String = "Class<${clazz.name}>"

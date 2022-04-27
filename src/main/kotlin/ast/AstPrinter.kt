@@ -32,9 +32,9 @@ class AstPrinter : AstNodeVisitor<String> {
 
     override fun visit(program: AstNode.Program): String {
         val builder = StringBuilder()
-        for (field in program.fields) builder.append(field.accept(this))
-        for (func in program.funcs) builder.append(func.accept(this))
-        for (c in program.classes) builder.append(c.accept(this))
+        for (field in program.fields) if (field !is SyntheticNode) builder.append(field.accept(this))
+        for (func in program.funcs) if (func !is SyntheticNode) builder.append(func.accept(this))
+        for (c in program.classes) if (c !is SyntheticNode) builder.append(c.accept(this))
         return builder.toString()
     }
 

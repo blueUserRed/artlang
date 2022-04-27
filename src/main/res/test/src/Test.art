@@ -1,27 +1,43 @@
 
-const field numHiSayers: int = 10
-
 fn main() {
-    const hiSayerFactory = HiSayerFactory()
-    hiSayerFactory.numInstances = numHiSayers
-    const hiSayers = hiSayerFactory.getInstances()
-    let i = -1
-    while ((i := i + 1) < hiSayers.size) hiSayers[i].sayHi()
+    let extending2 = Extending2()
+    takesBase(extending2)
+    takesObject(extending2)
 }
 
-class HiSayerFactory {
-    public field numInstances: int = 0
-
-    public fn getInstances(): HiSayer[] {
-        const toRet = HiSayer[this.numInstances]
-        let i = -1
-        while ((i := i + 1) < this.numInstances) toRet[i] = HiSayer()
-        return toRet
-    }
-}
-
-class HiSayer {
-    public fn sayHi() {
-        print "Hi"
-    }
-}
+//fn main() {
+//    const cat = Cat()
+//    takeAnimal(cat)
+//}
+//
+//fn takeAnimal(animal: Animal) {
+//    animal.saySomething()
+//}
+//
+//class Cat : Animal {
+//
+//    public field catField: int = 21
+//
+//    public fn meow() {
+//        print "meow"
+//    }
+//
+//    public fn saySomething() {
+//        this.meow()
+//    }
+//
+//}
+//
+//class Animal {
+//
+//    public field animalField: str = "sdsdfsdfjkl"
+//
+//    public fn walk() {
+//        print "Animal walking..."
+//    }
+//
+//    public fn saySomething() {
+//        print "<generic animal sounds>"
+//    }
+//
+//}

@@ -225,6 +225,11 @@ abstract class AstNode {
          * the superClass of this class
          */
         abstract val extends: ArtClass?
+
+        /**
+         * the name that is used to refer to the class on the jvm
+         */
+        abstract val jvmName: String
     }
 
     /**
@@ -235,7 +240,6 @@ abstract class AstNode {
      * @param staticFields the static fields that are contained in this class
      * @param fields the non-static fields that are contained in this class
      * @param extendsToken the with the name of the extending class; null if none
-//     * @param interfaces the list containing all implemented interfaces
      */
     class ClassDefinition(
         val nameToken: Token,
@@ -244,7 +248,7 @@ abstract class AstNode {
         staticFields: MutableList<Field>,
         fields: MutableList<Field>,
         val extendsToken: Token?,
-//        val interfaces: List<Token>
+        override val jvmName: String = nameToken.lexeme
     ) : ArtClass(staticFuncs, funcs, staticFields, fields) {
 
         override val name: String = nameToken.lexeme
@@ -581,7 +585,7 @@ abstract class AstNode {
          * returns the full name of the function (using the [AstPrinter])
          */
         fun getFullName(): String {
-            return if (from == null) "$name()" else "${from!!.accept(AstPrinter())}.$name()"
+            return if (from == null) "$name()" else "${from!!.accept(AstPrinter())}.${name.lexeme}()"
         }
 
         override fun swap(orig: AstNode, to: AstNode) {
@@ -904,7 +908,12 @@ data class FunctionDescriptor(val args: MutableList<Pair<String, Datatype>>, val
             argsNoThis.removeAt(0)
         }
         if (other.size != argsNoThis.size) return false
-        for (i in other.indices) if (other[i] != args[i].second) return false
+        for (i in other.indices) {
+            if (other[i].kind != argsNoThis[i].second.kind) return false
+            if (other[i].kind == Datakind.OBJECT) {
+                return Datatype.StatClass((argsNoThis[i].second as Datatype.Object).clazz).isSuperClassOf((other[i] as Datatype.Object).clazz)
+            }
+        }
         return true
     }
 

@@ -135,7 +135,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         curFunction = function
 
         val newVars = mutableMapOf<Int, Datatype>()
-        if (function.hasThis) newVars[0] = Datatype.Object(curClass!!.name, curClass!!)
+        if (function.hasThis) newVars[0] = Datatype.Object(curClass!!)
         for (i in function.functionDescriptor.args.indices) newVars[i] = function.functionDescriptor.args[i].second
         vars = newVars
         function.clazz = curClass
@@ -148,22 +148,33 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         preCalcFields(program.fields, null)
         preCalcFuncs(program.funcs, null)
         preCalcClasses(program.classes)
-        for (field in program.fields) check(field, program)
-        for (func in program.funcs) check(func, program)
-        for (c in program.classes) check(c, program)
+        for (field in program.fields) if (field !is SyntheticNode) check(field, program)
+        for (func in program.funcs) if (func !is SyntheticNode) check(func, program)
+        for (c in program.classes) if (c !is SyntheticNode) check(c, program)
         return Datatype.Void()
     }
 
     private fun preCalcClasses(clazzes: List<AstNode.ArtClass>) {
         val names = mutableListOf<String>()
 
-        for (clazz in clazzes) if (clazz !is SyntClass) {
+        for (clazz in clazzes) if (clazz !is SyntheticNode) {
             if (clazz.name in names) throw RuntimeException("duplicate definition of class ${clazz.name}")
             names.add(clazz.name)
             preCalcFields(clazz.fields, clazz)
             preCalcFields(clazz.staticFields, clazz)
             preCalcFuncs(clazz.staticFuncs, clazz)
             preCalcFuncs(clazz.funcs, clazz)
+        }
+        for (clazz in clazzes) if (clazz !is SyntheticNode) {
+            clazz as AstNode.ClassDefinition
+            val superClass = clazz.extendsToken?.let {
+                lookupTopLevelClass(it.lexeme) ?: throw RuntimeException("couldn't find class ${it.lexeme}")
+            } ?: SyntheticAst.objetClass
+            clazz._extends = superClass
+        }
+        for (clazz in clazzes) if (clazz !is SyntheticNode) {
+            if (clazz === clazz.extends) throw RuntimeException("class cant extend itself")
+            if (clazz === clazz.extends?.extends) throw RuntimeException("two classes cant extend each other")
         }
     }
 
@@ -173,7 +184,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             curFunction = func
             func.clazz = clazz
             val args = mutableListOf<Pair<String, Datatype>>()
-            if (func.hasThis) args.add(Pair("this", Datatype.Object(clazz!!.name, clazz)))
+            if (func.hasThis) args.add(Pair("this", Datatype.Object(clazz!!)))
             for (arg in func.args) args.add(Pair(arg.first.lexeme, typeNodeToDataType(arg.second)))
 
             val returnType = func.returnType?.let { typeNodeToDataType(it) } ?: Datatype.Void()
@@ -372,7 +383,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             if (curClass != null && funcCall.name.lexeme == curClass!!.name) {
                 if (funcCall.arguments.size != 0) TODO("constructor calls with arguments are not yet implemented")
                 val toSwap = AstNode.ConstructorCall(curClass!!, funcCall.arguments)
-                toSwap.type = Datatype.Object(curClass!!.name, curClass!!)
+                toSwap.type = Datatype.Object(curClass!!)
                 swap = toSwap
                 return toSwap.type
             }
@@ -380,7 +391,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             if (clazz != null) {
                 if (funcCall.arguments.size != 0) TODO("constructor calls with arguments are not yet implemented")
                 val toSwap = AstNode.ConstructorCall(clazz, funcCall.arguments)
-                toSwap.type = Datatype.Object(clazz.name, clazz)
+                toSwap.type = Datatype.Object(clazz)
                 swap = toSwap
                 return toSwap.type
             }
@@ -591,7 +602,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         if (amType != Datatype.Integer()) throw RuntimeException("array size has to be an integer")
         if (arr.of.matches(Datakind.STAT_CLASS)) {
             val clazz = (arr.of as Datatype.StatClass).clazz
-            return Datatype.ArrayType(Datatype.Object(clazz.name, clazz))
+            return Datatype.ArrayType(Datatype.Object(clazz))
         } else return Datatype.ArrayType(arr.of)
     }
 
@@ -653,7 +664,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             node as AstNode.ObjectTypeNode
             var toRet: Datatype? = null
             for (c in program.classes) if (c.name == node.identifier.lexeme) {
-                toRet = Datatype.Object(c.name, c)
+                toRet = Datatype.Object(c)
             }
             toRet ?: throw RuntimeException("unknown Type: ${node.identifier.lexeme}")
             if (node.isArray) Datatype.ArrayType(toRet) else toRet

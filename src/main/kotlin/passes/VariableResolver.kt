@@ -2,6 +2,7 @@ package passes
 
 import ast.AstNode
 import ast.AstNodeVisitor
+import ast.SyntheticNode
 import kotlin.RuntimeException
 
 class VariableResolver : AstNodeVisitor<Unit> {
@@ -50,9 +51,9 @@ class VariableResolver : AstNodeVisitor<Unit> {
     override fun visit(program: AstNode.Program) {
         curProgram = program
 
-        for (field in program.fields) resolve(field, program)
-        for (func in program.funcs) resolve(func, program)
-        for (c in program.classes) resolve(c, program)
+        for (field in program.fields) if (field !is SyntheticNode) resolve(field, program)
+        for (func in program.funcs) if (func !is SyntheticNode) resolve(func, program)
+        for (c in program.classes) if (c !is SyntheticNode) resolve(c, program)
     }
 
     override fun visit(print: AstNode.Print) {
