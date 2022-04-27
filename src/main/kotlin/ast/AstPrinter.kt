@@ -21,9 +21,10 @@ class AstPrinter : AstNodeVisitor<String> {
     }
 
     override fun visit(function: AstNode.Function): String {
+        function as AstNode.FunctionDeclaration
         val builder = StringBuilder("\n")
         for (modifier in function.modifiers) builder.append(modifier.lexeme).append(" ")
-        builder.append("fn ").append(function.name.lexeme).append("() {\n")
+        builder.append("fn ").append(function.name).append("() {\n")
         for (s in function.statements.statements) builder.append(s.accept(this)).append("\n")
         builder.append("}\n")
         return builder.toString()
@@ -31,9 +32,9 @@ class AstPrinter : AstNodeVisitor<String> {
 
     override fun visit(program: AstNode.Program): String {
         val builder = StringBuilder()
-        for (field in program.fields) builder.append(field.accept(this))
-        for (func in program.funcs) builder.append(func.accept(this))
-        for (c in program.classes) builder.append(c.accept(this))
+        for (field in program.fields) if (field !is SyntheticNode) builder.append(field.accept(this))
+        for (func in program.funcs) if (func !is SyntheticNode) builder.append(func.accept(this))
+        for (c in program.classes) if (c !is SyntheticNode) builder.append(c.accept(this))
         return builder.toString()
     }
 
@@ -58,9 +59,20 @@ class AstPrinter : AstNodeVisitor<String> {
     }
 
     override fun visit(varAssign: AstNode.Assignment): String {
-        return "(${varAssign.name.accept(this)} ${
+        return "(${
+            if (varAssign.from != null) "${varAssign.from!!.accept(this)}.${varAssign.name.lexeme}"
+            else varAssign.name.lexeme
+        } ${
             if (varAssign.isWalrus) ":=" else "="
         } ${varAssign.toAssign.accept(this)})"
+    }
+
+    override fun visit(arr: AstNode.ArrGet): String {
+        return "${arr.from.accept(this)}[${arr.arrIndex.accept(this)}]"
+    }
+
+    override fun visit(arr: AstNode.ArrSet): String {
+        return "${arr.from.accept(this)}[${arr.arrIndex.accept(this)}] = ${arr.to.accept(this)}"
     }
 
     override fun visit(loop:AstNode.Loop): String {
@@ -108,8 +120,15 @@ class AstPrinter : AstNodeVisitor<String> {
     }
 
     override fun visit(clazz: AstNode.ArtClass): String {
+        clazz as AstNode.ClassDefinition
         val builder = StringBuilder()
-        builder.append("\nclass ${clazz.name.lexeme} {\n")
+        builder.append("\nclass ${clazz.name} ")
+        if (clazz.extendsToken != null) builder.append(": ${clazz.extendsToken.lexeme} ")
+//        if (clazz.interfaces.isNotEmpty()) {
+//            builder.append("~ ")
+//            for (int in clazz.interfaces) builder.append(int.lexeme).append(" ")
+//        }
+        builder.append("{\n")
         for (field in clazz.fields) builder.append(field.accept(this)).append("\n")
         for (field in clazz.staticFields) builder.append(field.accept(this))
         for (func in clazz.staticFuncs) builder.append(func.accept(this))
@@ -131,15 +150,16 @@ class AstPrinter : AstNodeVisitor<String> {
     }
 
     override fun visit(constructorCall: AstNode.ConstructorCall): String {
-        return "(new ${constructorCall.clazz.name.lexeme})"
+        return "(new ${constructorCall.clazz.name})"
     }
 
-    override fun visit(field: AstNode.FieldDeclaration): String {
+    override fun visit(field: AstNode.Field): String {
+        field as AstNode.FieldDeclaration
         val builder = StringBuilder()
         for (modifier in field.modifiers) builder.append(modifier.lexeme).append(" ")
         if (field.isConst) builder.append("const ")
         builder
-            .append(field.name.lexeme)
+            .append(field.name)
             .append(" = ")
             .append(field.initializer.accept(this))
             .append("\n")
@@ -147,7 +167,7 @@ class AstPrinter : AstNodeVisitor<String> {
     }
 
     override fun visit(arr: AstNode.ArrayCreate): String {
-        return "new ${arr.typeNode}[${arr.amount.accept(this)}]"
+        return "new ${arr.of}[${arr.amount.accept(this)}]"
     }
 
     override fun visit(arr: AstNode.ArrayLiteral): String {

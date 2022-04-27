@@ -2,6 +2,7 @@ package passes
 
 import ast.AstNode
 import ast.AstNodeVisitor
+import ast.SyntheticNode
 import kotlin.RuntimeException
 
 class VariableResolver : AstNodeVisitor<Unit> {
@@ -31,6 +32,7 @@ class VariableResolver : AstNodeVisitor<Unit> {
     }
 
     override fun visit(function: AstNode.Function) {
+        function as AstNode.FunctionDeclaration
         val vars = mutableListOf<String>()
         val varDecs = mutableListOf<AstNode.VariableDeclaration?>()
         if (function.hasThis) {
@@ -49,9 +51,9 @@ class VariableResolver : AstNodeVisitor<Unit> {
     override fun visit(program: AstNode.Program) {
         curProgram = program
 
-        for (field in program.fields) resolve(field, program)
-        for (func in program.funcs) resolve(func, program)
-        for (c in program.classes) resolve(c, program)
+        for (field in program.fields) if (field !is SyntheticNode) resolve(field, program)
+        for (func in program.funcs) if (func !is SyntheticNode) resolve(func, program)
+        for (c in program.classes) if (c !is SyntheticNode) resolve(c, program)
     }
 
     override fun visit(print: AstNode.Print) {
@@ -76,20 +78,20 @@ class VariableResolver : AstNodeVisitor<Unit> {
     }
 
     override fun visit(varAssign: AstNode.Assignment) {
-        varAssign.arrIndex?.let { resolve(it, varAssign) }
+//        varAssign.arrIndex?.let { resolve(it, varAssign) }
         resolve(varAssign.toAssign, varAssign)
-        if (varAssign.name.from != null) {
-            resolve(varAssign.name.from!!, varAssign.name)
+        if (varAssign.from != null) {
+            resolve(varAssign.from!!, varAssign)
             return
         }
-        val index = curVars.indexOf(varAssign.name.name.lexeme)
+        val index = curVars.indexOf(varAssign.name.lexeme)
         if (index == -1) {
             varAssign.index = -1
             return
         }
         // if varDeclarations[index] == null the variable is a function arg or 'this', which is const
-        if (varDeclarations[index]?.isConst ?: true && varAssign.arrIndex == null) {
-            throw RuntimeException("Tried to assign to const ${varAssign.name.name.lexeme}")
+        if (varDeclarations[index]?.isConst ?: true) {
+            throw RuntimeException("Tried to assign to const ${varAssign.name.lexeme}")
         }
         varAssign.index = index
     }
@@ -118,7 +120,7 @@ class VariableResolver : AstNodeVisitor<Unit> {
     }
 
     override fun visit(funcCall: AstNode.FunctionCall) {
-        resolve(funcCall.func, funcCall)
+        funcCall.from?.let { resolve(it, funcCall) }
         for (arg in funcCall.arguments) resolve(arg, funcCall)
     }
 
@@ -143,7 +145,7 @@ class VariableResolver : AstNodeVisitor<Unit> {
     }
 
     override fun visit(get: AstNode.Get) {
-        if (get.arrIndex != null) resolve(get.arrIndex!!, get)
+//        if (get.arrIndex != null) resolve(get.arrIndex!!, get)
         if (get.from != null) {
             resolve(get.from!!, get)
             return
@@ -152,7 +154,7 @@ class VariableResolver : AstNodeVisitor<Unit> {
         if (index == -1) return
         val toSwap = AstNode.Variable(get.name)
         toSwap.index = index
-        toSwap.arrIndex = get.arrIndex
+//        toSwap.arrIndex = get.arrIndex
         swap = toSwap
         return
     }
@@ -167,7 +169,8 @@ class VariableResolver : AstNodeVisitor<Unit> {
         for (arg in constructorCall.arguments) resolve(arg, constructorCall)
     }
 
-    override fun visit(field: AstNode.FieldDeclaration) {
+    override fun visit(field: AstNode.Field) {
+        field as AstNode.FieldDeclaration
         resolve(field.initializer, field)
     }
 
@@ -186,5 +189,16 @@ class VariableResolver : AstNodeVisitor<Unit> {
 
     override fun visit(arr: AstNode.ArrayLiteral) {
         for (el in arr.elements) resolve(el, arr)
+    }
+
+    override fun visit(arr: AstNode.ArrGet) {
+        resolve(arr.from, arr)
+        resolve(arr.arrIndex, arr)
+    }
+
+    override fun visit(arr: AstNode.ArrSet) {
+        resolve(arr.from, arr)
+        resolve(arr.arrIndex, arr)
+        resolve(arr.to, arr)
     }
 }

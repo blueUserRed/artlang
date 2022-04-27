@@ -2,7 +2,8 @@ package passes
 
 import ast.AstNode
 import ast.AstNodeVisitor
-import passes.TypeChecker.Datatype
+import Datatype
+import ast.SyntheticNode
 import java.lang.RuntimeException
 import passes.ControlFlowChecker.ControlFlowState
 
@@ -39,17 +40,18 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
     }
 
     override fun visit(function: AstNode.Function): ControlFlowState {
+        function as AstNode.FunctionDeclaration
         if (function.functionDescriptor.returnType == Datatype.Void()) return ControlFlowState()
         if (!check(function.statements).alwaysReturns) {
-            throw RuntimeException("Function ${function.name.lexeme} does not always return")
+            throw RuntimeException("Function ${function.name} does not always return")
         }
         return ControlFlowState()
     }
 
     override fun visit(program: AstNode.Program): ControlFlowState {
-        for (field in program.fields) check(field)
-        for (func in program.funcs) check(func)
-        for (c in program.classes) check(c)
+        for (field in program.fields) if (field !is SyntheticNode) check(field)
+        for (func in program.funcs) if (func !is SyntheticNode) check(func)
+        for (c in program.classes) if (c !is SyntheticNode) check(c)
         return ControlFlowState()
     }
 
@@ -155,8 +157,17 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
         return ControlFlowState()
     }
 
-    override fun visit(field: AstNode.FieldDeclaration): ControlFlowState {
+    override fun visit(field: AstNode.Field): ControlFlowState {
+        field as AstNode.FieldDeclaration
         check(field.initializer)
+        return ControlFlowState()
+    }
+
+    override fun visit(arr: AstNode.ArrGet): ControlFlowState {
+        return ControlFlowState()
+    }
+
+    override fun visit(arr: AstNode.ArrSet): ControlFlowState {
         return ControlFlowState()
     }
 

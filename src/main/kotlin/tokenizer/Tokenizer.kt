@@ -49,6 +49,7 @@ object Tokenizer {
             '%' -> { emit(TokenType.MOD, "%", null); consume() }
             ',' -> { emit(TokenType.COMMA, ",", null); consume() }
             '.' -> { emit(TokenType.DOT, ".", null); consume() }
+            '~' -> { emit(TokenType.TILDE, "~", null); consume() }
             '\n' -> {
                 emit(TokenType.SOFT_BREAK, "\n", null)
                 consume()

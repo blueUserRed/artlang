@@ -2,9 +2,8 @@ package errors
 
 import ast.AstNode
 import passes.MinMaxPosFinder
-import passes.TypeChecker
+import Datatype
 import tokenizer.Token
-import passes.TypeChecker.Datatype
 
 class Errors {
 

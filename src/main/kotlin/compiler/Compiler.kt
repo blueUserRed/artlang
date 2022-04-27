@@ -8,12 +8,12 @@ import classFile.Field
 import classFile.MethodBuilder
 import classFile.StackMapTableAttribute
 import classFile.StackMapTableAttribute.VerificationTypeInfo
-import passes.TypeChecker.Datakind
-import passes.TypeChecker.Datatype
+import Datatype
+import Datakind
+import ast.SyntheticNode
 import tokenizer.TokenType
 import java.io.File
 import java.util.*
-import javax.xml.crypto.Data
 
 /**
  * compiles the AST into a binary class file
@@ -53,9 +53,9 @@ class Compiler : AstNodeVisitor<Unit> {
     private var curFile: String = ""
 
     /**
-     * the name of the class that is currently being compiled
+     * the class that is currently being compiled
      */
-    private var curClassName: String = ""
+    private var curClass: AstNode.ArtClass? = null
 
     /**
      * true if the top level is currently being compiled
@@ -336,6 +336,8 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     override fun visit(function: AstNode.Function) {
+        function as AstNode.FunctionDeclaration
+
         curFunction = function
 
         val methodBuilder = MethodBuilder()
@@ -354,7 +356,7 @@ class Compiler : AstNodeVisitor<Unit> {
         emitterTarget.maxLocals = function.amountLocals
 
         methodBuilder.descriptor = function.functionDescriptor.getDescriptorString()
-        methodBuilder.name = function.name.lexeme
+        methodBuilder.name = function.name
 
         compile(function.statements, true)
 
@@ -408,7 +410,7 @@ class Compiler : AstNodeVisitor<Unit> {
         // implementation ignored the flag if it was set.
 
         curFile = file.thisClass
-        curClassName = file.thisClass
+        curClass = null
 
         val clinitBuilder = MethodBuilder()
         clinit = MethodEmitter(clinitBuilder)
@@ -438,22 +440,23 @@ class Compiler : AstNodeVisitor<Unit> {
         }
         file.build("$outdir/$curFile.class")
 
-        for (clazz in program.classes) doClass(clazz)
+        for (clazz in program.classes) if (clazz !is SyntheticNode) doClass(clazz)
     }
 
     /**
      * compiles a class. Sets [file], [clinit], [init] and [emitterTarget].
-     * Creates the output file and compiles all functions and fieds associated with this class
+     * Creates the output file and compiles all functions and fields associated with this class
      */
     private fun doClass(clazz: AstNode.ArtClass) {
         curFunction = null
         file = ClassFileBuilder()
-        file.thisClass = clazz.name.lexeme
-        file.superClass = "java/lang/Object"
+        file.thisClass = clazz.jvmName
+        file.superClass = clazz.extends!!.jvmName
         file.isSuper = true
         file.isPublic = true
+        file.isPublic = true
         curFile = file.thisClass
-        curClassName = clazz.name.lexeme
+        curClass = clazz
 
         val clinitBuilder = MethodBuilder()
         clinit = MethodEmitter(clinitBuilder)
@@ -492,7 +495,7 @@ class Compiler : AstNodeVisitor<Unit> {
     /**
      * compiles the non-static fields of the current class. Sets [init]
      */
-    private fun doNonStaticFields(fields: List<AstNode.FieldDeclaration>) {
+    private fun doNonStaticFields(fields: List<AstNode.Field>) {
         if (fields.isEmpty()) return
         emitterTarget = init
         for (field in fields) compile(field, true)
@@ -501,7 +504,7 @@ class Compiler : AstNodeVisitor<Unit> {
     /**
      * compiles the non-static fields of the current class. Sets [clinit]
      */
-    private fun doStaticFields(fields: List<AstNode.FieldDeclaration>) {
+    private fun doStaticFields(fields: List<AstNode.Field>) {
         if (fields.isEmpty()) return
         emitterTarget = clinit
         for (field in fields) compile(field, true)
@@ -606,7 +609,7 @@ class Compiler : AstNodeVisitor<Unit> {
         }
         Datakind.OBJECT -> {
             if (emitStore) emitObjectVarStore(index)
-            emitterTarget.locals[index] = getObjVerificationType((type as Datatype.Object).clazz.name.lexeme)
+            emitterTarget.locals[index] = getObjVerificationType((type as Datatype.Object).clazz.jvmName)
         }
         Datakind.ARRAY -> {
             if (emitStore) emitObjectVarStore(index)
@@ -621,7 +624,7 @@ class Compiler : AstNodeVisitor<Unit> {
             return
         }
 
-        if (varAssign.name.fieldDef!!.isStatic || varAssign.name.fieldDef!!.isTopLevel) {
+        if (varAssign.fieldDef!!.isStatic) {
             doVarAssignForStaticField(varAssign)
             return
         }
@@ -629,39 +632,14 @@ class Compiler : AstNodeVisitor<Unit> {
         //non static field
 
         val fieldRef = file.fieldRefInfo(
-            file.classInfo(file.utf8Info(varAssign.name.fieldDef!!.clazz?.name?.lexeme ?: topLevelName)),
+            file.classInfo(file.utf8Info(varAssign.fieldDef!!.clazz?.jvmName ?: topLevelName)),
             file.nameAndTypeInfo(
-                file.utf8Info(varAssign.name.name.lexeme),
-                file.utf8Info(varAssign.name.fieldDef!!.fieldType.descriptorType)
+                file.utf8Info(varAssign.name.lexeme),
+                file.utf8Info(varAssign.fieldDef!!.fieldType.descriptorType)
             )
         )
 
-        if (varAssign.arrIndex != null) {
-            //array access
-            compile(varAssign.name.from!!, false)
-            emit(getfield)
-            emit(*Utils.getLastTwoBytes(fieldRef))
-            incStack(varAssign.name.fieldDef!!.type)
-            compile(varAssign.arrIndex!!, false)
-            compile(varAssign.toAssign, false)
-            if (
-                (varAssign.name.from!!.type as Datatype.ArrayType).type.kind == Datakind.FLOAT &&
-                varAssign.toAssign.type.kind != Datakind.FLOAT
-            ) {
-                doConvertPrimitive(varAssign.toAssign.type, Datatype.Float())
-            }
-            if (varAssign.isWalrus) {
-                emit(dup_x2)
-                incStack(varAssign.toAssign.type)
-            }
-            emitAStore(varAssign.toAssign.type)
-            decStack()
-            decStack()
-            decStack()
-            return
-        }
-
-        compile(varAssign.name.from!!, false)
+        compile(varAssign.from!!, false)
         compile(varAssign.toAssign, false)
 
         if (varAssign.isWalrus) {
@@ -682,30 +660,12 @@ class Compiler : AstNodeVisitor<Unit> {
     private fun doVarAssignForStaticField(varAssign: AstNode.Assignment) {
 
         val fieldRef = file.fieldRefInfo(
-            file.classInfo(file.utf8Info(varAssign.name.fieldDef!!.clazz?.name?.lexeme ?: topLevelName)),
+            file.classInfo(file.utf8Info(varAssign.fieldDef!!.clazz?.jvmName ?: topLevelName)),
             file.nameAndTypeInfo(
-                file.utf8Info(varAssign.name.name.lexeme),
-                file.utf8Info(varAssign.name.fieldDef!!.fieldType.descriptorType)
+                file.utf8Info(varAssign.name.lexeme),
+                file.utf8Info(varAssign.fieldDef!!.fieldType.descriptorType)
             )
         )
-
-        if (varAssign.arrIndex != null) {
-            //array access
-            emit(getstatic)
-            emit(*Utils.getLastTwoBytes(fieldRef))
-            incStack(varAssign.name.type)
-            compile(varAssign.arrIndex!!, false)
-            compile(varAssign.toAssign, false)
-            if (varAssign.isWalrus) {
-                emit(dup_x2)
-                incStack(varAssign.toAssign.type)
-            }
-            emitAStore(varAssign.toAssign.type)
-            decStack()
-            decStack()
-            decStack()
-            return
-        }
 
         compile(varAssign.toAssign, false)
         if (varAssign.isWalrus) {
@@ -722,23 +682,6 @@ class Compiler : AstNodeVisitor<Unit> {
      * compiles an assignment to a local variable
      */
     private fun doVarAssignForLocal(varAssign: AstNode.Assignment) {
-        if (varAssign.arrIndex != null) {
-            //array access
-            emitObjectVarLoad(varAssign.index)
-            incStack(varAssign.name.type)
-            compile(varAssign.arrIndex!!, false)
-            compile(varAssign.toAssign, false)
-            if (varAssign.isWalrus) {
-                emit(dup_x2)
-                incStack(varAssign.toAssign.type)
-            }
-            emitAStore(varAssign.toAssign.type)
-            decStack()
-            decStack()
-            decStack()
-            return
-        }
-
         compile(varAssign.toAssign, false)
         if (varAssign.isWalrus) {
             emit(dup)
@@ -849,10 +792,10 @@ class Compiler : AstNodeVisitor<Unit> {
             emit(invokestatic)
             val funcRef = file.methodRefInfo(
                 file.classInfo(file.utf8Info(
-                    if (funcCall.definition.isTopLevel) topLevelName else funcCall.definition.clazz!!.name.lexeme
+                    if (funcCall.definition.isTopLevel) topLevelName else funcCall.definition.clazz!!.jvmName
                 )),
                 file.nameAndTypeInfo(
-                    file.utf8Info(funcCall.func.name.lexeme),
+                    file.utf8Info(funcCall.name.lexeme),
                     file.utf8Info(funcCall.definition.functionDescriptor.getDescriptorString())
                 )
             )
@@ -863,13 +806,13 @@ class Compiler : AstNodeVisitor<Unit> {
         }
 
         //non-static function
-        compile(funcCall.func.from!!, false)
+        compile(funcCall.from!!, false)
         for (arg in funcCall.arguments) compile(arg, false)
         emit(invokevirtual)
         val funcRef = file.methodRefInfo(
-            file.classInfo(file.utf8Info(funcCall.definition.clazz!!.name.lexeme)),
+            file.classInfo(file.utf8Info(funcCall.definition.clazz!!.jvmName)),
             file.nameAndTypeInfo(
-                file.utf8Info(funcCall.func.name.lexeme),
+                file.utf8Info(funcCall.name.lexeme),
                 file.utf8Info(funcCall.definition.functionDescriptor.getDescriptorString())
             )
         )
@@ -916,21 +859,15 @@ class Compiler : AstNodeVisitor<Unit> {
             emit(getstatic)
             val fieldRef = file.fieldRefInfo(
                 file.classInfo(file.utf8Info(
-                    if (get.fieldDef!!.isTopLevel) topLevelName else get.fieldDef!!.clazz!!.name.lexeme
+                    if (get.fieldDef!!.isTopLevel) topLevelName else get.fieldDef!!.clazz!!.jvmName
                 )),
                 file.nameAndTypeInfo(
-                    file.utf8Info(get.fieldDef!!.name.lexeme),
+                    file.utf8Info(get.fieldDef!!.name),
                     file.utf8Info(get.fieldDef!!.fieldType.descriptorType)
                 )
             )
             emit(*Utils.getLastTwoBytes(fieldRef))
             incStack(get.fieldDef!!.fieldType)
-            if (get.arrIndex == null) return
-            compile(get.arrIndex!!, false)
-            emitALoad(get.type)
-            decStack()
-            decStack()
-            incStack(get.type)
             return
         }
 
@@ -947,7 +884,7 @@ class Compiler : AstNodeVisitor<Unit> {
             //reference to static or top level field with a from specified
             emit(getstatic)
             val fieldRef = file.fieldRefInfo(
-                file.classInfo(file.utf8Info((get.from!!.type as Datatype.StatClass).clazz.name.lexeme)),
+                file.classInfo(file.utf8Info((get.from!!.type as Datatype.StatClass).clazz.jvmName)),
                 file.nameAndTypeInfo(
                     file.utf8Info(get.name.lexeme),
                     file.utf8Info(get.fieldDef!!.fieldType.descriptorType)
@@ -955,13 +892,13 @@ class Compiler : AstNodeVisitor<Unit> {
             )
             emit(*Utils.getLastTwoBytes(fieldRef))
             incStack(get.fieldDef!!.fieldType)
-            if (get.arrIndex == null) return
-            compile(get.arrIndex!!, false)
-            emitALoad(get.type)
-            decStack()
-            decStack()
-            incStack(get.type)
-            return
+//            if (get.arrIndex == null) return
+//            compile(get.arrIndex!!, false)
+//            emitALoad(get.type)
+//            decStack()
+//            decStack()
+//            incStack(get.type)
+//            return
         }
 
         //a non-static field
@@ -970,7 +907,7 @@ class Compiler : AstNodeVisitor<Unit> {
         emit(getfield)
 
         val fieldRef = file.fieldRefInfo(
-            file.classInfo(file.utf8Info((get.from!!.type as Datatype.Object).clazz.name.lexeme)),
+            file.classInfo(file.utf8Info((get.from!!.type as Datatype.Object).clazz.jvmName)),
             file.nameAndTypeInfo(
                 file.utf8Info(get.name.lexeme),
                 file.utf8Info(get.fieldDef!!.fieldType.descriptorType)
@@ -979,12 +916,35 @@ class Compiler : AstNodeVisitor<Unit> {
         emit(*Utils.getLastTwoBytes(fieldRef))
         decStack()
         incStack(get.fieldDef!!.fieldType)
-        if (get.arrIndex == null) return
-        compile(get.arrIndex!!, false)
-        emitALoad(get.type)
+//        if (get.arrIndex == null) return
+//        compile(get.arrIndex!!, false)
+//        emitALoad(get.type)
+//        decStack()
+//        decStack()
+//        incStack(get.type)
+    }
+
+    override fun visit(arr: AstNode.ArrGet) {
+        compile(arr.from, false)
+        compile(arr.arrIndex, false)
+        emitALoad(arr.type)
         decStack()
         decStack()
-        incStack(get.type)
+        incStack(arr.type)
+    }
+
+    override fun visit(arr: AstNode.ArrSet) {
+        compile(arr.from, false)
+        compile(arr.arrIndex, false)
+        compile(arr.to, false)
+        if (arr.isWalrus) {
+            emit(dup_x2)
+            emitterTarget.stack.add(emitterTarget.stack.size - 2, getVerificationType(arr.to.type))
+        }
+        emitAStore(arr.to.type)
+        decStack()
+        decStack()
+        decStack()
     }
 
     /**
@@ -1016,13 +976,13 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     override fun visit(constructorCall: AstNode.ConstructorCall) {
-        emit(new, *Utils.getLastTwoBytes(file.classInfo(file.utf8Info(constructorCall.clazz.name.lexeme))))
+        emit(new, *Utils.getLastTwoBytes(file.classInfo(file.utf8Info(constructorCall.clazz.jvmName))))
         incStack(constructorCall.type)
         emit(dup)
         incStack(constructorCall.type)
 
         val methodIndex = file.methodRefInfo(
-            file.classInfo(file.utf8Info(constructorCall.clazz.name.lexeme)),
+            file.classInfo(file.utf8Info(constructorCall.clazz.name)),
             file.nameAndTypeInfo(
                 file.utf8Info("<init>"),
                 file.utf8Info("()V")
@@ -1035,9 +995,11 @@ class Compiler : AstNodeVisitor<Unit> {
     /**
      * assumes [emitterTarget] is set correctly
      */
-    override fun visit(field: AstNode.FieldDeclaration) {
+    override fun visit(field: AstNode.Field) {
+        field as AstNode.FieldDeclaration
+
         val fieldToAdd = Field(
-            file.utf8Info(field.name.lexeme),
+            file.utf8Info(field.name),
             file.utf8Info(field.fieldType.descriptorType)
         )
 
@@ -1053,15 +1015,15 @@ class Compiler : AstNodeVisitor<Unit> {
 
         if (!field.isStatic && !field.isTopLevel) {
             emit(aload_0)
-            incStack(getObjVerificationType(curClassName))
+            incStack(getObjVerificationType(curClass!!.jvmName))
         }
 
         compile(field.initializer, false)
 
         val fieldRefIndex = file.fieldRefInfo(
-            file.classInfo(file.utf8Info(curClassName)),
+            file.classInfo(file.utf8Info(curClass?.jvmName ?: topLevelName)),
             file.nameAndTypeInfo(
-                file.utf8Info(field.name.lexeme),
+                file.utf8Info(field.name),
                 file.utf8Info(field.fieldType.descriptorType)
             )
         )
@@ -1089,7 +1051,7 @@ class Compiler : AstNodeVisitor<Unit> {
             Datakind.OBJECT -> {
                 compile(arr.amount, false)
                 emit(anewarray, *Utils.getLastTwoBytes(file.classInfo(file.utf8Info(
-                    ((arr.type as Datatype.ArrayType).type as Datatype.Object).clazz.name.lexeme
+                    ((arr.type as Datatype.ArrayType).type as Datatype.Object).clazz.jvmName
                 ))))
                 decStack()
                 incStack(arr.type)
@@ -1140,7 +1102,7 @@ class Compiler : AstNodeVisitor<Unit> {
                 emitIntLoad(arr.elements.size)
                 incStack(Datatype.Integer())
                 emit(anewarray, *Utils.getLastTwoBytes(file.classInfo(file.utf8Info(
-                    ((arr.type as Datatype.ArrayType).type as Datatype.Object).clazz.name.lexeme
+                    ((arr.type as Datatype.ArrayType).type as Datatype.Object).clazz.jvmName
                 ))))
                 decStack()
                 incStack(arr.type)
@@ -1177,7 +1139,7 @@ class Compiler : AstNodeVisitor<Unit> {
      */
     private fun doDefaultConstructor() {
         val objConstructorIndex = file.methodRefInfo(
-            file.classInfo(file.utf8Info("java/lang/Object")),
+            file.classInfo(file.utf8Info(curClass?.extends?.jvmName ?: "java/lang/Object")),
             file.nameAndTypeInfo(
                 file.utf8Info("<init>"),
                 file.utf8Info("()V")
@@ -1398,7 +1360,7 @@ class Compiler : AstNodeVisitor<Unit> {
         Datakind.INT, Datakind.BOOLEAN, Datakind.BYTE, Datakind.SHORT -> VerificationTypeInfo.Integer()
         Datakind.FLOAT -> VerificationTypeInfo.Float()
         Datakind.STRING -> getObjVerificationType("java/lang/String")
-        Datakind.OBJECT -> getObjVerificationType((type as Datatype.Object).clazz.name.lexeme)
+        Datakind.OBJECT -> getObjVerificationType((type as Datatype.Object).clazz.jvmName)
         Datakind.ARRAY -> getObjVerificationType(type.descriptorType)
         else -> TODO("not yet implemented")
     }
