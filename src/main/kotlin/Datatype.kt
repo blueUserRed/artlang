@@ -91,21 +91,29 @@ abstract class Datatype(val kind: Datakind) {
     }
 
     class Object(val name: String, val clazz: AstNode.ArtClass) : Datatype(Datakind.OBJECT) {
+
         override val descriptorType: String = "L$name;"
+
         override fun equals(other: Any?): Boolean {
             return if (other == null) false else other::class == Object::class && name == (other as Object).name
         }
+
         override fun toString(): String = name
+
         override fun compatibleWith(other: Datatype): Boolean {
             return other.kind in arrayOf(Datakind.OBJECT, Datakind.ERROR)
         }
 
         fun lookupFunc(name: String, sig: List<Datatype>): AstNode.Function? {
-            for (func in clazz.funcs) if (func.name == name && func.functionDescriptor.matches(sig)) {
-                return func
-            }
+            for (func in clazz.funcs) if (func.name == name && func.functionDescriptor.matches(sig)) return func
             return null
         }
+
+        fun lookupField(name: String): AstNode.Field? {
+            for (field in clazz.fields) if (field.name == name) return field
+            return null
+        }
+
     }
 
     class StatClass(val clazz: AstNode.ArtClass) : Datatype(Datakind.STAT_CLASS) {
@@ -116,7 +124,18 @@ abstract class Datatype(val kind: Datakind) {
             return if (other == null) false else other::class == StatClass::class && clazz === (other as StatClass).clazz
         }
 
+        fun lookupFunc(name: String, sig: List<Datatype>): AstNode.Function? {
+            for (func in clazz.staticFuncs) if (func.name == name && func.functionDescriptor.matches(sig)) return func
+            return null
+        }
+
+        fun lookupField(name: String): AstNode.Field? {
+            for (field in clazz.staticFields) if (field.name == name) return field
+            return null
+        }
+
         override fun toString(): String = "Class<${clazz.name}>"
+
         override fun compatibleWith(other: Datatype): Boolean = false
     }
 

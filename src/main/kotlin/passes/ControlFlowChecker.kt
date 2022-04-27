@@ -2,7 +2,7 @@ package passes
 
 import ast.AstNode
 import ast.AstNodeVisitor
-import passes.TypeChecker.Datatype
+import Datatype
 import java.lang.RuntimeException
 import passes.ControlFlowChecker.ControlFlowState
 
@@ -39,9 +39,10 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
     }
 
     override fun visit(function: AstNode.Function): ControlFlowState {
+        function as AstNode.FunctionDeclaration
         if (function.functionDescriptor.returnType == Datatype.Void()) return ControlFlowState()
         if (!check(function.statements).alwaysReturns) {
-            throw RuntimeException("Function ${function.name.lexeme} does not always return")
+            throw RuntimeException("Function ${function.name} does not always return")
         }
         return ControlFlowState()
     }
@@ -156,7 +157,16 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
     }
 
     override fun visit(field: AstNode.Field): ControlFlowState {
+        field as AstNode.FieldDeclaration
         check(field.initializer)
+        return ControlFlowState()
+    }
+
+    override fun visit(arr: AstNode.ArrGet): ControlFlowState {
+        return ControlFlowState()
+    }
+
+    override fun visit(arr: AstNode.ArrSet): ControlFlowState {
         return ControlFlowState()
     }
 

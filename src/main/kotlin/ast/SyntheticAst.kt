@@ -1,6 +1,6 @@
 package ast
 
-import passes.TypeChecker
+import Datatype
 
 interface SyntheticNode
 
@@ -37,7 +37,7 @@ class SyntField(
     override val isPrivate: Boolean,
     override val isStatic: Boolean,
     override val isTopLevel: Boolean,
-    override val fieldType: TypeChecker.Datatype,
+    override val fieldType: Datatype,
     override val isConst: Boolean,
     override var clazz: ArtClass?
 ) : AstNode.Field(), SyntheticNode {

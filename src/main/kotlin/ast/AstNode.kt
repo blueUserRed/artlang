@@ -49,9 +49,7 @@ abstract class AstNode {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
-    abstract class Function(
-
-    ) : AstNode() {
+    abstract class Function : AstNode() {
 
         /**
          * the name of the Function
@@ -355,7 +353,9 @@ abstract class AstNode {
     /**
      * represents a (walrus-) assignment to a local variable, a field or array
      */
-    class Assignment(var name: Get, var toAssign: AstNode, val isWalrus: Boolean) : AstNode() {
+    class Assignment(var from: AstNode?, var name: Token, var toAssign: AstNode, val isWalrus: Boolean) : AstNode() {
+
+        var fieldDef: Field? = null
 
         /**
          * the local variable index; the index into the locals array of the jvm at which the variable can be found;
@@ -363,22 +363,13 @@ abstract class AstNode {
          */
         var index: Int = -1
 
-        /**
-         * if the assignment target is an array, arrIndex is the Node that evaluates to the index
-         */
-        var arrIndex: AstNode? = null
-
         override fun swap(orig: AstNode, to: AstNode) {
-            if (name === orig && to is Get) {
-                name = to
+            if (from === orig) {
+                from = to
                 return
             }
             if (toAssign === orig) {
                 toAssign = to
-                return
-            }
-            if (arrIndex === orig) {
-                arrIndex = to
                 return
             }
             throw CantSwapException()
@@ -577,7 +568,7 @@ abstract class AstNode {
      * @param func the get for the function
      * @param arguments the arguments provided
      */
-    class FunctionCall(var func: Get, val arguments: MutableList<AstNode>) : AstNode() {
+    class FunctionCall(var from: AstNode?, val name: Token, val arguments: MutableList<AstNode>) : AstNode() {
 
         /**
          * the definition of the referenced function
@@ -590,12 +581,12 @@ abstract class AstNode {
          * returns the full name of the function (using the [AstPrinter])
          */
         fun getFullName(): String {
-            return AstPrinter().visit(func)
+            return if (from == null) "$name()" else "${from!!.accept(AstPrinter())}.$name()"
         }
 
         override fun swap(orig: AstNode, to: AstNode) {
-            if (func === orig && to is Get) {
-                func = to
+            if (from === orig) {
+                from = to
                 return
             }
             for (i in arguments.indices) if (arguments[i] === orig) {
@@ -608,12 +599,50 @@ abstract class AstNode {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
-    /**
-     * represents a get. Can either be a single identifier referring to a field, class or a local (local only before
-     * the variableResolver step). Can also be a chained get which gets something from another get (e.g.
-     * `hiSayer.sayHi()` gets the sayHi function from the object hiSayer). Can also be indexed get from an array (e.g
-     * `x.getArr()[5]` consists of two nested gets, the first one gets the x-object, the second one gets the function
-     * getArr from x and has [arrIndex] set to 5)
+    class ArrGet(var from: AstNode, var arrIndex: AstNode) : AstNode() {
+
+        override fun swap(orig: AstNode, to: AstNode) {
+            if (from === orig) {
+                from = to
+                return
+            }
+            if (arrIndex === orig) {
+                arrIndex = to
+                return
+            }
+            throw CantSwapException()
+        }
+
+        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
+    }
+
+    class ArrSet(var from: AstNode, var arrIndex: AstNode, var to: AstNode, val isWalrus: Boolean) : AstNode() {
+
+        override fun swap(orig: AstNode, to: AstNode) {
+            if (from === orig) {
+                from = to
+                return
+            }
+            if (arrIndex === orig) {
+                arrIndex = to
+                return
+            }
+            if (this.to === orig) {
+                this.to = to
+                return
+            }
+            throw CantSwapException()
+        }
+
+        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
+    }
+
+     /** TODO: fix doc
+//     * represents a get. Can either be a single identifier referring to a field, class or a local (local only before
+//     * the variableResolver step). Can also be a chained get which gets something from another get (e.g.
+//     * `hiSayer.sayHi()` gets the sayHi function from the object hiSayer). Can also be indexed get from an array (e.g
+//     * `x.getArr()[5]` consists of two nested gets, the first one gets the x-object, the second one gets the function
+//     * getArr from x and has [arrIndex] set to 5)
      * @param name the name of the thing to get
      * @param from the node from which [name] should be got, null if [name] is not looked up on another object/class
      */
@@ -626,22 +655,9 @@ abstract class AstNode {
          */
         var fieldDef: Field? = null
 
-        /**
-         * if the get-target is array, this represents the index into the array
-         */
-        var arrIndex: AstNode? = null
-
         override fun swap(orig: AstNode, to: AstNode) {
-            if (arrIndex === orig) {
-                arrIndex = to
-                return
-            }
             if (from === orig) {
                 from = to
-                return
-            }
-            if (arrIndex === orig) {
-                arrIndex = to
                 return
             }
             throw CantSwapException()
@@ -678,9 +694,8 @@ abstract class AstNode {
      * with this node
      * @param clazz the class to which the constructor refers to
      * @param arguments the list of arguments with which the constructor is called
-     * @param origFrom the get of the [FunctionCall] this ConstructorCall originated from
      */
-    class ConstructorCall(var clazz: ArtClass, val arguments: MutableList<AstNode>, val origFrom: Get) : AstNode() {
+    class ConstructorCall(var clazz: ArtClass, val arguments: MutableList<AstNode>) : AstNode() {
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (clazz === orig && to is ArtClass) {
@@ -756,6 +771,7 @@ abstract class AstNode {
 
         override val isStatic: Boolean
             get() {
+                if (isTopLevel) return true
                 for (modifier in modifiers) {
                     if (modifier.tokenType == TokenType.IDENTIFIER && modifier.lexeme == "static") return true
                 }
@@ -788,10 +804,10 @@ abstract class AstNode {
     /**
      * represents an array-creation statement (e.g. int[4]). The Parser only emits array-gets, because it can't
      * distinguish between array-accesses and array creations. This node is swapped into the tree by the TypeChecker
-     * @param typeNode the type (node) of the array
+     * @param of the type of the array
      * @param amount the node that when evaluated results in the array size
      */
-    class ArrayCreate(val typeNode: DatatypeNode, var amount: AstNode) : AstNode() {
+    class ArrayCreate(val of: Datatype, var amount: AstNode) : AstNode() {
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (amount !== orig) throw CantSwapException()
@@ -882,7 +898,12 @@ data class FunctionDescriptor(val args: MutableList<Pair<String, Datatype>>, val
     }
 
     fun matches(other: List<Datatype>): Boolean {
-        if (other.size != args.size) return false
+        var argsNoThis: MutableList<Pair<String, Datatype>> = args
+        if (args.isNotEmpty() && args[0].first == "this") {
+            argsNoThis = args.toMutableList()
+            argsNoThis.removeAt(0)
+        }
+        if (other.size != argsNoThis.size) return false
         for (i in other.indices) if (other[i] != args[i].second) return false
         return true
     }

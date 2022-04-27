@@ -1,4 +1,27 @@
 
+const field numHiSayers: int = 10
+
 fn main() {
-    let test = [[1], [2], [3]]
+    const hiSayerFactory = HiSayerFactory()
+    hiSayerFactory.numInstances = numHiSayers
+    const hiSayers = hiSayerFactory.getInstances()
+    let i = -1
+    while ((i := i + 1) < hiSayers.size) hiSayers[i].sayHi()
+}
+
+class HiSayerFactory {
+    public field numInstances: int = 0
+
+    public fn getInstances(): HiSayer[] {
+        const toRet = HiSayer[this.numInstances]
+        let i = -1
+        while ((i := i + 1) < this.numInstances) toRet[i] = HiSayer()
+        return toRet
+    }
+}
+
+class HiSayer {
+    public fn sayHi() {
+        print "Hi"
+    }
 }

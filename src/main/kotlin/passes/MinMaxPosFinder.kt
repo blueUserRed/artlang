@@ -4,6 +4,7 @@ import ast.AstNode
 import ast.AstNodeVisitor
 import tokenizer.Token
 
+//TODO: rewrite properly
 class MinMaxPosFinder : AstNodeVisitor<MutableMap<Int, Pair<Int, Int>>> {
 
     override fun visit(binary: AstNode.Binary): MutableMap<Int, Pair<Int, Int>> {
@@ -31,7 +32,7 @@ class MinMaxPosFinder : AstNodeVisitor<MutableMap<Int, Pair<Int, Int>>> {
     }
 
     override fun visit(funcCall: AstNode.FunctionCall): MutableMap<Int, Pair<Int, Int>> {
-        return combine(find(funcCall.func), *Array(funcCall.arguments.size) { find(funcCall.arguments[it]) })
+        return combine(getMinMaxFor(funcCall.name), *Array(funcCall.arguments.size) { find(funcCall.arguments[it]) })
     }
 
     override fun visit(exprStmt: AstNode.ExpressionStatement): MutableMap<Int, Pair<Int, Int>> {
@@ -63,7 +64,7 @@ class MinMaxPosFinder : AstNodeVisitor<MutableMap<Int, Pair<Int, Int>>> {
     }
 
     override fun visit(varAssign: AstNode.Assignment): MutableMap<Int, Pair<Int, Int>> {
-        return combine(find(varAssign.name), find(varAssign.toAssign))
+        return combine(getMinMaxFor(varAssign.name), find(varAssign.toAssign))
     }
 
     override fun visit(loop: AstNode.Loop): MutableMap<Int, Pair<Int, Int>> {
@@ -100,12 +101,20 @@ class MinMaxPosFinder : AstNodeVisitor<MutableMap<Int, Pair<Int, Int>>> {
         return getMinMaxFor(breac.breakToken)
     }
 
+    override fun visit(arr: AstNode.ArrGet): MutableMap<Int, Pair<Int, Int>> {
+        TODO("Not yet implemented")
+    }
+
+    override fun visit(arr: AstNode.ArrSet): MutableMap<Int, Pair<Int, Int>> {
+        TODO("Not yet implemented")
+    }
+
     override fun visit(constructorCall: AstNode.ConstructorCall): MutableMap<Int, Pair<Int, Int>> {
-        return combine(find(constructorCall.origFrom),
-            *Array(constructorCall.arguments.size) { find(constructorCall.arguments[it]) })
+        TODO("figure this out")
     }
 
     override fun visit(field: AstNode.Field): MutableMap<Int, Pair<Int, Int>> {
+        field as AstNode.FieldDeclaration
         return combine(*Array(field.modifiers.size) { getMinMaxFor(field.modifiers[it]) }, find(field.initializer))
     }
 

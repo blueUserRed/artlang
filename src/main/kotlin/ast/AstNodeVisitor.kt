@@ -33,5 +33,7 @@ interface AstNodeVisitor<T> {
     fun visit(field: AstNode.Field): T
     fun visit(arr: AstNode.ArrayCreate): T
     fun visit(arr: AstNode.ArrayLiteral): T
+    fun visit(arr: AstNode.ArrGet): T
+    fun visit(arr: AstNode.ArrSet): T
 
 }
