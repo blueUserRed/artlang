@@ -338,8 +338,9 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     override fun visit(ifStmt: AstNode.If): Datatype {
         val type = check(ifStmt.condition, ifStmt)
         if (type != Datatype.Bool()) throw RuntimeException("Expected Boolean value")
-        ifStmt.ifStmt.accept(this)
-        ifStmt.elseStmt?.accept(this)
+        val ifPart = check(ifStmt.ifStmt, ifStmt)
+        val elsePart = ifStmt.elseStmt?.let { check(it, ifStmt) }
+        if (elsePart != null && ifPart.kind != Datakind.VOID && ifPart == elsePart) return ifPart
         return Datatype.Void()
     }
 

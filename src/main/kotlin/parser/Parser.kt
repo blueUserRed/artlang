@@ -562,7 +562,7 @@ object Parser {
             try {
                 val statement = parseStatement()
                 statements.add(statement)
-                consumeExpectingSoftBreakOrError("Expected line break or semicolon")
+                if (peek().tokenType != TokenType.R_BRACE) consumeExpectingSoftBreakOrError("Expected line break or semicolon")
                 if (statement is AstNode.YieldArrow) {
                     consumeOrError(TokenType.R_BRACE, "the yield-arrow has to be the last statement in a block")
                     return AstNode.Block(statements.toTypedArray())

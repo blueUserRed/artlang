@@ -743,7 +743,9 @@ class Compiler : AstNodeVisitor<Unit> {
         val jmpAddrOffset = emitterTarget.curCodeOffset - 2
 
         wasReturn = false
-        compile(ifStmt.ifStmt, true)
+        compile(ifStmt.ifStmt, ifStmt.type.kind == Datakind.VOID)
+        if (ifStmt.type.kind != Datakind.VOID) decStack()
+
         val skipGoto = wasReturn
         wasReturn = false
 
@@ -752,7 +754,8 @@ class Compiler : AstNodeVisitor<Unit> {
         val jmpAddr = emitterTarget.curCodeOffset - (jmpAddrOffset - 1)
         overwriteByteCode(jmpAddrOffset, *Utils.getLastTwoBytes(jmpAddr))
         if (hasElse) emitStackMapFrame()
-        if (hasElse) compile(ifStmt.elseStmt!!, true)
+        if (hasElse) compile(ifStmt.elseStmt!!, ifStmt.type.kind == Datakind.VOID)
+
         val elseJmpAddr = emitterTarget.curCodeOffset - (elseJmpAddrOffset - 1)
         if (hasElse && !skipGoto) overwriteByteCode(elseJmpAddrOffset, *Utils.getLastTwoBytes(elseJmpAddr))
         emitStackMapFrame()

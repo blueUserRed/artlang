@@ -1,9 +1,5 @@
 fn main() {
-    let test = {
-        const n1 = get1()
-        const n2 = get2()
-        => n1 + n2
-    }
+    let test = if (false) "was true" else "was false"
     print test
 }
 
