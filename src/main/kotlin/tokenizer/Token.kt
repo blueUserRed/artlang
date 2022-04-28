@@ -48,7 +48,7 @@ enum class TokenType {
     //operators
     PLUS, MINUS, D_PLUS, D_MINUS, STAR, SLASH, MOD, TILDE,
     EQ, GT, LT, GT_EQ, LT_EQ, D_EQ, NOT_EQ, NOT, D_AND, D_OR,
-    PLUS_EQ, MINUS_EQ, STAR_EQ, SLASH_EQ, WALRUS,
+    PLUS_EQ, MINUS_EQ, STAR_EQ, SLASH_EQ, WALRUS, YIELD_ARROW,
 
     SOFT_BREAK, //line break
 

@@ -139,21 +139,22 @@ class Compiler : AstNodeVisitor<Unit> {
             return
         }
 
-        var isFloat = false
-        if (
-            binary.type == Datatype.Float() ||
-            binary.left.type == Datatype.Float() ||
-            binary.right.type == Datatype.Float()
-        ) {
-            isFloat = true
+        val isFloat = binary.type == Datatype.Float()
+
+//        if (
+//            binary.type == Datatype.Float() ||
+//            binary.left.type == Datatype.Float() ||
+//            binary.right.type == Datatype.Float()
+//        ) {
+//            isFloat = true
+//            compile(binary.left, false)
+//            if (binary.left.type != Datatype.Float()) doConvertPrimitive(binary.left.type, Datatype.Float())
+//            compile(binary.right, false)
+//            if (binary.right.type != Datatype.Float()) doConvertPrimitive(binary.right.type, Datatype.Float())
+//        } else {
             compile(binary.left, false)
-            if (binary.left.type != Datatype.Float()) doConvertPrimitive(binary.left.type, Datatype.Float())
             compile(binary.right, false)
-            if (binary.right.type != Datatype.Float()) doConvertPrimitive(binary.right.type, Datatype.Float())
-        } else {
-            compile(binary.left, false)
-            compile(binary.right, false)
-        }
+//        }
 
         when (val type = binary.operator.tokenType) {
             TokenType.PLUS -> {
@@ -185,9 +186,9 @@ class Compiler : AstNodeVisitor<Unit> {
             else -> TODO("not yet implemented")
         }
 
-        if (binary.type.kind in arrayOf(Datakind.BYTE, Datakind.SHORT)) {
-            doConvertPrimitive(Datatype.Integer(), binary.type)
-        }
+//        if (binary.type.kind in arrayOf(Datakind.BYTE, Datakind.SHORT)) {
+//            doConvertPrimitive(Datatype.Integer(), binary.type)
+//        }
     }
 
     private fun doFloatCompare(comparison: TokenType) = when (comparison) {
@@ -210,40 +211,40 @@ class Compiler : AstNodeVisitor<Unit> {
         else -> throw RuntimeException("not a comparison")
     }
 
-    /**
-     * emits the instruction to convert the value on the top of the stack from '[from]' to '[to]'
-     */
-    private fun doConvertPrimitive(from: Datatype, to: Datatype) {
-        when (from.kind) {
-            Datakind.BYTE -> when (to.kind) {
-                Datakind.SHORT -> { }
-                Datakind.INT -> { }
-                Datakind.LONG -> emit(i2l)
-                Datakind.FLOAT -> emit(i2f)
-                Datakind.DOUBLE -> emit(i2d)
-                else -> throw RuntimeException("unsupported type")
-            }
-            Datakind.SHORT -> when (to.kind) {
-                Datakind.BYTE -> emit(i2b)
-                Datakind.INT -> { }
-                Datakind.LONG -> emit(i2l)
-                Datakind.FLOAT -> emit(i2f)
-                Datakind.DOUBLE -> emit(i2d)
-                else -> throw RuntimeException("unsupported type")
-            }
-            Datakind.INT -> when (to.kind) {
-                Datakind.BYTE -> emit(i2b)
-                Datakind.SHORT -> emit(i2s)
-                Datakind.LONG -> emit(i2l)
-                Datakind.FLOAT -> emit(i2f)
-                Datakind.DOUBLE -> emit(i2d)
-                else -> throw RuntimeException("unsupported type")
-            }
-            else -> throw RuntimeException("unsupported type")
-        }
-        decStack()
-        incStack(to)
-    }
+//    /**
+//     * emits the instruction to convert the value on the top of the stack from '[from]' to '[to]'
+//     */
+//    private fun doConvertPrimitive(from: Datatype, to: Datatype) {
+//        when (from.kind) {
+//            Datakind.BYTE -> when (to.kind) {
+//                Datakind.SHORT -> { }
+//                Datakind.INT -> { }
+//                Datakind.LONG -> emit(i2l)
+//                Datakind.FLOAT -> emit(i2f)
+//                Datakind.DOUBLE -> emit(i2d)
+//                else -> throw RuntimeException("unsupported type")
+//            }
+//            Datakind.SHORT -> when (to.kind) {
+//                Datakind.BYTE -> emit(i2b)
+//                Datakind.INT -> { }
+//                Datakind.LONG -> emit(i2l)
+//                Datakind.FLOAT -> emit(i2f)
+//                Datakind.DOUBLE -> emit(i2d)
+//                else -> throw RuntimeException("unsupported type")
+//            }
+//            Datakind.INT -> when (to.kind) {
+//                Datakind.BYTE -> emit(i2b)
+//                Datakind.SHORT -> emit(i2s)
+//                Datakind.LONG -> emit(i2l)
+//                Datakind.FLOAT -> emit(i2f)
+//                Datakind.DOUBLE -> emit(i2d)
+//                else -> throw RuntimeException("unsupported type")
+//            }
+//            else -> throw RuntimeException("unsupported type")
+//        }
+//        decStack()
+//        incStack(to)
+//    }
 
     /**
      * compiles a binary addition of strings using StringBuilders
@@ -355,6 +356,7 @@ class Compiler : AstNodeVisitor<Unit> {
         emitterTarget.lastStackMapFrameOffset = -1
         emitterTarget.maxLocals = function.amountLocals
 
+        methodBuilder.descriptor = function.functionDescriptor.getDescriptorString()
         methodBuilder.descriptor = function.functionDescriptor.getDescriptorString()
         methodBuilder.name = function.name
 
@@ -583,9 +585,9 @@ class Compiler : AstNodeVisitor<Unit> {
 
     override fun visit(varDec: AstNode.VariableDeclaration) {
         compile(varDec.initializer, false)
-        if (varDec.varType == Datatype.Float() && varDec.initializer.type != Datatype.Float()) {
-            doConvertPrimitive(varDec.initializer.type, Datatype.Float())
-        }
+//        if (varDec.varType == Datatype.Float() && varDec.initializer.type != Datatype.Float()) {
+//            doConvertPrimitive(varDec.initializer.type, Datatype.Float())
+//        }
         putTypeInLocals(varDec.index, varDec.varType, true)
         decStack()
     }
@@ -701,8 +703,13 @@ class Compiler : AstNodeVisitor<Unit> {
     override fun visit(loop: AstNode.Loop) {
         emitStackMapFrame()
         val before = emitterTarget.curCodeOffset
-        loopContinueAddress = before //TODO: fix nested loops
+
+        val loopContinueAddressBefore = loopContinueAddress
+        val loopBreakAddressesToOverwriteBefore = loopBreakAddressesToOverwrite
+
+        loopContinueAddress = before
         loopBreakAddressesToOverwrite = mutableListOf()
+
         compile(loop.body, true)
         val absOffset = (before - emitterTarget.curCodeOffset)
         emitGoto(absOffset)
@@ -711,11 +718,19 @@ class Compiler : AstNodeVisitor<Unit> {
         for (addr in loopBreakAddressesToOverwrite) {
             overwriteByteCode(addr, *Utils.getShortAsBytes((offset - (addr - 1)).toShort()))
         }
+
+        loopContinueAddress = loopContinueAddressBefore
+        loopBreakAddressesToOverwrite = loopBreakAddressesToOverwriteBefore
     }
 
     override fun visit(block: AstNode.Block) {
         val before = emitterTarget.locals.toMutableList()
-        for (s in block.statements) compile(s, true)
+        for (s in block.statements) {
+            if (s is AstNode.YieldArrow) {
+                compile(s, false)
+                break
+            } else compile(s, true)
+        }
         emitterTarget.locals = before
     }
 
@@ -766,9 +781,14 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     override fun visit(whileStmt: AstNode.While) {
-        //TODO: fix nested loops
         val startOffset = emitterTarget.curCodeOffset
+
+        val loopContinueAddressBefore = loopContinueAddress
+        val loopBreakAddressesToOverwriteBefore = loopBreakAddressesToOverwrite
+
         loopContinueAddress = startOffset
+        loopBreakAddressesToOverwrite = mutableListOf()
+
         emitStackMapFrame()
         compile(whileStmt.condition, false)
         emit(ifeq, 0x00.toByte(), 0x00.toByte())
@@ -783,6 +803,10 @@ class Compiler : AstNodeVisitor<Unit> {
         for (addr in loopBreakAddressesToOverwrite) {
             overwriteByteCode(addr, *Utils.getShortAsBytes((offset - (addr - 1)).toShort()))
         }
+
+        loopContinueAddress = loopContinueAddressBefore
+        loopBreakAddressesToOverwrite = loopBreakAddressesToOverwriteBefore
+
     }
 
     override fun visit(funcCall: AstNode.FunctionCall) {
@@ -830,12 +854,12 @@ class Compiler : AstNodeVisitor<Unit> {
 
         compile(returnStmt.toReturn!!, false)
 
-        if (
-            returnStmt.toReturn!!.type.kind == Datakind.FLOAT
-            && curFunction!!.functionDescriptor.returnType.kind != Datakind.FLOAT
-        ) {
-            doConvertPrimitive(returnStmt.toReturn!!.type, Datatype.Float())
-        }
+//        if (
+//            returnStmt.toReturn!!.type.kind == Datakind.FLOAT
+//            && curFunction!!.functionDescriptor.returnType.kind != Datakind.FLOAT
+//        ) {
+//            doConvertPrimitive(returnStmt.toReturn!!.type, Datatype.Float())
+//        }
 
         when (returnStmt.toReturn!!.type.kind) {
             Datakind.STRING, Datakind.OBJECT, Datakind.ARRAY -> emit(areturn)
@@ -990,6 +1014,10 @@ class Compiler : AstNodeVisitor<Unit> {
         )
         emit(invokespecial, *Utils.getLastTwoBytes(methodIndex))
         decStack()
+    }
+
+    override fun visit(yieldArrow: AstNode.YieldArrow) {
+        compile(yieldArrow.statement, false)
     }
 
     /**

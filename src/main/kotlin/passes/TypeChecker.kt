@@ -229,8 +229,12 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     }
 
     override fun visit(block: AstNode.Block): Datatype {
-        for (s in block.statements) check(s, block)
-        return Datatype.Void()
+        var type: Datatype = Datatype.Void()
+        for (s in block.statements) {
+            check(s, block)
+            if (s is AstNode.YieldArrow) type = s.yieldType
+        }
+        return type
     }
 
     override fun visit(variable: AstNode.Variable): Datatype {
@@ -618,13 +622,12 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         return arr.type
     }
 
-//    private fun doFuncSigsMatch(types1: List<Datatype>, types2: List<Pair<String, Datatype>>): Boolean {
-//        val types2NoThis = types2.toMutableList()
-//        if (types2.isNotEmpty() && types2[0].first == "this") types2NoThis.removeAt(0)
-//        if (types1.size != types2NoThis.size) return false
-//        for (i in types1.indices) if (types1[i] != types2NoThis[i].second) return false
-//        return true
-//    }
+    override fun visit(yieldArrow: AstNode.YieldArrow): Datatype {
+        val type = check(yieldArrow.statement, yieldArrow)
+        if (type.kind == Datakind.VOID) throw RuntimeException("expected Expression")
+        yieldArrow.yieldType = type
+        return Datatype.Void()
+    }
 
     private fun lookupTopLevelFunc(name: String, sig: List<Datatype>): AstNode.Function? {
         for (func in program.funcs) if (func.name == name && func.functionDescriptor.matches(sig)) return func

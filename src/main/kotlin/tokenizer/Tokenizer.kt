@@ -152,6 +152,11 @@ object Tokenizer {
                         emit(TokenType.D_EQ, "==", null, cur - lastLineBreakPos - 2)
                         continue
                     }
+                    if (canPeek() && peek() == '>') {
+                        consume(); consume()
+                        emit(TokenType.YIELD_ARROW, "=>", null, cur - lastLineBreakPos - 2)
+                        continue
+                    }
                     emit(TokenType.EQ, "=", null)
                     consume()
                     continue

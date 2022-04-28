@@ -840,6 +840,18 @@ abstract class AstNode {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
+    class YieldArrow(var statement: AstNode) : AstNode() {
+
+        lateinit var yieldType: Datatype
+
+        override fun swap(orig: AstNode, to: AstNode) {
+            if (orig !== statement) throw CantSwapException()
+            statement = to
+        }
+
+        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
+    }
+
     /**
      * the parser-representation of a datatype. Converted to a proper type by the TypeChecker
      * @param kind the kind of data

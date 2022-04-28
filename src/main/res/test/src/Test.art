@@ -1,43 +1,48 @@
-
 fn main() {
-    let extending2 = Extending2()
-    takesBase(extending2)
-    takesObject(extending2)
+    let test = {
+        const n1 = get1()
+        const n2 = get2()
+        => n1 + n2
+    }
+    print test
 }
 
-//fn main() {
-//    const cat = Cat()
-//    takeAnimal(cat)
-//}
-//
-//fn takeAnimal(animal: Animal) {
-//    animal.saySomething()
-//}
-//
-//class Cat : Animal {
-//
-//    public field catField: int = 21
-//
-//    public fn meow() {
-//        print "meow"
-//    }
-//
-//    public fn saySomething() {
-//        this.meow()
-//    }
-//
-//}
-//
-//class Animal {
-//
-//    public field animalField: str = "sdsdfsdfjkl"
-//
-//    public fn walk() {
-//        print "Animal walking..."
-//    }
-//
-//    public fn saySomething() {
-//        print "<generic animal sounds>"
-//    }
-//
-//}
+fn get1(): int {
+    return 1
+}
+
+fn get2(): int {
+    return 2
+}
+
+fn takeAnimal(animal: Animal) {
+    animal.saySomething()
+}
+
+class Cat : Animal {
+
+    public field catField: int = 21
+
+    public fn meow() {
+        print "meow"
+    }
+
+    public fn saySomething() {
+        this.meow()
+    }
+
+}
+
+class Animal {
+
+    public field animalField: str = "sdsdfsdfjkl"
+
+    public fn walk() {
+        print "Animal walking..."
+    }
+
+    public fn saySomething() {
+        print "<generic animal sounds>"
+    }
+
+}

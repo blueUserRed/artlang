@@ -476,6 +476,7 @@ object Parser {
         if (match(TokenType.IDENTIFIER)) return AstNode.Get(last(), null)
         if (match(TokenType.L_PAREN)) return groupExpression()
         if (match(TokenType.L_BRACKET)) return parseArrayLiteral()
+        if (match(TokenType.YIELD_ARROW)) return AstNode.YieldArrow(parseStatement())
 
         if (match(
                 TokenType.T_BYTE,
@@ -559,8 +560,13 @@ object Parser {
         val statements = mutableListOf<AstNode>()
         while (!match(TokenType.R_BRACE)) {
             try {
-                statements.add(parseStatement())
+                val statement = parseStatement()
+                statements.add(statement)
                 consumeExpectingSoftBreakOrError("Expected line break or semicolon")
+                if (statement is AstNode.YieldArrow) {
+                    consumeOrError(TokenType.R_BRACE, "the yield-arrow has to be the last statement in a block")
+                    return AstNode.Block(statements.toTypedArray())
+                }
             } catch (e: ParserResyncException) {
                 resync()
                 continue

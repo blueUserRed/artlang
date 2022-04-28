@@ -201,4 +201,8 @@ class VariableResolver : AstNodeVisitor<Unit> {
         resolve(arr.arrIndex, arr)
         resolve(arr.to, arr)
     }
+
+    override fun visit(yieldArrow: AstNode.YieldArrow) {
+        resolve(yieldArrow.statement, yieldArrow)
+    }
 }
