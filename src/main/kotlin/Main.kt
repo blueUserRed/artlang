@@ -94,7 +94,7 @@ object Main {
         }
 
         val program: AstNode.Program
-        val parseTime = Stopwatch.time { program = Parser.parse(tokens, code) }
+        val parseTime = Stopwatch.time { program = Parser().parse(tokens, code) }
         if (ErrorPool.errors.size != lastErrors) {
             if (Settings.verbose) {
                 println("${Ansi.yellow}Accumulated ${ErrorPool.errors.size - lastErrors} error(s)" +

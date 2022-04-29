@@ -5,12 +5,29 @@ import passes.MinMaxPosFinder
 import Datatype
 import tokenizer.Token
 
+/**
+ * contains the different errors
+ */
 class Errors {
 
+    /**
+     * base-class for all Errors
+     */
     abstract class ArtError(val errorCode: Int, val srcCode: String) {
+
+        /**
+         * the message displayed to the user
+         */
         abstract val message: String
+
+        /**
+         * where in the file the error is located (Map<Linenumber, Pair<startInLine, stopInLine>>)
+         */
         abstract val ranges: MutableMap<Int, Pair<Int, Int>>
 
+        /**
+         * constructs a string with the error-message and the lines where the error is located
+         */
         fun constructString(): String {
             val builder = StringBuilder()
             builder
@@ -48,8 +65,14 @@ class Errors {
             return builder.toString()
         }
 
+        /**
+         * @return how much the line numbers need to be padded
+         */
         private fun getPadAmount(maxLine: Int): Int = (maxLine + 2).toString().length
 
+        /**
+         * returns the amount of lines that need to be displayed
+         */
         private fun getMinAndMaxLine(): Pair<Int, Int> {
             var max = -1
             var min = Integer.MAX_VALUE
@@ -60,6 +83,9 @@ class Errors {
             return min to max
         }
 
+        /**
+         * gets the ranges of the error from tokens
+         */
         protected fun getRangesFromTokens(tokens: List<Token>): MutableMap<Int, Pair<Int, Int>> {
             val toRet = mutableMapOf<Int, Pair<Int, Int>>()
             for (token in tokens) {

@@ -9,12 +9,31 @@ import Datakind
 import kotlin.RuntimeException
 import errors.Errors
 
-object Parser {
+/**
+ * parses a list of tokens and constructs the ast
+ */
+class Parser {
 
+    /**
+     * the index of the current token
+     */
     private var cur: Int = 0
+
+    /**
+     * the tokens that are being parsed
+     */
     private var tokens: List<Token> = listOf()
+
+    /**
+     * the srcCode the tokens originated from
+     */
     private var srcCode: String = ""
 
+    /**
+     * parses the [tokens] and constructs the ast
+     * @param tokens the tokens
+     * @param code the srcCode the tokens originated from
+     */
     fun parse(tokens: List<Token>, code: String): AstNode.Program {
         cur = 0
         this.tokens = tokens
@@ -58,13 +77,21 @@ object Parser {
         return AstNode.Program(functions, classes, fields)
     }
 
+    /**
+     * attempts to resync the parser in the context of the top-level
+     */
     fun resyncTopLevel() {
         while (peek().tokenType !in arrayOf(TokenType.K_FN, TokenType.K_CLASS, TokenType.K_CONST, TokenType.EOF) &&
             !(peek().tokenType == TokenType.IDENTIFIER && peek().lexeme == "field")) cur++
     }
 
-    private fun parseFieldDeclaration(modifiers: List<Token>, isConst: Boolean, isTopLevel: Boolean)
-    : AstNode.Field {
+    /**
+     * parses a field declaration
+     * @param modifiers the modifiers that preceeded the field
+     * @param isConst true if the field is const
+     * @param isTopLevel true if the field was defined in the top level
+     */
+    private fun parseFieldDeclaration(modifiers: List<Token>, isConst: Boolean, isTopLevel: Boolean) : AstNode.Field {
         consumeOrError(TokenType.IDENTIFIER, "expected name")
         val name = last()
         consumeOrError(TokenType.COLON, "Field-definitions always require a explicit type")
@@ -74,13 +101,18 @@ object Parser {
         return AstNode.FieldDeclaration(name, type, initializer, isConst, modifiers, isTopLevel)
     }
 
+    /**
+     * parses a function
+     * @param modifiers the modifies that preceeded the function
+     * @param isTopLevel true if the function was defined in the top level
+     */
     private fun parseFunc(modifiers: List<Token>, isTopLevel: Boolean): AstNode.Function {
         consumeOrError(TokenType.IDENTIFIER, "Expected function name")
         val funcName = last()
         consumeOrError(TokenType.L_PAREN, "Expected () after function name")
 
         if (funcName.lexeme == "main" && modifiers.isNotEmpty()) {
-            artError(Errors.InvalidMainFunctionDeclarationError("main function must not have modifiers",
+            artError(Errors.InvalidMainFunctionDeclarationError("Main function must not have modifiers",
                 srcCode, modifiers))
         }
 
@@ -109,6 +141,10 @@ object Parser {
         return function
     }
 
+    /**
+     * parses a class
+     * @param classModifiers the modifiers that preceeded the class
+     */
     private fun parseClass(classModifiers: List<Token>): AstNode.ArtClass {
         consumeOrError(TokenType.IDENTIFIER, "Expected class name")
         val name = last()
@@ -150,7 +186,7 @@ object Parser {
                 continue
             }
             if (match(TokenType.K_CONST)) {
-                consumeIdentOrError("field", "expected field declaration after const")
+                consumeIdentOrError("field", "Expected field declaration after const")
                 val field = parseFieldDeclaration(modifiers, true, false)
                 if (field.isStatic) staticFields.add(field) else fields.add(field)
                 continue
@@ -165,17 +201,26 @@ object Parser {
         return AstNode.ClassDefinition(name, staticFuncs, funcs, staticFields, fields, extends)
     }
 
+    /**
+     * attempts to resync the parser in the context of a class
+     */
     private fun resyncClass() {
         while (peek().tokenType !in arrayOf(TokenType.K_FN, TokenType.K_CONST, TokenType.EOF) &&
             !(peek().tokenType == TokenType.IDENTIFIER && peek().lexeme == "field")) cur++
     }
 
+    /**
+     * parses a list of modifiers
+     */
     private fun parseModifiers(): List<Token> {
         val modifiers = mutableListOf<Token>()
         while (matchIdent("public", "abstract", "static")) modifiers.add(last())
         return modifiers
     }
 
+    /**
+     * validates that the [modifiers] can be used in front of a function and that each modifier is only present once
+     */
     private fun validateModifiersForFunc(modifiers: List<Token>) {
         val had = mutableListOf<String>()
         for (modifier in modifiers) {
@@ -192,6 +237,9 @@ object Parser {
         }
     }
 
+    /**
+     * validates that the [modifiers] can be used in front of a field and that each modifier is only present once
+     */
     private fun validateModifiersForField(modifiers: List<Token>) {
         val had = mutableListOf<String>()
         for (modifier in modifiers) {
@@ -211,6 +259,9 @@ object Parser {
         }
     }
 
+    /**
+     * validates that the [modifiers] can be used in front of a class and that each modifier is only present once
+     */
     private fun validateModifiersForClass(modifiers: List<Token>) {
         val had = mutableListOf<String>()
         for (modifier in modifiers) {
@@ -227,6 +278,9 @@ object Parser {
         }
     }
 
+    /**
+     * parses a statement
+     */
     private fun parseStatement(): AstNode {
         if (match(TokenType.L_BRACE)) return parseBlock()
         if (match(TokenType.K_PRINT)) return parsePrint()
@@ -242,6 +296,12 @@ object Parser {
         return parseAssignment()
     }
 
+    /**
+     * parses the shorthand for operations and assignments (`+=`, `-=`, etc.)
+     * @param variable the statement where the shorthand is applied
+     * @param op the operation
+     * @param num the right side of the statement
+     */
     private fun parseVarAssignShorthand(variable: AstNode.Get, op: Token, num: AstNode): AstNode {
         when (op.tokenType) {
             TokenType.STAR_EQ -> return AstNode.Assignment(
@@ -298,6 +358,9 @@ object Parser {
         }
     }
 
+    /**
+     * parses a return statement
+     */
     private fun parseReturn(): AstNode.Return {
         val returnToken = last()
         if (matchNSFB(TokenType.SOFT_BREAK)) return AstNode.Return(null, returnToken)
@@ -305,6 +368,9 @@ object Parser {
         return AstNode.Return(returnExpr, returnToken)
     }
 
+    /**
+     * parses a while loop
+     */
     private fun parseWhileLoop(): AstNode {
         consumeOrError(TokenType.L_PAREN, "Expected Parenthesis after while")
         val condition = parseStatement()
@@ -318,6 +384,9 @@ object Parser {
         return AstNode.While(body, condition)
     }
 
+    /**
+     * parses an if statement
+     */
     private fun parseIf(): AstNode {
 
         consumeOrError(TokenType.L_PAREN, "Expected Parenthesis after if")
@@ -339,6 +408,9 @@ object Parser {
         return AstNode.If(ifStmt, elseStmt, condition)
     }
 
+    /**
+     * parses a loop statement
+     */
     private fun parseLoop(): AstNode {
         val stmt = parseStatement()
         if (stmt is AstNode.VariableDeclaration) {
@@ -347,6 +419,10 @@ object Parser {
         return AstNode.Loop(stmt)
     }
 
+    /**
+     * parses a variable declaration
+     * @param isConst true if the variable was declared using the const keyword
+     */
     private fun parseVariableDeclaration(isConst: Boolean): AstNode.VariableDeclaration {
         val decToken = last()
         consumeOrError(TokenType.IDENTIFIER, "expected identifier after let/const")
@@ -360,6 +436,9 @@ object Parser {
         return stmt
     }
 
+    /**
+     * parses an assignment
+     */
     private fun parseAssignment(): AstNode {
         val left = parseBooleanComparison()
         if (match(TokenType.EQ)) {
@@ -386,6 +465,10 @@ object Parser {
         return left
     }
 
+    /**
+     * parses `&&` and `||`
+     * TODO: finally fix priority, it isnt that hard
+     */
     private fun parseBooleanComparison(): AstNode {
         var left = parseComparison()
         while (match(TokenType.D_AND, TokenType.D_OR)) { //TODO: fix priority
@@ -396,6 +479,9 @@ object Parser {
         return left
     }
 
+    /**
+     * parses number comparisons (==, >, >=, etc.)
+     */
     private fun parseComparison(): AstNode {
         var left = parseTermExpression()
         while (match(TokenType.D_EQ, TokenType.LT, TokenType.LT_EQ, TokenType.GT, TokenType.GT_EQ, TokenType.NOT_EQ)) {
@@ -406,6 +492,9 @@ object Parser {
         return left
     }
 
+    /**
+     * parses additions and subractions
+     */
     private fun parseTermExpression(): AstNode {
         var left = parseFactorExpression()
         while (matchNSFB(TokenType.PLUS, TokenType.MINUS)) {
@@ -416,6 +505,9 @@ object Parser {
         return left
     }
 
+    /**
+     * parses multiplications, divisions and modulo(s)
+     */
     private fun parseFactorExpression(): AstNode {
         var left = parseUnaryExpression()
         while (matchNSFB(TokenType.STAR, TokenType.SLASH, TokenType.MOD)) {
@@ -426,6 +518,9 @@ object Parser {
         return left
     }
 
+    /**
+     * parses unary minus and unary not
+     */
     private fun parseUnaryExpression(): AstNode {
         var cur: AstNode? = null
         if (match(TokenType.MINUS, TokenType.NOT)) {
@@ -436,6 +531,9 @@ object Parser {
         return cur ?: parseGetExpression()
     }
 
+    /**
+     * parses get-expressions, array-gets and array-sets
+     */
     private fun parseGetExpression(): AstNode {
         var left = parseLiteralExpression()
         while (true) {
@@ -472,6 +570,9 @@ object Parser {
         return left
     }
 
+    /**
+     * parses a literal expression (e.g. numbers, strings, variables, groups, etc.)
+     */
     private fun parseLiteralExpression(): AstNode {
         if (match(TokenType.IDENTIFIER)) return AstNode.Get(last(), null)
         if (match(TokenType.L_PAREN)) return groupExpression()
@@ -523,6 +624,9 @@ object Parser {
         return AstNode.Literal(last())
     }
 
+    /**
+     * parses an array literal (`let x = [1, 2, 3, 4]`)
+     */
     private fun parseArrayLiteral(): AstNode.ArrayLiteral {
         val startToken = last()
         val elements = mutableListOf<AstNode>()
@@ -537,6 +641,9 @@ object Parser {
         return AstNode.ArrayLiteral(elements, startToken, endToken)
     }
 
+    /**
+     * parses a function call
+     */
     private fun parseFunctionCall(func: AstNode): AstNode {
         val args = mutableListOf<AstNode>()
         while (!match(TokenType.R_PAREN)) {
@@ -550,12 +657,18 @@ object Parser {
         return AstNode.FunctionCall(func.from, func.name, args)
     }
 
+    /**
+     * parse a group expression (`3 * (1 + 2)`)
+     */
     private fun groupExpression(): AstNode {
         val exp = parseStatement()
         if (!match(TokenType.R_PAREN)) throw RuntimeException("Expected closing Parenthesis")
         return AstNode.Group(exp)
     }
 
+    /**
+     * parses a code-block
+     */
     private fun parseBlock(): AstNode.Block {
         val statements = mutableListOf<AstNode>()
         while (!match(TokenType.R_BRACE)) {
@@ -575,16 +688,25 @@ object Parser {
         return AstNode.Block(statements.toTypedArray())
     }
 
+    /**
+     * attempts to resync the parser in the context of a block
+     */
     private fun resync() {
         while (!matchNSFB(TokenType.SOFT_BREAK, TokenType.SEMICOLON)) consume()
     }
 
+    /**
+     * parses a print statement
+     */
     private fun parsePrint(): AstNode {
         val printToken = last()
         val exp = parseStatement()
         return AstNode.Print(exp, printToken)
     }
 
+    /**
+     * parses a type
+     */
     private fun parseType(): AstNode.DatatypeNode {
         val primitives = arrayOf(
             TokenType.T_BYTE,
@@ -613,6 +735,9 @@ object Parser {
         return AstNode.ObjectTypeNode(last())
     }
 
+    /**
+     * translates from a tokenType to the corresponding data type
+     */
     private fun tokenTypeToDataKind(type: TokenType) = when (type) {
         TokenType.T_BYTE -> Datakind.BYTE
         TokenType.T_SHORT -> Datakind.SHORT
@@ -624,6 +749,13 @@ object Parser {
         else -> throw RuntimeException("invalid type")
     }
 
+    /**
+     * checks whether the type of the current token matches any of the types in [types] and consumes the current token
+     * it is the case
+     *
+     * ignores soft breaks before the token
+     * @return true if the types matched
+     */
     private fun match(vararg types: TokenType): Boolean {
         val start = cur
         while (tokens[cur].tokenType == TokenType.SOFT_BREAK) cur++
@@ -635,6 +767,9 @@ object Parser {
         return false
     }
 
+    /**
+     * like [match], but instead of matching the type it matches the lexeme of an identifier token
+     */
     private fun matchIdent(vararg identifiers: String): Boolean {
         val start = cur
         while (tokens[cur].tokenType == TokenType.SOFT_BREAK) cur++
@@ -648,7 +783,11 @@ object Parser {
         return false
     }
 
-    //match no soft break; TODO: come up with better name
+    /**
+     * match no soft break; TODO: come up with better name
+     *
+     * like [match], but doesn't ignore soft breaks
+     */
     private fun matchNSFB(vararg types: TokenType): Boolean {
         for (type in types) if (tokens[cur].tokenType == type) {
             cur++
@@ -657,16 +796,26 @@ object Parser {
         return false
     }
 
+    /**
+     * consumes all soft breaks
+     */
     private fun consumeSoftBreaks() {
         while (tokens[cur].tokenType == TokenType.SOFT_BREAK) cur++
     }
 
+    /**
+     * consumes the current token
+     */
     private fun consume(): Token {
         consumeSoftBreaks()
         cur++
         return last()
     }
 
+    /**
+     * consumes all soft breaks, but produces a syntax error if no soft break is encountered
+     * @param message the message of the syntax error
+     */
     private fun consumeExpectingSoftBreakOrError(message: String) {
         if (tokens[cur].tokenType !in arrayOf(TokenType.SOFT_BREAK, TokenType.SEMICOLON)) {
             artError(Errors.SyntaxError(consume(), message, srcCode))
@@ -675,6 +824,10 @@ object Parser {
         while (tokens[cur].tokenType in arrayOf(TokenType.SOFT_BREAK, TokenType.SEMICOLON)) cur++
     }
 
+    /**
+     * tries to consume a token of type [type] and produces a syntax error with message [message] if the type does not
+     * match
+     */
     private fun consumeOrError(type: TokenType, message: String) {
         while (tokens[cur].tokenType == TokenType.SOFT_BREAK) cur++
         if (tokens[cur].tokenType == type) cur++
@@ -684,6 +837,9 @@ object Parser {
         }
     }
 
+    /**
+     * like [consumeOrError], but instead of matching the tokenType it matches the lexeme of an identifier token
+     */
     private fun consumeIdentOrError(identifier: String, message: String) {
         while (tokens[cur].tokenType == TokenType.SOFT_BREAK) cur++
         if (tokens[cur].tokenType == TokenType.IDENTIFIER && tokens[cur].lexeme == identifier) cur++
@@ -693,26 +849,34 @@ object Parser {
         }
     }
 
+    /**
+     * returns the last token
+     */
     private fun last(): Token {
         return tokens[cur - 1]
     }
 
+    /**
+     * returns the current token without consuming it
+     */
     private fun peek(): Token {
         return tokens[cur]
-//        return if (cur + 1 < tokens.size) tokens[cur + 1] else null
     }
 
-    private fun peekNext(): Token? {
-        val start = cur
-        consumeSoftBreaks()
-        cur++
-        consumeSoftBreaks()
-        val ret = tokens[cur]
-        cur = start
-        return ret
-//        return if (cur + 1 < tokens.size) tokens[cur + 1] else null
-    }
+//    private fun peekNext(): Token? {
+//        val start = cur
+//        consumeSoftBreaks()
+//        cur++
+//        consumeSoftBreaks()
+//        val ret = tokens[cur]
+//        cur = start
+//        return ret
+////        return if (cur + 1 < tokens.size) tokens[cur + 1] else null
+//    }
 
+    /**
+     * thrown when a syntax error is encountered, causes the parser to resync
+     */
     class ParserResyncException : RuntimeException()
 
 }
