@@ -69,6 +69,7 @@ object Ansi {
     const val red = "\u001B[31m"
     const val blue = "\u001B[34m"
     const val white = "\u001B[37m"
+    const val green = "\u001B[32m"
 }
 
 /**
