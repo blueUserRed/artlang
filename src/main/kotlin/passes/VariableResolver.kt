@@ -145,7 +145,6 @@ class VariableResolver : AstNodeVisitor<Unit> {
     }
 
     override fun visit(get: AstNode.Get) {
-//        if (get.arrIndex != null) resolve(get.arrIndex!!, get)
         if (get.from != null) {
             resolve(get.from!!, get)
             return
@@ -154,7 +153,6 @@ class VariableResolver : AstNodeVisitor<Unit> {
         if (index == -1) return
         val toSwap = AstNode.Variable(get.name)
         toSwap.index = index
-//        toSwap.arrIndex = get.arrIndex
         swap = toSwap
         return
     }

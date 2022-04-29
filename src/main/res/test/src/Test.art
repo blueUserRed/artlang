@@ -1,6 +1,10 @@
 fn main() {
-    let test = if (false) "was true" else "was false"
-    print test
+    let myAnimal = if (true) Animal() else Cat()
+    print myAnimal
+//    let arr = [BlackCat(), BlackCat(), Cat(), Animal()]
+//
+//    let i = -1
+//    while ((i := i + 1) < arr.size) print arr[i]
 }
 
 fn get1(): int {
@@ -13,6 +17,9 @@ fn get2(): int {
 
 fn takeAnimal(animal: Animal) {
     animal.saySomething()
+}
+
+class BlackCat : Cat {
 }
 
 class Cat : Animal {

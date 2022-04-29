@@ -16,11 +16,7 @@ class MinMaxPosFinder : AstNodeVisitor<MutableMap<Int, Pair<Int, Int>>> {
     }
 
     override fun visit(variable: AstNode.Variable): MutableMap<Int, Pair<Int, Int>> {
-        val nameMap = getMinMaxFor(variable.name)
-        if (variable.arrIndex != null) {
-            return combine(nameMap, find(variable.arrIndex!!))
-        }
-        return nameMap
+        return getMinMaxFor(variable.name)
     }
 
     override fun visit(group: AstNode.Group): MutableMap<Int, Pair<Int, Int>> {
