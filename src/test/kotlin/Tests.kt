@@ -1,5 +1,5 @@
-import Test.programDir
-import Test.sampleOutDir
+import TestsDeprecated.programDir
+import TestsDeprecated.sampleOutDir
 import ast.AstPrinter
 import parser.Parser
 import passes.ControlFlowChecker
@@ -13,16 +13,51 @@ import java.nio.file.Paths
 import kotlin.io.path.name
 
 fun main() {
-    Test.test(Paths.get("${programDir}HelloWorld.art"), Paths.get("${sampleOutDir}HelloWorld"))
+    TestsDeprecated.test(Paths.get("${programDir}HelloWorld.art"), Paths.get("${sampleOutDir}HelloWorld.art"))
+    val test = Test("HelloWorld.art")
+    test.test()
+}
+
+class Test(val testfileName: String, val printOutput: Boolean = true) {
+    // Working directory set to artlang/src/test/res
+    val outDir = "out/"
+    val srcDir = "src/"
+    val sampleOutDir = "sampleOutputs/"
+    val sampleOutput = Files.readAllLines(Paths.get("$sampleOutDir/$testfileName")).toString()
+
+    fun test() {
+        Main.main(arrayOf("compile", "$srcDir$testfileName", "-v"))
+        val output = runProgram()
+        if (printOutput) println(output)
+        if (sampleOutput.equals(output)) {
+            println("Test s")
+            println("\u001B[32mTest succeeded [\u2713]")
+        } else {
+            println("\u001B[31mTest failed [\u2718]")
+        }
+        println(Ansi.reset)
+        // TODO compare is to should - Output; if Output is incorrect
+    }
+
+    private fun runProgram(): String {
+        val builder = ProcessBuilder("java", "-jar", "FizzBuzz.jar")
+        builder.directory(File(outDir))
+
+        val process = builder.start()
+        val output = java.lang.StringBuilder();
+        process.inputStream.bufferedReader(Charsets.UTF_8).forEachLine { output.append(it).append("\n") }
+        process.waitFor()
+        if (process.exitValue() != 0) throw RuntimeException("running jar file failed")
+        return output.toString()
+    }
 
 }
 
-object Test {
-
-
-    val programDir = "src/test/res/programs/"
-    val sampleOutDir = "src/test/res/sampleOutputs/"
-    val outDir = "src/test/res/out/"
+object TestsDeprecated {
+    // Working directory set to artlang/src/test/res
+    val programDir = "src/"
+    val sampleOutDir = "sampleOutputs/"
+    val outDir = "out/"
 
     var testNum: Int = 0
 
@@ -30,6 +65,11 @@ object Test {
      * Tests whether //TODO
      */
     fun test(artFile: Path, sampleOutput: Path) {
+        Main.main(arrayOf("compile", "src/FizzBuzz.art", "-v"));
+        println(runProgram());
+    }
+
+    fun testDeprecated(artFile: Path, sampleOutput: Path) {
         val code = Paths.get("$artFile").toFile().readText(Charsets.UTF_8)
         val tokens = Tokenizer.tokenize(code, artFile.toString())
         val program = Parser.parse(tokens, code)
@@ -127,7 +167,7 @@ object Test {
     }
 
     private fun runProgram(): String {
-        var builder = ProcessBuilder("java", "-jar", "Test.jar")
+        var builder = ProcessBuilder("java", "-jar", "FizzBuzz.jar")
 //        print(Utils.Ansi.yellow)
 //        builder.redirectOutput(ProcessBuilder.Redirect.INHERIT)
 //        builder.redirectError(ProcessBuilder.Redirect.INHERIT)
@@ -135,13 +175,11 @@ object Test {
 //        println(builder.command() + Utils.Ansi.reset)
 
         val process = builder.start()
-        var output = "";
-        process.inputStream.bufferedReader(Charsets.UTF_8).forEachLine {
-            output = it
-        }
+        val output = java.lang.StringBuilder();
+        process.inputStream.bufferedReader(Charsets.UTF_8).forEachLine { output.append(it).append("\n") }
         process.waitFor()
         if (process.exitValue() != 0) throw RuntimeException("running jar file failed")
-        return output
+        return output.toString()
     }
 
     private fun Path.toAbsString(): String = this.toAbsolutePath().toString()
