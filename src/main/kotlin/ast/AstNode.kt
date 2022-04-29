@@ -3,6 +3,7 @@ package ast
 import tokenizer.Token
 import Datatype
 import Datakind
+import passes.ControlFlowChecker
 import tokenizer.TokenType
 
 /**
@@ -525,14 +526,8 @@ abstract class AstNode {
          */
         var index: Int = -1
 
-        /**
-         * if the variable is array-get, this represents the index into the array
-         */
-        var arrIndex: AstNode? = null
-
         override fun swap(orig: AstNode, to: AstNode){
-            if (arrIndex !== orig) throw CantSwapException()
-            arrIndex = to
+            throw CantSwapException()
         }
 
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
@@ -585,7 +580,7 @@ abstract class AstNode {
          * returns the full name of the function (using the [AstPrinter])
          */
         fun getFullName(): String {
-            return if (from == null) "$name()" else "${from!!.accept(AstPrinter())}.${name.lexeme}()"
+            return if (from == null) "${name.lexeme}()" else "${from!!.accept(AstPrinter())}.${name.lexeme}()"
         }
 
         override fun swap(orig: AstNode, to: AstNode) {

@@ -162,13 +162,6 @@ class Errors {
             get() = incrementTarget.accept(MinMaxPosFinder())
     }
 
-    class InvalidArrayGetTargetError(val arrayGetTarget: AstNode, srcCode: String) : ArtError(9, srcCode) {
-        override val message: String
-            get() = "Invalid array-get target, expected variable or field"
-        override val ranges: MutableMap<Int, Pair<Int, Int>>
-            get() = arrayGetTarget.accept(MinMaxPosFinder())
-    }
-
     class IllegalTypesInBinaryOperationError(
         val operator: String,
         val type1: Datatype,
@@ -186,12 +179,144 @@ class Errors {
         val pos: Int,
         val line: Int,
         val character: Char,
-        srcCode: String,
+        srcCode: String
     ) : ArtError(11, srcCode) {
         override val message: String
             get() = "Invalid literal type character: $character"
         override val ranges: MutableMap<Int, Pair<Int, Int>>
             get() = mutableMapOf(line to (pos to pos))
+    }
+
+    class IncompatibleTypesError(
+        val stmt: AstNode,
+        val context: String,
+        val type1: Datatype,
+        val type2: Datatype,
+        srcCode: String
+    ) : ArtError(12, srcCode) {
+        override val message: String = "incompatible types in $context: $type1 and $type2"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = stmt.accept(MinMaxPosFinder())
+    }
+
+    class DuplicateDefinitionError(
+        val definitionToken: Token,
+        val of: String,
+        srcCode: String
+    ) : ArtError(13, srcCode) {
+        override val message: String = "duplicate definition of $of ${definitionToken.lexeme}"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = mutableMapOf(
+                definitionToken.line to (definitionToken.pos to definitionToken.pos + definitionToken.lexeme.length)
+            )
+    }
+
+    class UnknownIdentifierError(
+        val identifier: Token,
+        srcCode: String
+    ) : ArtError(14, srcCode) {
+        override val message: String = "Unknown identifier ${identifier.lexeme}"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = mutableMapOf(identifier.line to (identifier.pos to identifier.pos + identifier.lexeme.length))
+    }
+
+    class InheritanceLoopError(
+        override val message: String,
+        val name: Token,
+        srcCode: String
+    ) : ArtError(15, srcCode) {
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = mutableMapOf(name.line to (name.pos to name.pos + name.lexeme.length))
+    }
+
+    class ExpectedAnExpressionError(
+        val notExpression: AstNode,
+        srcCode: String
+    ) : ArtError(16, srcCode) {
+        override val message: String = "Expected an expression"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = notExpression.accept(MinMaxPosFinder())
+    }
+
+    class ArrayIndexTypeError(
+        val expr: AstNode,
+        val acutalType: Datatype,
+        srcCode: String
+    ) : ArtError(17, srcCode) {
+        override val message: String = "Arrays can only be indexed by int, found $acutalType"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = expr.accept(MinMaxPosFinder())
+    }
+
+    class InvalidGetSetReceiverError(
+        val receiver: AstNode,
+        val action: String,
+        srcCode: String
+    ) : ArtError(18, srcCode) {
+        override val message: String = "$action can only be used on an array"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = receiver.accept(MinMaxPosFinder())
+    }
+
+    class AssignToConstError(
+        val assignment: AstNode,
+        val name: String,
+        srcCode: String
+    ) : ArtError(19, srcCode) {
+        override val message: String = "Cannot assign to const $name"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = assignment.accept(MinMaxPosFinder())
+    }
+
+    class PrivateMemberAccessError(
+        val access: AstNode,
+        val type: String,
+        val name: String,
+        srcCode: String
+    ) : ArtError(20, srcCode) {
+        override val message: String = "Cannot access private $type $name"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = access.accept(MinMaxPosFinder())
+    }
+
+    class ExpectedConditionError(
+        val notCondition: AstNode,
+        val actualType: Datatype,
+        srcCode: String
+    ) : ArtError(21, srcCode) {
+        override val message: String = "Expected a condition, found type $actualType instead"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = notCondition.accept(MinMaxPosFinder())
+    }
+
+    class OperationNotApplicableError(
+        val operation: String,
+        val type: Datatype,
+        val stmt: AstNode,
+        srcCode: String
+    ) : ArtError(22, srcCode) {
+        override val message: String = "Operation $operation is cannot be used on type $type"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = stmt.accept(MinMaxPosFinder())
+    }
+
+    class InvalidTypeInArrayCreateError(
+        val arrCreate: AstNode,
+        val found: Datatype,
+        srcCode: String
+    ) : ArtError(23, srcCode) {
+        override val message: String = "Expected type int in array create, found $found"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = arrCreate.accept(MinMaxPosFinder())
+    }
+
+    class EmptyArrayLiteralError(
+        val arrLiteral: AstNode,
+        srcCode: String
+    ) : ArtError(24, srcCode) {
+        override val message: String = "Array literal must not be empty"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = arrLiteral.accept(MinMaxPosFinder())
     }
 
 }

@@ -562,24 +562,12 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     override fun visit(variable: AstNode.Variable) {
-
-        if (variable.arrIndex == null) {
-            when (variable.type.kind) {
-                Datakind.INT, Datakind.BOOLEAN, Datakind.SHORT, Datakind.BYTE -> emitIntVarLoad(variable.index)
-                Datakind.STRING, Datakind.OBJECT, Datakind.ARRAY -> emitObjectVarLoad(variable.index)
-                Datakind.FLOAT -> emitFloatVarLoad(variable.index)
-                else -> TODO("variable load type not implemented")
-            }
-            incStack(variable.type)
-            return
+        when (variable.type.kind) {
+            Datakind.INT, Datakind.BOOLEAN, Datakind.SHORT, Datakind.BYTE -> emitIntVarLoad(variable.index)
+            Datakind.STRING, Datakind.OBJECT, Datakind.ARRAY -> emitObjectVarLoad(variable.index)
+            Datakind.FLOAT -> emitFloatVarLoad(variable.index)
+            else -> TODO("variable load type not implemented")
         }
-
-        emitObjectVarLoad(variable.index)
-        incStack(emitterTarget.locals[variable.index]!!)
-        compile(variable.arrIndex!!, false)
-        emitALoad(variable.type)
-        decStack()
-        decStack()
         incStack(variable.type)
     }
 

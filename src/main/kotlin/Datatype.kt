@@ -89,7 +89,10 @@ abstract class Datatype(val kind: Datakind) {
         override fun toString(): String = clazz.name
 
         override fun compatibleWith(other: Datatype): Boolean {
-            return other.kind in arrayOf(Datakind.OBJECT, Datakind.ERROR) //TODO: fix
+            if (other.kind != Datakind.OBJECT) return false
+            other as Object
+            if (other.clazz === clazz) return true
+            return StatClass(other.clazz).isSuperClassOf(clazz)
         }
 
         fun lookupFunc(name: String, sig: List<Datatype>): AstNode.Function? {
