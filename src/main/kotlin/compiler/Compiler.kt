@@ -377,6 +377,7 @@ class Compiler : AstNodeVisitor<Unit> {
             "public" -> methodBuilder.isPublic = true
             "static" -> methodBuilder.isStatic = true
             "abstract" -> methodBuilder.isAbstract = true
+            "override" -> { }
             else -> TODO("not yet implemented")
         }
 

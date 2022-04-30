@@ -5,6 +5,7 @@ import compiler.Compiler
 import errors.ErrorPool
 import parser.Parser
 import passes.ControlFlowChecker
+import passes.InheritanceChecker
 import passes.TypeChecker
 import passes.VariableResolver
 import tokenizer.Token
@@ -116,7 +117,7 @@ object Main {
         val variableResolverTime = Stopwatch.time { program.accept(VariableResolver()) }
         if (ErrorPool.errors.size != lastErrors) {
             if (Settings.verbose) {
-                println("${Ansi.yellow}Accumulated ${ErrorPool.errors.size - lastErrors} errors${Ansi.reset}")
+                println("${Ansi.yellow}Accumulated ${ErrorPool.errors.size - lastErrors} error(s)${Ansi.reset}")
             }
             lastErrors = ErrorPool.errors.size
         }
@@ -126,7 +127,7 @@ object Main {
         val typeCheckingTime = Stopwatch.time { program.accept(TypeChecker().apply { srcCode = code }) }
         if (ErrorPool.errors.size != lastErrors) {
             if (Settings.verbose) {
-                println("${Ansi.yellow}Accumulated ${ErrorPool.errors.size - lastErrors} errors${Ansi.reset}")
+                println("${Ansi.yellow}Accumulated ${ErrorPool.errors.size - lastErrors} error(s)${Ansi.reset}")
             }
             lastErrors = ErrorPool.errors.size
         }
@@ -136,10 +137,19 @@ object Main {
         val controlFlowCheckingTime = Stopwatch.time { program.accept(ControlFlowChecker()) }
         if (ErrorPool.errors.size != lastErrors) {
             if (Settings.verbose) {
-                println("${Ansi.yellow}Accumulated ${ErrorPool.errors.size - lastErrors} errors${Ansi.reset}")
+                println("${Ansi.yellow}Accumulated ${ErrorPool.errors.size - lastErrors} error(s)${Ansi.reset}")
             }
         }
         if (Settings.verbose) println("done in ${controlFlowCheckingTime}ms\n")
+
+        if (Settings.verbose) println("running inheritance checker")
+        val inheritanceCheckingTime = Stopwatch.time { program.accept(InheritanceChecker().apply { srcCode = code }) }
+        if (ErrorPool.errors.size != lastErrors) {
+            if (Settings.verbose) {
+                println("${Ansi.yellow}Accumulated ${ErrorPool.errors.size - lastErrors} error(s)${Ansi.reset}")
+            }
+        }
+        if (Settings.verbose) println("done in ${inheritanceCheckingTime}ms\n")
 
         if (Settings.printAst) {
             println("------------revised AST-------------")
@@ -153,7 +163,7 @@ object Main {
         }
 
         if (ErrorPool.hasErrors()) {
-            println("${Ansi.yellow}Accumulated ${ErrorPool.errors.size} errors, skipping Compilation${Ansi.reset}")
+            println("${Ansi.yellow}Accumulated ${ErrorPool.errors.size} error(s), skipping Compilation${Ansi.reset}")
             stopwatch.stop()
             println("\nTook ${stopwatch.time}ms in total\n")
             ErrorPool.printErrors()

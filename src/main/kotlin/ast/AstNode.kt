@@ -172,6 +172,11 @@ abstract class AstNode {
             statements = to
         }
 
+        fun hasModifier(modifier: String): Boolean {
+            for (mod in modifiers) if (mod.tokenType == TokenType.IDENTIFIER && mod.lexeme == modifier) return true
+            return false
+        }
+
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
@@ -922,20 +927,20 @@ data class FunctionDescriptor(val args: MutableList<Pair<String, Datatype>>, val
     }
 
     /**
-     * checks if this descriptor matches another descriptor
+     * checks if this descriptor matches another descriptor (excluding return type)
      */
     fun matches(desc: FunctionDescriptor): Boolean {
         if (desc.args.size != args.size) return false
-        for (i in desc.args.indices) if (desc.args[i].second != args[i].second) return false
+        for (i in desc.args.indices) if (args[i].first != "this" && desc.args[i].second != args[i].second) return false
         return true
     }
 
     /**
-     * checks if a list of datatypes matches the function-descriptor. If the function-descriptor has a `this`-parameter,
+     * checks if a list of datatypes is compatible to the function-descriptor. If the function-descriptor has a `this`-parameter,
      * it is ignored. Assumes [other] has no `this`
      * @param other the list of datatypes
      */
-    fun matches(other: List<Datatype>): Boolean {
+    fun isCompatibleWith(other: List<Datatype>): Boolean {
         var argsNoThis: MutableList<Pair<String, Datatype>> = args
         if (args.isNotEmpty() && args[0].first == "this") {
             argsNoThis = args.toMutableList()

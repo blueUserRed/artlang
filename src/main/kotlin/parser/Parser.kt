@@ -214,7 +214,7 @@ class Parser {
      */
     private fun parseModifiers(): List<Token> {
         val modifiers = mutableListOf<Token>()
-        while (matchIdent("public", "abstract", "static")) modifiers.add(last())
+        while (matchIdent("public", "abstract", "static", "override")) modifiers.add(last())
         return modifiers
     }
 
@@ -232,6 +232,7 @@ class Parser {
                 "abstract" -> TODO("abstract functions are not yet implemented")
                 "public" -> had.add("public")
                 "static" -> had.add("static")
+                "override" -> had.add("override")
                 else -> throw RuntimeException("unknown modifier ${modifier.lexeme}")
             }
         }

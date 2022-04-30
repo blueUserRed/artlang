@@ -1,4 +1,5 @@
 import ast.AstNode
+import ast.FunctionDescriptor
 
 abstract class Datatype(val kind: Datakind) {
 
@@ -96,8 +97,14 @@ abstract class Datatype(val kind: Datakind) {
         }
 
         fun lookupFunc(name: String, sig: List<Datatype>): AstNode.Function? {
-            for (func in clazz.funcs) if (func.name == name && func.functionDescriptor.matches(sig)) return func
+            for (func in clazz.funcs) if (func.name == name && func.functionDescriptor.isCompatibleWith(sig)) return func
             if (clazz.extends != null) return Object(clazz.extends!!).lookupFunc(name, sig)
+            return null
+        }
+
+        fun lookupFuncExact(name: String, sig: FunctionDescriptor): AstNode.Function? {
+            for (func in clazz.funcs) if (func.name == name && func.functionDescriptor.matches(sig)) return func
+            if (clazz.extends != null) return Object(clazz.extends!!).lookupFuncExact(name, sig)
             return null
         }
 
@@ -118,6 +125,11 @@ abstract class Datatype(val kind: Datakind) {
         }
 
         fun lookupFunc(name: String, sig: List<Datatype>): AstNode.Function? {
+            for (func in clazz.staticFuncs) if (func.name == name && func.functionDescriptor.isCompatibleWith(sig)) return func
+            return null
+        }
+
+        fun lookupFuncExact(name: String, sig: FunctionDescriptor): AstNode.Function? {
             for (func in clazz.staticFuncs) if (func.name == name && func.functionDescriptor.matches(sig)) return func
             return null
         }

@@ -12,6 +12,8 @@ class Errors {
 
     /**
      * base-class for all Errors
+     * @param errorCode the unique code of the error, maybe useful in the future (for example, to provide more detailed
+     *  explanations of errors)
      */
     abstract class ArtError(val errorCode: Int, val srcCode: String) {
 
@@ -343,6 +345,35 @@ class Errors {
         override val message: String = "Array literal must not be empty"
         override val ranges: MutableMap<Int, Pair<Int, Int>>
             get() = arrLiteral.accept(MinMaxPosFinder())
+    }
+
+    class FunctionRequiresOverrideModifierError(
+        val funcName: Token,
+        srcCode: String
+    ) : ArtError(25, srcCode) {
+        override val message: String = "Function ${funcName.lexeme} overrides another function, needs 'override'-modifier"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = mutableMapOf(funcName.line to (funcName.pos to funcName.pos + funcName.lexeme.length))
+    }
+
+    class FunctionDoesNotOverrideAnythingError(
+        val overrideToken: Token,
+        val name: String,
+        srcCode: String
+    ) : ArtError(26, srcCode) {
+        override val message: String = "Function $name doesn't override anything"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = mutableMapOf(overrideToken.line to (overrideToken.pos to overrideToken.pos + overrideToken.lexeme.length))
+    }
+
+    class CantWeakenAccessModifiersError(
+        val name: Token,
+        srcCode: String
+    ) : ArtError(27, srcCode) {
+        override val message: String = "Cannot weaken access privileges from public to private in overriding " +
+                "function ${name.lexeme}"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = mutableMapOf(name.line to (name.pos to name.pos + name.lexeme.length))
     }
 
 }

@@ -752,7 +752,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     }
 
     private fun lookupTopLevelFunc(name: String, sig: List<Datatype>): AstNode.Function? {
-        for (func in program.funcs) if (func.name == name && func.functionDescriptor.matches(sig)) return func
+        for (func in program.funcs) if (func.name == name && func.functionDescriptor.isCompatibleWith(sig)) return func
         return null
     }
 
