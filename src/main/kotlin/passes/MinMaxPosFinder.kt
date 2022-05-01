@@ -119,7 +119,7 @@ class MinMaxPosFinder : AstNodeVisitor<MutableMap<Int, Pair<Int, Int>>> {
     }
 
     override fun visit(arr: AstNode.ArrayLiteral): MutableMap<Int, Pair<Int, Int>> {
-        return combine(getMinMaxFor(arr.startToken), getMinMaxFor(arr.endToken))
+        TODO("figure this out")
     }
 
     override fun visit(yieldArrow: AstNode.YieldArrow): MutableMap<Int, Pair<Int, Int>> {

@@ -1,5 +1,6 @@
 import ast.AstNode
 import ast.FunctionDescriptor
+import ast.SyntheticAst
 
 abstract class Datatype(val kind: Datakind) {
 
@@ -63,13 +64,13 @@ abstract class Datatype(val kind: Datakind) {
         }
     }
 
-    class Str: Datatype(Datakind.STRING) {
-        override val descriptorType: String = "Ljava/lang/String;"
-        override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Str::class
-        override fun toString(): String = "str"
-        override fun compatibleWith(other: Datatype): Boolean {
-            return other.kind in arrayOf(Datakind.STRING, Datakind.ERROR)
-        }
+    class Str: Datatype.Object(SyntheticAst.stringClass) {
+//        override val descriptorType: String = "Ljava/lang/String;"
+//        override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Str::class
+//        override fun toString(): String = "str"
+//        override fun compatibleWith(other: Datatype): Boolean {
+//            return other.kind in arrayOf(Datakind.STRING, Datakind.ERROR)
+//        }
     }
 
     class Void : Datatype(Datakind.VOID) {
@@ -79,12 +80,12 @@ abstract class Datatype(val kind: Datakind) {
         override fun compatibleWith(other: Datatype): Boolean = false
     }
 
-    class Object(val clazz: AstNode.ArtClass) : Datatype(Datakind.OBJECT) {
+    open class Object(val clazz: AstNode.ArtClass) : Datatype(Datakind.OBJECT) {
 
         override val descriptorType: String = "L${clazz.jvmName};"
 
         override fun equals(other: Any?): Boolean {
-            return if (other == null) false else other::class == Object::class && clazz.jvmName == (other as Object).clazz.jvmName
+            return if (other == null) false else other is Object && clazz.jvmName == other.clazz.jvmName
         }
 
         override fun toString(): String = clazz.name

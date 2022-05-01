@@ -442,7 +442,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             }
             if (curClass != null && funcCall.name.lexeme == curClass!!.name) {
                 if (funcCall.arguments.size != 0) TODO("constructor calls with arguments are not yet implemented")
-                val toSwap = AstNode.ConstructorCall(curClass!!, funcCall.arguments)
+                val toSwap = AstNode.ConstructorCall(curClass!!, funcCall.arguments, funcCall.relevantTokens)
                 toSwap.type = Datatype.Object(curClass!!)
                 swap = toSwap
                 return toSwap.type
@@ -450,7 +450,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             val clazz = lookupTopLevelClass(funcCall.name.lexeme)
             if (clazz != null) {
                 if (funcCall.arguments.size != 0) TODO("constructor calls with arguments are not yet implemented")
-                val toSwap = AstNode.ConstructorCall(clazz, funcCall.arguments)
+                val toSwap = AstNode.ConstructorCall(clazz, funcCall.arguments, funcCall.relevantTokens)
                 toSwap.type = Datatype.Object(clazz)
                 swap = toSwap
                 return toSwap.type
@@ -543,10 +543,13 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                     varInc.name.name.pos, varInc.name.name.line),
                 AstNode.Literal(
                     Token(TokenType.INT, "+=", varInc.toAdd.toInt(), varInc.name.name.file,
-                        varInc.name.name.pos, varInc.name.name.line)
-                )
+                        varInc.name.name.pos, varInc.name.name.line),
+                    varInc.relevantTokens
+                ),
+                varInc.relevantTokens
             ),
-            false
+            false,
+            varInc.relevantTokens
         )
         check(toSwap, null)
         swap = toSwap
@@ -640,7 +643,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         val from = check(arr.from, arr)
 
         if (from.matches(Datakind.STAT_CLASS)) {
-            val toSwap = AstNode.ArrayCreate(from as Datatype.StatClass, arr.arrIndex)
+            val toSwap = AstNode.ArrayCreate(from as Datatype.StatClass, arr.arrIndex, arr.relevantTokens)
             check(toSwap, null)
             swap = toSwap
             return toSwap.type

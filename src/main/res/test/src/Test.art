@@ -1,8 +1,18 @@
 
 fn main() {
-    const myAnimal: Animal = BlackCat()
-    myAnimal.saySomething()
-//    myAnimal.meow()
+
+    getCat().catField += 2
+
+//    const hahah = while (true) 4
+//
+//    const myAnimal: Animal = BlackCat()
+//    myAnimal.saySomething()
+////    myAnimal.meow()
+}
+
+fn getCat(): Cat {
+    print "hi"
+    return BlackCat()
 }
 
 class BlackCat : Cat {

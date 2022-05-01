@@ -151,7 +151,7 @@ class VariableResolver : AstNodeVisitor<Unit> {
         }
         val index = curVars.indexOf(get.name.lexeme)
         if (index == -1) return
-        val toSwap = AstNode.Variable(get.name)
+        val toSwap = AstNode.Variable(get.name, get.relevantTokens)
         toSwap.index = index
         swap = toSwap
         return
