@@ -3,7 +3,6 @@ package ast
 import tokenizer.Token
 import Datatype
 import Datakind
-import passes.ControlFlowChecker
 import tokenizer.TokenType
 
 /**
@@ -50,6 +49,9 @@ abstract class AstNode {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
+    /**
+     * represents a function
+     */
     abstract class Function : AstNode() {
 
         /**
@@ -168,6 +170,11 @@ abstract class AstNode {
         override fun swap(orig: AstNode, to: AstNode) {
             if (statements !== orig || to !is Block) throw CantSwapException()
             statements = to
+        }
+
+        fun hasModifier(modifier: String): Boolean {
+            for (mod in modifiers) if (mod.tokenType == TokenType.IDENTIFIER && mod.lexeme == modifier) return true
+            return false
         }
 
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
@@ -598,6 +605,11 @@ abstract class AstNode {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
+    /**
+     * gets something from an array
+     * @param from the expression that results in the array
+     * @param arrIndex the expression that results in the index into the array
+     */
     class ArrGet(var from: AstNode, var arrIndex: AstNode) : AstNode() {
 
         override fun swap(orig: AstNode, to: AstNode) {
@@ -615,6 +627,12 @@ abstract class AstNode {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
+    /**
+     * represents a set into some index in an array
+     * @param from the expression that results in the array
+     * @param arrIndex the expression that results in the index into the array
+     * @param isWalrus true if a walrus-assign is used
+     */
     class ArrSet(var from: AstNode, var arrIndex: AstNode, var to: AstNode, val isWalrus: Boolean) : AstNode() {
 
         override fun swap(orig: AstNode, to: AstNode) {
@@ -636,14 +654,10 @@ abstract class AstNode {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
-     /** TODO: fix doc
-//     * represents a get. Can either be a single identifier referring to a field, class or a local (local only before
-//     * the variableResolver step). Can also be a chained get which gets something from another get (e.g.
-//     * `hiSayer.sayHi()` gets the sayHi function from the object hiSayer). Can also be indexed get from an array (e.g
-//     * `x.getArr()[5]` consists of two nested gets, the first one gets the x-object, the second one gets the function
-//     * getArr from x and has [arrIndex] set to 5)
+    /**
+     * represent a get expression. Used to get something from an Object or a class (e.g. `SomeClazz.someStaticField`)
      * @param name the name of the thing to get
-     * @param from the node from which [name] should be got, null if [name] is not looked up on another object/class
+     * @param from where to get [name] from. Null if [name] should be looked up in the top-level
      */
     class Get(val name: Token, var from: AstNode?) : AstNode() {
 
@@ -711,6 +725,9 @@ abstract class AstNode {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
+    /**
+     * represents a field either in the top-level or in a class
+     */
     abstract class Field : AstNode() {
 
         /**
@@ -785,6 +802,9 @@ abstract class AstNode {
                 return true
             }
 
+        /**
+         * used to set fieldType
+         */
         lateinit var _fieldType: Datatype
 
         override val fieldType: Datatype
@@ -835,13 +855,20 @@ abstract class AstNode {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
-    class YieldArrow(var statement: AstNode) : AstNode() {
+    /**
+     * represent the yield-arrow in a block-expression (e.g. `let x = { => 45 }`)
+     * @param expr the expression that results in the value of the block
+     */
+    class YieldArrow(var expr: AstNode) : AstNode() {
 
+        /**
+         * the type of [expr] and the type of the surrounding block
+         */
         lateinit var yieldType: Datatype
 
         override fun swap(orig: AstNode, to: AstNode) {
-            if (orig !== statement) throw CantSwapException()
-            statement = to
+            if (orig !== expr) throw CantSwapException()
+            expr = to
         }
 
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
@@ -900,15 +927,20 @@ data class FunctionDescriptor(val args: MutableList<Pair<String, Datatype>>, val
     }
 
     /**
-     * checks if this descriptor matches another descriptor
+     * checks if this descriptor matches another descriptor (excluding return type)
      */
     fun matches(desc: FunctionDescriptor): Boolean {
         if (desc.args.size != args.size) return false
-        for (i in desc.args.indices) if (desc.args[i].second != args[i].second) return false
+        for (i in desc.args.indices) if (args[i].first != "this" && desc.args[i].second != args[i].second) return false
         return true
     }
 
-    fun matches(other: List<Datatype>): Boolean {
+    /**
+     * checks if a list of datatypes is compatible to the function-descriptor. If the function-descriptor has a `this`-parameter,
+     * it is ignored. Assumes [other] has no `this`
+     * @param other the list of datatypes
+     */
+    fun isCompatibleWith(other: List<Datatype>): Boolean {
         var argsNoThis: MutableList<Pair<String, Datatype>> = args
         if (args.isNotEmpty() && args[0].first == "this") {
             argsNoThis = args.toMutableList()

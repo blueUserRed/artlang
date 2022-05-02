@@ -191,6 +191,9 @@ class Compiler : AstNodeVisitor<Unit> {
 //        }
     }
 
+    /**
+     * emits the instruction to compare to floats
+     */
     private fun doFloatCompare(comparison: TokenType) = when (comparison) {
         TokenType.GT -> {
             emit(fcmpg, iconst_1)
@@ -374,6 +377,7 @@ class Compiler : AstNodeVisitor<Unit> {
             "public" -> methodBuilder.isPublic = true
             "static" -> methodBuilder.isStatic = true
             "abstract" -> methodBuilder.isAbstract = true
+            "override" -> { }
             else -> TODO("not yet implemented")
         }
 
@@ -1008,7 +1012,7 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     override fun visit(yieldArrow: AstNode.YieldArrow) {
-        compile(yieldArrow.statement, false)
+        compile(yieldArrow.expr, false)
     }
 
     /**
@@ -1375,6 +1379,9 @@ class Compiler : AstNodeVisitor<Unit> {
         if (emitterTarget.stack.size > emitterTarget.maxStack) emitterTarget.maxStack = emitterTarget.stack.size
     }
 
+    /**
+     * returns the VerifactionType for a datatype
+     */
     private fun getVerificationType(type: Datatype) = when (type.kind) {
         Datakind.INT, Datakind.BOOLEAN, Datakind.BYTE, Datakind.SHORT -> VerificationTypeInfo.Integer()
         Datakind.FLOAT -> VerificationTypeInfo.Float()

@@ -78,7 +78,7 @@ object TestsDeprecated {
     fun testDeprecated(artFile: Path, sampleOutput: Path) {
         val code = Paths.get("$artFile").toFile().readText(Charsets.UTF_8)
         val tokens = Tokenizer.tokenize(code, artFile.toString())
-        val program = Parser.parse(tokens, code)
+        val program = Parser().parse(tokens, code)
         testNum++
 
         println("----------------code----------------")

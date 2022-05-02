@@ -179,6 +179,6 @@ class AstPrinter : AstNodeVisitor<String> {
     }
 
     override fun visit(yieldArrow: AstNode.YieldArrow): String {
-        return "(=> ${yieldArrow.statement.accept(this)})"
+        return "(=> ${yieldArrow.expr.accept(this)})"
     }
 }

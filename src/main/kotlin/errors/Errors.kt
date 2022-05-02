@@ -5,12 +5,31 @@ import passes.MinMaxPosFinder
 import Datatype
 import tokenizer.Token
 
+/**
+ * contains the different errors
+ */
 class Errors {
 
+    /**
+     * base-class for all Errors
+     * @param errorCode the unique code of the error, maybe useful in the future (for example, to provide more detailed
+     *  explanations of errors)
+     */
     abstract class ArtError(val errorCode: Int, val srcCode: String) {
+
+        /**
+         * the message displayed to the user
+         */
         abstract val message: String
+
+        /**
+         * where in the file the error is located (Map<Linenumber, Pair<startInLine, stopInLine>>)
+         */
         abstract val ranges: MutableMap<Int, Pair<Int, Int>>
 
+        /**
+         * constructs a string with the error-message and the lines where the error is located
+         */
         fun constructString(): String {
             val builder = StringBuilder()
             builder
@@ -48,8 +67,14 @@ class Errors {
             return builder.toString()
         }
 
+        /**
+         * @return how much the line numbers need to be padded
+         */
         private fun getPadAmount(maxLine: Int): Int = (maxLine + 2).toString().length
 
+        /**
+         * returns the amount of lines that need to be displayed
+         */
         private fun getMinAndMaxLine(): Pair<Int, Int> {
             var max = -1
             var min = Integer.MAX_VALUE
@@ -60,6 +85,9 @@ class Errors {
             return min to max
         }
 
+        /**
+         * gets the ranges of the error from tokens
+         */
         protected fun getRangesFromTokens(tokens: List<Token>): MutableMap<Int, Pair<Int, Int>> {
             val toRet = mutableMapOf<Int, Pair<Int, Int>>()
             for (token in tokens) {
@@ -317,6 +345,35 @@ class Errors {
         override val message: String = "Array literal must not be empty"
         override val ranges: MutableMap<Int, Pair<Int, Int>>
             get() = arrLiteral.accept(MinMaxPosFinder())
+    }
+
+    class FunctionRequiresOverrideModifierError(
+        val funcName: Token,
+        srcCode: String
+    ) : ArtError(25, srcCode) {
+        override val message: String = "Function ${funcName.lexeme} overrides another function, needs 'override'-modifier"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = mutableMapOf(funcName.line to (funcName.pos to funcName.pos + funcName.lexeme.length))
+    }
+
+    class FunctionDoesNotOverrideAnythingError(
+        val overrideToken: Token,
+        val name: String,
+        srcCode: String
+    ) : ArtError(26, srcCode) {
+        override val message: String = "Function $name doesn't override anything"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = mutableMapOf(overrideToken.line to (overrideToken.pos to overrideToken.pos + overrideToken.lexeme.length))
+    }
+
+    class CantWeakenAccessModifiersError(
+        val name: Token,
+        srcCode: String
+    ) : ArtError(27, srcCode) {
+        override val message: String = "Cannot weaken access privileges from public to private in overriding " +
+                "function ${name.lexeme}"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = mutableMapOf(name.line to (name.pos to name.pos + name.lexeme.length))
     }
 
 }

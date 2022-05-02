@@ -741,9 +741,9 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     }
 
     override fun visit(yieldArrow: AstNode.YieldArrow): Datatype {
-        val type = check(yieldArrow.statement, yieldArrow)
+        val type = check(yieldArrow.expr, yieldArrow)
         if (type.kind in arrayOf(Datakind.VOID, Datakind.STAT_CLASS)) {
-            artError(Errors.ExpectedAnExpressionError(yieldArrow.statement, srcCode))
+            artError(Errors.ExpectedAnExpressionError(yieldArrow.expr, srcCode))
             yieldArrow.yieldType = Datatype.ErrorType()
             return Datatype.Void()
         }
@@ -752,7 +752,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     }
 
     private fun lookupTopLevelFunc(name: String, sig: List<Datatype>): AstNode.Function? {
-        for (func in program.funcs) if (func.name == name && func.functionDescriptor.matches(sig)) return func
+        for (func in program.funcs) if (func.name == name && func.functionDescriptor.isCompatibleWith(sig)) return func
         return null
     }
 
