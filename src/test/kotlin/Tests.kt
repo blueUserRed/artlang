@@ -1,5 +1,3 @@
-import TestsDeprecated.programDir
-import TestsDeprecated.sampleOutDir
 import ast.AstPrinter
 import parser.Parser
 import passes.ControlFlowChecker
@@ -19,13 +17,11 @@ fun main() {
 }
 
 class Test(val testfileName: String, val printOutput: Boolean = true) {
-    // Working directory set to artlang/src/test/res
-    val outDir = "out/"
-    val srcDir = "src/"
-    val sampleOutDir = "sampleOutputs/"
-    val sampleOutput = Files.readAllLines(Paths.get("$sampleOutDir/$testfileName")).toString()
+
+    var sampleOutput = Files.readAllLines(Paths.get("$sampleOutDir/$testfileName")).toString().substring(1)
 
     fun test() {
+        sampleOutput = sampleOutput.substring(0, sampleOutput.length - 1) //TODO beautify
         Main.main(arrayOf("compile", "$srcDir$testfileName", "-v"))
         val output = runProgram()
         if (printOutput) println(output)
@@ -42,7 +38,8 @@ class Test(val testfileName: String, val printOutput: Boolean = true) {
     }
 
     private fun runProgram(): String {
-        val jarFile = "$outDir/$testfileName".split(".")[0] + ".jar"
+        //TODO: warum ist pwd …/res/out/
+        val jarFile = testfileName.split(".")[0] + ".jar"
         println(jarFile)
         val builder = ProcessBuilder("java", "-jar", jarFile)
         builder.directory(File(outDir))
@@ -55,6 +52,13 @@ class Test(val testfileName: String, val printOutput: Boolean = true) {
         process.waitFor()
         if (process.exitValue() != 0) throw RuntimeException("running jar file failed")
         return output.toString()
+    }
+
+    companion object {
+        // Working directory set to artlang/src/test/res
+        const val outDir = "out/"
+        const val srcDir = "src/"
+        const val sampleOutDir = "sampleOutputs/"
     }
 
 }

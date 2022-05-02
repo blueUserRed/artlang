@@ -75,10 +75,10 @@ containing the arguments.
 ````rust
 
 fn main() {
-    addTwo(2, 4)
+    addTwoNums(2, 4)
 }
 
-fn addTwo(a: int, b: int): int {
+fn addTwoNums(a: int, b: int): int {
     return a + b
 }
 ````
