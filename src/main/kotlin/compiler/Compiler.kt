@@ -868,6 +868,48 @@ class Compiler : AstNodeVisitor<Unit> {
         emit(iinc, (varInc.index and 0xFF).toByte(), varInc.toAdd)
     }
 
+    override fun visit(varInc: AstNode.VarAssignShorthand) {
+        if (varInc.index != -1) {
+            emitIntLoad(varInc.index)
+            incStack(emitterTarget.locals[varInc.index]!!)
+            compile(varInc.toAdd, false)
+            emit(iadd)
+            decStack()
+            emitIntVarStore(varInc.index)
+            decStack()
+            return
+        }
+
+        val fieldIndex = file.fieldRefInfo(
+            file.classInfo(file.utf8Info(varInc.fieldDef!!.clazz?.jvmName ?: topLevelName)),
+            file.nameAndTypeInfo(
+                file.utf8Info(varInc.fieldDef!!.name),
+                file.utf8Info(varInc.fieldDef!!.fieldType.descriptorType)
+            )
+        )
+
+        if (varInc.fieldDef!!.isStatic) emit(getstatic, *Utils.getLastTwoBytes(fieldIndex))
+        else {
+            compile(varInc.from!!, false)
+            emit(dup)
+            incStack(emitterTarget.stack.peek())
+            emit(getfield, *Utils.getLastTwoBytes(fieldIndex))
+            decStack()
+        }
+
+        incStack(varInc.fieldDef!!.fieldType)
+        compile(varInc.toAdd, false)
+        emit(iadd)
+        decStack()
+
+        if (varInc.fieldDef!!.isStatic) emit(putstatic, *Utils.getLastTwoBytes(fieldIndex))
+        else {
+            emit(putfield, *Utils.getLastTwoBytes(fieldIndex))
+            decStack()
+        }
+        decStack()
+    }
+
     override fun visit(get: AstNode.Get) {
         if (get.from == null) {
             //direct reference to either static field or top level field

@@ -333,44 +333,22 @@ class Parser {
      */
     private fun parseVarAssignShorthand(variable: AstNode.Get, op: Token, num: AstNode): AstNode {
         when (op.tokenType) {
-            TokenType.STAR_EQ -> return AstNode.Assignment(
+            TokenType.STAR_EQ, TokenType.SLASH_EQ -> return AstNode.VarAssignShorthand(
                 variable.from,
                 variable.name,
-                AstNode.Binary(
-                    variable,
-                    Token(TokenType.STAR, "*=", null, op.file, op.pos, op.line),
-                    num,
-                    listOf()
-                ),
-                false,
-                listOf()
-            )
-            TokenType.SLASH_EQ -> return AstNode.Assignment(
-                variable.from,
-                variable.name,
-                AstNode.Binary(
-                    variable,
-                    Token(TokenType.SLASH, "/=", null, op.file, op.pos, op.line),
-                    num,
-                    listOf()
-                ),
-                false,
+                op,
+                num,
                 listOf()
             )
             TokenType.PLUS_EQ -> {
                 if (num is AstNode.Literal && num.literal.literal is Int && num.literal.literal in Byte.MIN_VALUE..Byte.MAX_VALUE) {
                     return AstNode.VarIncrement(variable, num.literal.literal.toByte(), listOf())
                 }
-                return AstNode.Assignment(
+                return AstNode.VarAssignShorthand(
                     variable.from,
                     variable.name,
-                    AstNode.Binary(
-                        variable,
-                        Token(TokenType.PLUS, "+=", null, op.file, op.pos, op.line),
-                        num,
-                        listOf()
-                    ),
-                    false,
+                    op,
+                    num,
                     listOf()
                 )
             }
@@ -378,16 +356,11 @@ class Parser {
                 if (num is AstNode.Literal && num.literal.literal is Int && num.literal.literal in Byte.MIN_VALUE..Byte.MAX_VALUE) {
                     return AstNode.VarIncrement(variable, (-num.literal.literal).toByte(), listOf())
                 }
-                return AstNode.Assignment(
+                return AstNode.VarAssignShorthand(
                     variable.from,
                     variable.name,
-                    AstNode.Binary(
-                        variable,
-                        Token(TokenType.MINUS, "-=", null, op.file, op.pos, op.line),
-                        num,
-                        listOf()
-                    ),
-                    false,
+                    op,
+                    num,
                     listOf()
                 )
             }

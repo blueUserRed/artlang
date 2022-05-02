@@ -109,5 +109,7 @@ class InheritanceChecker : AstNodeVisitor<Unit> {
 
     override fun visit(arr: AstNode.ArrSet) = throw RuntimeException("unreachable")
 
+    override fun visit(varInc: AstNode.VarAssignShorthand) = throw RuntimeException("unreachable")
+
     override fun visit(yieldArrow: AstNode.YieldArrow) = throw RuntimeException("unreachable")
 }

@@ -190,6 +190,10 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
         return ControlFlowState(alwaysRet, alwaysBreak, sometimesRet, sometimesBreak)
     }
 
+    override fun visit(varInc: AstNode.VarAssignShorthand): ControlFlowState {
+        return check(varInc.toAdd)
+    }
+
     override fun visit(yieldArrow: AstNode.YieldArrow): ControlFlowState {
         return ControlFlowState()
     }

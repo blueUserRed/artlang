@@ -484,6 +484,32 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
+    class VarAssignShorthand(
+        var from: AstNode?,
+        var name: Token,
+        val operator: Token,
+        var toAdd: AstNode,
+        relevantTokens: List<Token>
+    ) : AstNode(relevantTokens) {
+
+        var index: Int = -1
+        var fieldDef: Field? = null
+
+        override fun swap(orig: AstNode, to: AstNode) {
+            if (this.from === orig) {
+                this.from = to
+                return
+            }
+            if (toAdd === orig) {
+                toAdd = to
+                return
+            }
+            throw CantSwapException()
+        }
+
+        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
+    }
+
     /**
      * represents a variable increment; only increments by a constant value
      * @param name the variable name (or get)

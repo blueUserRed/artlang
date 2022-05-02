@@ -126,6 +126,10 @@ class MinMaxPosFinder : AstNodeVisitor<MutableMap<Int, Pair<Int, Int>>> {
         TODO("Not yet implemented")
     }
 
+    override fun visit(varInc: AstNode.VarAssignShorthand): MutableMap<Int, Pair<Int, Int>> {
+        TODO("Not yet implemented")
+    }
+
     @Suppress("NOTHING_TO_INLINE")
     private inline fun find(node: AstNode): MutableMap<Int, Pair<Int, Int>> = node.accept(this)
 

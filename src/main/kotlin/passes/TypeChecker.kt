@@ -534,25 +534,17 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             }
         }
 
-        val toSwap = AstNode.Assignment(
+        val toSwap = AstNode.VarAssignShorthand(
             varInc.name.from,
             varInc.name.name,
-            AstNode.Binary(
-                varInc.name,
-                Token(TokenType.PLUS, "+=", null, varInc.name.name.file,
-                    varInc.name.name.pos, varInc.name.name.line),
-                AstNode.Literal(
-                    Token(TokenType.INT, "+=", varInc.toAdd.toInt(), varInc.name.name.file,
-                        varInc.name.name.pos, varInc.name.name.line),
-                    varInc.relevantTokens
-                ),
-                varInc.relevantTokens
+            Token(TokenType.PLUS_EQ, "++", null, "", -1, -1),
+            AstNode.Literal(
+                Token(TokenType.INT, "", varInc.toAdd, "", -1, -1),
+                listOf()
             ),
-            false,
-            varInc.relevantTokens
+            listOf()
         )
         check(toSwap, null)
-        swap = toSwap
         return toSwap.type
     }
 
@@ -564,6 +556,19 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         for (func in clazz.staticFuncs) check(func, clazz)
         for (func in clazz.funcs) check(func, clazz)
         curClass = tmp
+        return Datatype.Void()
+    }
+
+    override fun visit(varInc: AstNode.VarAssignShorthand): Datatype {
+        check(varInc.toAdd, varInc)
+        if (varInc.toAdd.type != Datatype.Integer()) TODO("only int is implemented for shorthand operators")
+        if (varInc.index != -1) return Datatype.Void()
+        //temporarily create Get and use its visit function to avoid duplicate logic
+        val tmpGet = AstNode.Get(varInc.name, varInc.from, listOf()) //easier this way
+        check(tmpGet, null)
+        if (tmpGet.type != Datatype.Integer()) TODO("only int is implemented for shorthand operators")
+        varInc.fieldDef = tmpGet.fieldDef
+
         return Datatype.Void()
     }
 

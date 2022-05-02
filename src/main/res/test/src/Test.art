@@ -1,13 +1,12 @@
 
+field testField: int = 2
+
 fn main() {
 
-    let arr = ["hi", "hi", "hi"]
-    arr[0] = "hello"
-    print arr[2]
-    let arr2: str[] = str[5]
-    const string: str = arr2[3]
+//    testField *= 4
+    getCat().catField *= 2
 
-//    getCat().catField += 2 TODO: fix
+//    getCat().catField += 2
 
 }
 
