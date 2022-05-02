@@ -2,12 +2,6 @@
 field testField: int = 2
 
 fn main() {
-
-//    testField *= 4
-    getCat().catField *= 2
-
-//    getCat().catField += 2
-
 }
 
 fn getCat(): Cat {
