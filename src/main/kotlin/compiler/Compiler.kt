@@ -568,7 +568,7 @@ class Compiler : AstNodeVisitor<Unit> {
     override fun visit(variable: AstNode.Variable) {
         when (variable.type.kind) {
             Datakind.INT, Datakind.BOOLEAN, Datakind.SHORT, Datakind.BYTE -> emitIntVarLoad(variable.index)
-            Datakind.STRING, Datakind.OBJECT, Datakind.ARRAY -> emitObjectVarLoad(variable.index)
+            Datakind.OBJECT, Datakind.ARRAY -> emitObjectVarLoad(variable.index)
             Datakind.FLOAT -> emitFloatVarLoad(variable.index)
             else -> TODO("variable load type not implemented")
         }
@@ -596,10 +596,6 @@ class Compiler : AstNodeVisitor<Unit> {
         Datakind.FLOAT -> {
             if (emitStore) emitFloatVarStore(index)
             emitterTarget.locals[index] = VerificationTypeInfo.Float()
-        }
-        Datakind.STRING -> {
-            if (emitStore) emitObjectVarStore(index)
-            emitterTarget.locals[index] = getObjVerificationType("java/lang/String")
         }
         Datakind.OBJECT -> {
             if (emitStore) emitObjectVarStore(index)
@@ -684,7 +680,7 @@ class Compiler : AstNodeVisitor<Unit> {
         when (varAssign.toAssign.type.kind) {
             Datakind.INT -> emitIntVarStore(varAssign.index)
             Datakind.FLOAT -> emitFloatVarStore(varAssign.index)
-            Datakind.OBJECT, Datakind.STRING -> emitObjectVarStore(varAssign.index)
+            Datakind.OBJECT -> emitObjectVarStore(varAssign.index)
             Datakind.BOOLEAN -> emitIntVarStore(varAssign.index)
             else -> TODO("type for local assignment not implemented")
         }
@@ -857,7 +853,7 @@ class Compiler : AstNodeVisitor<Unit> {
 //        }
 
         when (returnStmt.toReturn!!.type.kind) {
-            Datakind.STRING, Datakind.OBJECT, Datakind.ARRAY -> emit(areturn)
+            Datakind.OBJECT, Datakind.ARRAY -> emit(areturn)
             Datakind.INT, Datakind.SHORT, Datakind.BYTE -> emit(ireturn)
             Datakind.FLOAT -> emit(freturn)
             else -> TODO("return-type is not yet implemented")
@@ -971,7 +967,7 @@ class Compiler : AstNodeVisitor<Unit> {
      */
     fun emitAStore(type: Datatype) = when (type.kind) {
         Datakind.INT -> emit(iastore)
-        Datakind.STRING, Datakind.OBJECT -> emit(aastore)
+        Datakind.OBJECT -> emit(aastore)
         else -> TODO("only int, string and object arrays are implemented")
     }
 
@@ -981,7 +977,7 @@ class Compiler : AstNodeVisitor<Unit> {
     fun emitALoad(type: Datatype) = when (type.kind) {
         Datakind.INT -> emit(iaload)
         Datakind.FLOAT -> emit(faload)
-        Datakind.STRING, Datakind.OBJECT -> emit(aaload)
+        Datakind.OBJECT -> emit(aaload)
         else -> TODO("only int, string and object arrays are implemented")
     }
 
@@ -1065,12 +1061,6 @@ class Compiler : AstNodeVisitor<Unit> {
                 decStack()
                 incStack(arr.type)
             }
-            Datakind.STRING -> {
-                compile(arr.amount, false)
-                emit(anewarray, *Utils.getLastTwoBytes(file.classInfo(file.utf8Info("java/lang/String"))))
-                decStack()
-                incStack(arr.type)
-            }
             Datakind.OBJECT -> {
                 compile(arr.amount, false)
                 emit(anewarray, *Utils.getLastTwoBytes(file.classInfo(file.utf8Info(
@@ -1098,24 +1088,6 @@ class Compiler : AstNodeVisitor<Unit> {
                     incStack(Datatype.Integer())
                     compile(arr.elements[i], false)
                     if (kind == Datakind.INT) emit(iastore) else emit(fastore)
-                    decStack()
-                    decStack()
-                    decStack()
-                }
-            }
-            Datakind.STRING -> {
-                emitIntLoad(arr.elements.size)
-                incStack(Datatype.Integer())
-                emit(anewarray, *Utils.getLastTwoBytes(file.classInfo(file.utf8Info("java/lang/String"))))
-                decStack()
-                incStack(arr.type)
-                for (i in arr.elements.indices) {
-                    emit(dup)
-                    incStack(emitterTarget.stack.peek())
-                    emitIntLoad(i)
-                    incStack(Datatype.Integer())
-                    compile(arr.elements[i], false)
-                    emit(aastore)
                     decStack()
                     decStack()
                     decStack()
@@ -1385,7 +1357,6 @@ class Compiler : AstNodeVisitor<Unit> {
     private fun getVerificationType(type: Datatype) = when (type.kind) {
         Datakind.INT, Datakind.BOOLEAN, Datakind.BYTE, Datakind.SHORT -> VerificationTypeInfo.Integer()
         Datakind.FLOAT -> VerificationTypeInfo.Float()
-        Datakind.STRING -> getObjVerificationType("java/lang/String")
         Datakind.OBJECT -> getObjVerificationType((type as Datatype.Object).clazz.jvmName)
         Datakind.ARRAY -> getObjVerificationType(type.descriptorType)
         else -> TODO("not yet implemented")

@@ -418,6 +418,13 @@ class Parser {
         if (body is AstNode.VariableDeclaration) {
             artError(Errors.VarDeclarationWithoutBlockError(body, srcCode))
         }
+        if (body is AstNode.YieldArrow) {
+            artError(Errors.SyntaxError(
+                body.relevantTokens[0],
+                "Yield arrow can only be declared at the bottom of a block",
+                srcCode
+            ))
+        }
 
         return AstNode.While(body, condition, listOf(whileToken))
     }
@@ -436,12 +443,26 @@ class Parser {
         if (ifStmt is AstNode.VariableDeclaration) {
             artError(Errors.VarDeclarationWithoutBlockError(ifStmt, srcCode))
         }
+        if (ifStmt is AstNode.YieldArrow) {
+            artError(Errors.SyntaxError(
+                ifStmt.relevantTokens[0],
+                "Yield arrow can only be declared at the bottom of a block",
+                srcCode
+            ))
+        }
 
         if (!match(TokenType.K_ELSE)) return AstNode.If(ifStmt, null, condition, listOf(ifToken))
 
         val elseStmt = parseStatement()
         if (elseStmt is AstNode.VariableDeclaration) {
             artError(Errors.VarDeclarationWithoutBlockError(elseStmt, srcCode))
+        }
+        if (ifStmt is AstNode.YieldArrow) {
+            artError(Errors.SyntaxError(
+                elseStmt.relevantTokens[0],
+                "Yield arrow can only be declared at the bottom of a block",
+                srcCode
+            ))
         }
 
         return AstNode.If(ifStmt, elseStmt, condition, listOf(ifToken))
@@ -455,6 +476,13 @@ class Parser {
         val stmt = parseStatement()
         if (stmt is AstNode.VariableDeclaration) {
             artError(Errors.VarDeclarationWithoutBlockError(stmt, srcCode))
+        }
+        if (stmt is AstNode.YieldArrow) {
+            artError(Errors.SyntaxError(
+                stmt.relevantTokens[0],
+                "Yield arrow can only be declared at the bottom of a block",
+                srcCode
+            ))
         }
         return AstNode.Loop(stmt, listOf(loopToken))
     }
@@ -766,8 +794,7 @@ class Parser {
             TokenType.T_LONG,
             TokenType.T_FLOAT,
             TokenType.T_LONG,
-            TokenType.T_BOOLEAN,
-            TokenType.T_STRING
+            TokenType.T_BOOLEAN
         )
         if (match(*primitives)) {
             return AstNode.PrimitiveTypeNode(tokenTypeToDataKind(last().tokenType)).apply {
@@ -777,6 +804,18 @@ class Parser {
                 }
             }
         }
+
+        if (match(TokenType.T_STRING)) {
+            return AstNode.ObjectTypeNode(
+                Token(TokenType.IDENTIFIER, "\$String", "\$String", "", -1 ,-1),
+            ).apply {
+                if (matchNSFB(TokenType.L_BRACKET)) {
+                    consumeOrError(TokenType.R_BRACKET, "expected closing bracket")
+                    isArray = true
+                }
+            }
+        }
+
         consumeOrError(TokenType.IDENTIFIER, "Expected Type")
         val token = last()
         if (matchNSFB(TokenType.L_BRACKET)) {
@@ -796,7 +835,7 @@ class Parser {
         TokenType.T_LONG -> Datakind.LONG
         TokenType.T_FLOAT -> Datakind.FLOAT
         TokenType.T_BOOLEAN -> Datakind.BOOLEAN
-        TokenType.T_STRING -> Datakind.STRING
+        TokenType.T_STRING -> Datakind.OBJECT
         else -> throw RuntimeException("invalid type")
     }
 

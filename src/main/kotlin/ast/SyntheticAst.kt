@@ -17,7 +17,7 @@ object SyntheticAst {
     /**
      * represent java.lang.Object
      */
-    val objetClass: SyntClass = SyntClass(
+    val objectClass: SyntClass = SyntClass(
         "Object",
         staticFuncs = mutableListOf(),
         funcs = mutableListOf(),
@@ -33,12 +33,12 @@ object SyntheticAst {
         funcs = mutableListOf(),
         staticFields = mutableListOf(),
         fields = mutableListOf(),
-        objetClass,
+        objectClass,
         "java/lang/String"
     )
 
     init {
-        objetClass.funcs.addAll(arrayOf(
+        objectClass.funcs.addAll(arrayOf(
 
             SyntFunction(
                 "toString",
@@ -46,16 +46,16 @@ object SyntheticAst {
                 isStatic = false,
                 isTopLevel = false,
                 isPrivate = false,
-                objetClass
+                objectClass
             ),
 
             SyntFunction(
                 "equals",
-                FunctionDescriptor(mutableListOf(Pair("other", Datatype.Object(objetClass))), Datatype.Bool()),
+                FunctionDescriptor(mutableListOf(Pair("other", Datatype.Object(objectClass))), Datatype.Bool()),
                 isStatic = false,
                 isTopLevel = false,
                 isPrivate = false,
-                objetClass
+                objectClass
             )
 
         ))
@@ -141,7 +141,7 @@ object SyntheticAst {
      * @param root the real tree
      */
     fun addSyntheticTreeParts(root: AstNode.Program) {
-        root.classes.add(objetClass)
+        root.classes.add(objectClass)
         root.classes.add(stringClass)
     }
 

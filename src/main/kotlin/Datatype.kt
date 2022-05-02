@@ -180,7 +180,7 @@ abstract class Datatype(val kind: Datakind) {
 }
 
 enum class Datakind {
-    INT, LONG, BYTE, SHORT, FLOAT, DOUBLE, STRING, VOID, BOOLEAN, OBJECT,
+    INT, LONG, BYTE, SHORT, FLOAT, DOUBLE, VOID, BOOLEAN, OBJECT,
     ARRAY,
     ERROR,
     STAT_CLASS

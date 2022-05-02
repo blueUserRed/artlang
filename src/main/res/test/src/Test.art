@@ -1,13 +1,14 @@
 
 fn main() {
 
-    getCat().catField += 2
+    let arr = ["hi", "hi", "hi"]
+    arr[0] = "hello"
+    print arr[2]
+    let arr2: str[] = str[5]
+    const string: str = arr2[3]
 
-//    const hahah = while (true) 4
-//
-//    const myAnimal: Animal = BlackCat()
-//    myAnimal.saySomething()
-////    myAnimal.meow()
+//    getCat().catField += 2 TODO: fix
+
 }
 
 fn getCat(): Cat {

@@ -176,7 +176,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                     artError(Errors.UnknownIdentifierError(it, srcCode))
                     null
                 }
-            } ?: SyntheticAst.objetClass
+            } ?: SyntheticAst.objectClass
             clazz._extends = superClass
         }
         for (clazz in clazzes) if (clazz !is SyntheticNode) {
@@ -787,10 +787,10 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         Datakind.LONG -> if (node.isArray) Datatype.ArrayType(Datatype.Long()) else Datatype.Long()
         Datakind.FLOAT -> if (node.isArray) Datatype.ArrayType(Datatype.Float()) else Datatype.Float()
         Datakind.DOUBLE -> if (node.isArray) Datatype.ArrayType(Datatype.Double()) else Datatype.Double()
-        Datakind.STRING -> if (node.isArray) Datatype.ArrayType(Datatype.Str()) else Datatype.Str()
         Datakind.OBJECT -> {
             node as AstNode.ObjectTypeNode
             var toRet: Datatype? = null
+
             for (c in program.classes) if (c.name == node.identifier.lexeme) {
                 toRet = Datatype.Object(c)
             }
