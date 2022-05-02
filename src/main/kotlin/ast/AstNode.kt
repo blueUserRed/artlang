@@ -9,7 +9,7 @@ import tokenizer.TokenType
  * The **A**bstract **S**yntax **T**ree is an abstract representation of the program in form of tree. All nodes of the
  * tree inherit from this class
  */
-abstract class AstNode {
+abstract class AstNode(val relevantTokens: List<Token>) {
 
     /**
      * the type of this expression (can be void if the node doesn't result in a type)
@@ -39,7 +39,7 @@ abstract class AstNode {
      * wraps an expression (= leaves something on the stack) in a statement (= leaves nothing on the stack).
      * Probably not necessary anymore because the [type] of a node can just be void
      */
-    class ExpressionStatement(var exp: AstNode) : AstNode() { //TODO: necessary?
+    class ExpressionStatement(var exp: AstNode,relevantTokens: List<Token>) : AstNode(relevantTokens) {
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (exp !== orig) throw CantSwapException()
@@ -52,7 +52,7 @@ abstract class AstNode {
     /**
      * represents a function
      */
-    abstract class Function : AstNode() {
+    abstract class Function(relevantTokens: List<Token>) : AstNode(relevantTokens) {
 
         /**
          * the name of the Function
@@ -95,8 +95,9 @@ abstract class AstNode {
         var statements: Block,
         val nameToken: Token,
         val modifiers: List<Token>,
-        override val isTopLevel: Boolean
-    ) : Function() {
+        override val isTopLevel: Boolean,
+        relevantTokens: List<Token>
+    ) : Function(relevantTokens) {
 
         override val name: String = nameToken.lexeme
 
@@ -189,8 +190,9 @@ abstract class AstNode {
     class Program(
         val funcs: MutableList<Function>,
         val classes: MutableList<ArtClass>,
-        val fields: MutableList<Field>
-    ) : AstNode() {
+        val fields: MutableList<Field>,
+        relevantTokens: List<Token>
+    ) : AstNode(relevantTokens) {
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (to is Function) for (i in funcs.indices) if (funcs[i] === orig) {
@@ -222,7 +224,8 @@ abstract class AstNode {
         val funcs: MutableList<Function>,
         val staticFields: MutableList<Field>,
         val fields: MutableList<Field>,
-    ) : AstNode() {
+        relevantTokens: List<Token>
+    ) : AstNode(relevantTokens) {
 
         /**
          * the name of the class
@@ -256,8 +259,9 @@ abstract class AstNode {
         staticFields: MutableList<Field>,
         fields: MutableList<Field>,
         val extendsToken: Token?,
+        relevantTokens: List<Token>,
         override val jvmName: String = nameToken.lexeme
-    ) : ArtClass(staticFuncs, funcs, staticFields, fields) {
+    ) : ArtClass(staticFuncs, funcs, staticFields, fields, relevantTokens) {
 
         override val name: String = nameToken.lexeme
 
@@ -294,7 +298,7 @@ abstract class AstNode {
      * @param toPrint the node that should be printed
      * @param printToken the 'print' token
      */
-    class Print(var toPrint: AstNode, val printToken: Token) : AstNode() {
+    class Print(var toPrint: AstNode, val printToken: Token, relevantTokens: List<Token>) : AstNode(relevantTokens) {
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (orig !== toPrint) throw CantSwapException()
@@ -308,7 +312,7 @@ abstract class AstNode {
      * represents a code block
      * @param statements the statements contained in the block
      */
-    class Block(val statements: Array<AstNode>) : AstNode() {
+    class Block(val statements: Array<AstNode>, relevantTokens: List<Token>) : AstNode(relevantTokens) {
 
         override fun swap(orig: AstNode, to: AstNode) {
             for (i in statements.indices) if (statements[i] === orig) {
@@ -332,8 +336,9 @@ abstract class AstNode {
         val name: Token,
         var initializer: AstNode,
         val isConst: Boolean,
-        val decToken: Token
-    ) : AstNode() {
+        val decToken: Token,
+        relevantTokens: List<Token>
+    ) : AstNode(relevantTokens) {
 
         /**
          * the local variable index; the index into the locals array of the jvm at which the variable can be found
@@ -365,7 +370,13 @@ abstract class AstNode {
     /**
      * represents a (walrus-) assignment to a local variable, a field or array
      */
-    class Assignment(var from: AstNode?, var name: Token, var toAssign: AstNode, val isWalrus: Boolean) : AstNode() {
+    class Assignment(
+        var from: AstNode?,
+        var name: Token,
+        var toAssign: AstNode,
+        val isWalrus: Boolean,
+        relevantTokens: List<Token>
+    ) : AstNode(relevantTokens) {
 
         var fieldDef: Field? = null
 
@@ -394,7 +405,7 @@ abstract class AstNode {
      * represents the loop-statement
      * @param body the body of the loop
      */
-    class Loop(var body: AstNode) : AstNode() {
+    class Loop(var body: AstNode, relevantTokens: List<Token>) : AstNode(relevantTokens) {
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (body !== orig) throw CantSwapException()
@@ -410,7 +421,12 @@ abstract class AstNode {
      * @param elseStmt the else-branch of the statement; null if there is none
      * @param condition the condition that determines the path of execution
      */
-    class If(var ifStmt: AstNode, var elseStmt: AstNode?, var condition: AstNode) : AstNode() {
+    class If(
+        var ifStmt: AstNode,
+        var elseStmt: AstNode?,
+        var condition: AstNode,
+        relevantTokens: List<Token>
+    ) : AstNode(relevantTokens) {
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (ifStmt === orig) {
@@ -436,7 +452,7 @@ abstract class AstNode {
      * @param body the body of the loop
      * @param condition the condition
      */
-    class While(var body: AstNode, var condition: AstNode) : AstNode() {
+    class While(var body: AstNode, var condition: AstNode, relevantTokens: List<Token>) : AstNode(relevantTokens) {
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (body === orig) {
@@ -458,11 +474,37 @@ abstract class AstNode {
      * @param toReturn the value that is returned; null if there is none
      * @param returnToken the 'return' token
      */
-    class Return(var toReturn: AstNode?, val returnToken: Token) : AstNode() {
+    class Return(var toReturn: AstNode?, val returnToken: Token, relevantTokens: List<Token>) : AstNode(relevantTokens) {
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (toReturn !== orig) throw CantSwapException()
             toReturn = to
+        }
+
+        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
+    }
+
+    class VarAssignShorthand(
+        var from: AstNode?,
+        var name: Token,
+        val operator: Token,
+        var toAdd: AstNode,
+        relevantTokens: List<Token>
+    ) : AstNode(relevantTokens) {
+
+        var index: Int = -1
+        var fieldDef: Field? = null
+
+        override fun swap(orig: AstNode, to: AstNode) {
+            if (this.from === orig) {
+                this.from = to
+                return
+            }
+            if (toAdd === orig) {
+                toAdd = to
+                return
+            }
+            throw CantSwapException()
         }
 
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
@@ -473,7 +515,7 @@ abstract class AstNode {
      * @param name the variable name (or get)
      * @param toAdd the constant value to add
      */
-    class VarIncrement(var name: Get, val toAdd: Byte) : AstNode() {
+    class VarIncrement(var name: Get, val toAdd: Byte, relevantTokens: List<Token>) : AstNode(relevantTokens) {
 
         /**
          * the local variable index; the index into the locals array of the jvm at which the variabl can be found;
@@ -495,7 +537,12 @@ abstract class AstNode {
      * @param operator the operator of the operation
      * @param right the right side of the operation
      */
-    class Binary(var left: AstNode, val operator: Token, var right: AstNode) : AstNode() {
+    class Binary(
+        var left: AstNode,
+        val operator: Token,
+        var right: AstNode,
+        relevantTokens: List<Token>
+    ) : AstNode(relevantTokens) {
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (left === orig) {
@@ -515,7 +562,7 @@ abstract class AstNode {
     /**
      * represents a literal value (e.g. a constant number, a constant string)
      */
-    class Literal(val literal: Token) : AstNode() {
+    class Literal(val literal: Token, relevantTokens: List<Token>) : AstNode(relevantTokens) {
 
         override fun swap(orig: AstNode, to: AstNode) = throw CantSwapException()
 
@@ -526,7 +573,7 @@ abstract class AstNode {
      * represents a reference to local variable; the parser only emits gets, the variable node is swapped in by the
      * VariableResolver if a get references a local variable
      */
-    class Variable(val name: Token) : AstNode() {
+    class Variable(val name: Token, relevantTokens: List<Token>) : AstNode(relevantTokens) {
 
         /**
          * the local variable index; the index into the locals array of the jvm at which the variabl can be found
@@ -544,7 +591,7 @@ abstract class AstNode {
      * represents a group (an expression wrapped in parentheses)
      * @param grouped the expression in parentheses
      */
-    class Group(var grouped: AstNode) : AstNode() {
+    class Group(var grouped: AstNode, relevantTokens: List<Token>) : AstNode(relevantTokens) {
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (grouped !== orig) throw CantSwapException()
@@ -559,7 +606,7 @@ abstract class AstNode {
      * @param on the expression the operator operates on
      * @param operator the operator
      */
-    class Unary(var on: AstNode, val operator: Token) : AstNode() {
+    class Unary(var on: AstNode, val operator: Token, relevantTokens: List<Token>) : AstNode(relevantTokens) {
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (on !== orig) throw CantSwapException()
@@ -574,7 +621,12 @@ abstract class AstNode {
      * @param func the get for the function
      * @param arguments the arguments provided
      */
-    class FunctionCall(var from: AstNode?, val name: Token, val arguments: MutableList<AstNode>) : AstNode() {
+    class FunctionCall(
+        var from: AstNode?,
+        val name: Token,
+        val arguments: MutableList<AstNode>,
+        relevantTokens: List<Token>
+    ) : AstNode(relevantTokens) {
 
         /**
          * the definition of the referenced function
@@ -610,7 +662,7 @@ abstract class AstNode {
      * @param from the expression that results in the array
      * @param arrIndex the expression that results in the index into the array
      */
-    class ArrGet(var from: AstNode, var arrIndex: AstNode) : AstNode() {
+    class ArrGet(var from: AstNode, var arrIndex: AstNode, relevantTokens: List<Token>) : AstNode(relevantTokens) {
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (from === orig) {
@@ -633,7 +685,13 @@ abstract class AstNode {
      * @param arrIndex the expression that results in the index into the array
      * @param isWalrus true if a walrus-assign is used
      */
-    class ArrSet(var from: AstNode, var arrIndex: AstNode, var to: AstNode, val isWalrus: Boolean) : AstNode() {
+    class ArrSet(
+        var from: AstNode,
+        var arrIndex: AstNode,
+        var to: AstNode,
+        val isWalrus: Boolean,
+        relevantTokens: List<Token>
+    ) : AstNode(relevantTokens) {
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (from === orig) {
@@ -659,7 +717,7 @@ abstract class AstNode {
      * @param name the name of the thing to get
      * @param from where to get [name] from. Null if [name] should be looked up in the top-level
      */
-    class Get(val name: Token, var from: AstNode?) : AstNode() {
+    class Get(val name: Token, var from: AstNode?, relevantTokens: List<Token>) : AstNode(relevantTokens) {
 
         /**
          * if the get corresponds to field, fieldDef is set to the definition of the field
@@ -683,7 +741,7 @@ abstract class AstNode {
      * represents a break-statement
      * @param breakToken the 'break' token
      */
-    class Break(val breakToken: Token) : AstNode() {
+    class Break(val breakToken: Token, relevantTokens: List<Token>) : AstNode(relevantTokens) {
 
         override fun swap(orig: AstNode, to: AstNode) = throw CantSwapException()
 
@@ -694,7 +752,7 @@ abstract class AstNode {
      * represents a continue-statement
      * @param continueToken the 'continue' token
      */
-    class Continue(val continueToken: Token) : AstNode() {
+    class Continue(val continueToken: Token, relevantTokens: List<Token>) : AstNode(relevantTokens) {
 
         override fun swap(orig: AstNode, to: AstNode) = throw CantSwapException()
 
@@ -708,7 +766,11 @@ abstract class AstNode {
      * @param clazz the class to which the constructor refers to
      * @param arguments the list of arguments with which the constructor is called
      */
-    class ConstructorCall(var clazz: ArtClass, val arguments: MutableList<AstNode>) : AstNode() {
+    class ConstructorCall(
+        var clazz: ArtClass,
+        val arguments: MutableList<AstNode>,
+        relevantTokens: List<Token>
+    ) : AstNode(relevantTokens) {
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (clazz === orig && to is ArtClass) {
@@ -728,7 +790,7 @@ abstract class AstNode {
     /**
      * represents a field either in the top-level or in a class
      */
-    abstract class Field : AstNode() {
+    abstract class Field(relevantTokens: List<Token>) : AstNode(relevantTokens) {
 
         /**
          * the name of the field
@@ -780,8 +842,9 @@ abstract class AstNode {
         var initializer: AstNode,
         override val isConst: Boolean,
         val modifiers: List<Token>,
-        override val isTopLevel: Boolean
-    ) : Field() {
+        override val isTopLevel: Boolean,
+        relevantTokens: List<Token>
+    ) : Field(relevantTokens) {
 
         override val name: String = nameToken.lexeme
 
@@ -826,7 +889,7 @@ abstract class AstNode {
      * @param of the type of the array
      * @param amount the node that when evaluated results in the array size
      */
-    class ArrayCreate(val of: Datatype, var amount: AstNode) : AstNode() {
+    class ArrayCreate(val of: Datatype, var amount: AstNode, relevantTokens: List<Token>) : AstNode(relevantTokens) {
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (amount !== orig) throw CantSwapException()
@@ -842,7 +905,10 @@ abstract class AstNode {
      * @param startToken the '[' token
      * @param endToken the ']' token
      */
-    class ArrayLiteral(val elements: MutableList<AstNode>, val startToken: Token, val endToken: Token) : AstNode() {
+    class ArrayLiteral(
+        val elements: MutableList<AstNode>,
+        relevantTokens: List<Token>
+    ) : AstNode(relevantTokens) {
 
         override fun swap(orig: AstNode, to: AstNode) {
             for (i in elements.indices) if (elements[i] === orig) {
@@ -859,7 +925,7 @@ abstract class AstNode {
      * represent the yield-arrow in a block-expression (e.g. `let x = { => 45 }`)
      * @param expr the expression that results in the value of the block
      */
-    class YieldArrow(var expr: AstNode) : AstNode() {
+    class YieldArrow(var expr: AstNode, relevantTokens: List<Token>) : AstNode(relevantTokens) {
 
         /**
          * the type of [expr] and the type of the surrounding block

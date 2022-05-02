@@ -176,7 +176,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                     artError(Errors.UnknownIdentifierError(it, srcCode))
                     null
                 }
-            } ?: SyntheticAst.objetClass
+            } ?: SyntheticAst.objectClass
             clazz._extends = superClass
         }
         for (clazz in clazzes) if (clazz !is SyntheticNode) {
@@ -442,7 +442,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             }
             if (curClass != null && funcCall.name.lexeme == curClass!!.name) {
                 if (funcCall.arguments.size != 0) TODO("constructor calls with arguments are not yet implemented")
-                val toSwap = AstNode.ConstructorCall(curClass!!, funcCall.arguments)
+                val toSwap = AstNode.ConstructorCall(curClass!!, funcCall.arguments, funcCall.relevantTokens)
                 toSwap.type = Datatype.Object(curClass!!)
                 swap = toSwap
                 return toSwap.type
@@ -450,7 +450,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             val clazz = lookupTopLevelClass(funcCall.name.lexeme)
             if (clazz != null) {
                 if (funcCall.arguments.size != 0) TODO("constructor calls with arguments are not yet implemented")
-                val toSwap = AstNode.ConstructorCall(clazz, funcCall.arguments)
+                val toSwap = AstNode.ConstructorCall(clazz, funcCall.arguments, funcCall.relevantTokens)
                 toSwap.type = Datatype.Object(clazz)
                 swap = toSwap
                 return toSwap.type
@@ -534,22 +534,17 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             }
         }
 
-        val toSwap = AstNode.Assignment(
+        val toSwap = AstNode.VarAssignShorthand(
             varInc.name.from,
             varInc.name.name,
-            AstNode.Binary(
-                varInc.name,
-                Token(TokenType.PLUS, "+=", null, varInc.name.name.file,
-                    varInc.name.name.pos, varInc.name.name.line),
-                AstNode.Literal(
-                    Token(TokenType.INT, "+=", varInc.toAdd.toInt(), varInc.name.name.file,
-                        varInc.name.name.pos, varInc.name.name.line)
-                )
+            Token(TokenType.PLUS_EQ, "++", null, "", -1, -1),
+            AstNode.Literal(
+                Token(TokenType.INT, "", varInc.toAdd, "", -1, -1),
+                listOf()
             ),
-            false
+            listOf()
         )
         check(toSwap, null)
-        swap = toSwap
         return toSwap.type
     }
 
@@ -561,6 +556,19 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         for (func in clazz.staticFuncs) check(func, clazz)
         for (func in clazz.funcs) check(func, clazz)
         curClass = tmp
+        return Datatype.Void()
+    }
+
+    override fun visit(varInc: AstNode.VarAssignShorthand): Datatype {
+        check(varInc.toAdd, varInc)
+        if (varInc.toAdd.type != Datatype.Integer()) TODO("only int is implemented for shorthand operators")
+        if (varInc.index != -1) return Datatype.Void()
+        //temporarily create Get and use its visit function to avoid duplicate logic
+        val tmpGet = AstNode.Get(varInc.name, varInc.from, listOf()) //easier this way
+        check(tmpGet, null)
+        if (tmpGet.type != Datatype.Integer()) TODO("only int is implemented for shorthand operators")
+        varInc.fieldDef = tmpGet.fieldDef
+
         return Datatype.Void()
     }
 
@@ -640,7 +648,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         val from = check(arr.from, arr)
 
         if (from.matches(Datakind.STAT_CLASS)) {
-            val toSwap = AstNode.ArrayCreate(from as Datatype.StatClass, arr.arrIndex)
+            val toSwap = AstNode.ArrayCreate(from as Datatype.StatClass, arr.arrIndex, arr.relevantTokens)
             check(toSwap, null)
             swap = toSwap
             return toSwap.type
@@ -784,10 +792,10 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         Datakind.LONG -> if (node.isArray) Datatype.ArrayType(Datatype.Long()) else Datatype.Long()
         Datakind.FLOAT -> if (node.isArray) Datatype.ArrayType(Datatype.Float()) else Datatype.Float()
         Datakind.DOUBLE -> if (node.isArray) Datatype.ArrayType(Datatype.Double()) else Datatype.Double()
-        Datakind.STRING -> if (node.isArray) Datatype.ArrayType(Datatype.Str()) else Datatype.Str()
         Datakind.OBJECT -> {
             node as AstNode.ObjectTypeNode
             var toRet: Datatype? = null
+
             for (c in program.classes) if (c.name == node.identifier.lexeme) {
                 toRet = Datatype.Object(c)
             }

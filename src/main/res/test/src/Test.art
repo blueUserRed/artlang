@@ -1,8 +1,12 @@
 
+field testField: int = 2
+
 fn main() {
-    const myAnimal: Animal = BlackCat()
-    myAnimal.saySomething()
-//    myAnimal.meow()
+}
+
+fn getCat(): Cat {
+    print "hi"
+    return BlackCat()
 }
 
 class BlackCat : Cat {

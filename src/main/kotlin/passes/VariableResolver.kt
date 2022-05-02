@@ -151,7 +151,7 @@ class VariableResolver : AstNodeVisitor<Unit> {
         }
         val index = curVars.indexOf(get.name.lexeme)
         if (index == -1) return
-        val toSwap = AstNode.Variable(get.name)
+        val toSwap = AstNode.Variable(get.name, get.relevantTokens)
         toSwap.index = index
         swap = toSwap
         return
@@ -202,5 +202,14 @@ class VariableResolver : AstNodeVisitor<Unit> {
 
     override fun visit(yieldArrow: AstNode.YieldArrow) {
         resolve(yieldArrow.expr, yieldArrow)
+    }
+
+    override fun visit(varInc: AstNode.VarAssignShorthand) {
+        if (varInc.from != null) {
+            resolve(varInc.from!!, varInc)
+            return
+        }
+        val index = curVars.indexOf(varInc.name.lexeme)
+        varInc.index = index
     }
 }

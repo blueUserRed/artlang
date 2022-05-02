@@ -55,7 +55,7 @@ class Errors {
                     val until = ranges[i]!!.second
                     builder.append(Ansi.red)
                     repeat(padAmount + 3) { builder.append(" ") }
-                    for (cur in 0 until (until + 1)) builder.append(if (cur >= from) "~" else " ")
+                    for (cur in 0 until Math.max(until, from + 1)) builder.append(if (cur >= from) "~" else " ")
                     builder
                         .append(" <--------- here")
                         .append(Ansi.white)

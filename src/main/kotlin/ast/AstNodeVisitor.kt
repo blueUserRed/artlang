@@ -25,6 +25,7 @@ interface AstNodeVisitor<T> {
     fun visit(ifStmt: AstNode.If): T
     fun visit(whileStmt: AstNode.While): T
     fun visit(returnStmt: AstNode.Return): T
+    fun visit(varInc: AstNode.VarAssignShorthand): T
     fun visit(varInc: AstNode.VarIncrement): T
     fun visit(get: AstNode.Get): T
     fun visit(cont: AstNode.Continue): T

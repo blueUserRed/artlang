@@ -181,4 +181,11 @@ class AstPrinter : AstNodeVisitor<String> {
     override fun visit(yieldArrow: AstNode.YieldArrow): String {
         return "(=> ${yieldArrow.expr.accept(this)})"
     }
+
+    override fun visit(varInc: AstNode.VarAssignShorthand): String {
+        return "(${
+            if (varInc.from == null) varInc.name.lexeme
+            else "${varInc.from!!.accept(this)}.${varInc.name.lexeme}"
+        } ${varInc.operator.lexeme} ${varInc.toAdd.accept(this)})"
+    }
 }
