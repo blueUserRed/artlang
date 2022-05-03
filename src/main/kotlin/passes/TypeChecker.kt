@@ -648,7 +648,18 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         val from = check(arr.from, arr)
 
         if (from.matches(Datakind.STAT_CLASS)) {
-            val toSwap = AstNode.ArrayCreate(from as Datatype.StatClass, arr.arrIndex, arr.relevantTokens)
+            val toSwap = AstNode.ArrayCreate(from as Datatype.StatClass, arrayOf(arr.arrIndex), arr.relevantTokens)
+            check(toSwap, null)
+            swap = toSwap
+            return toSwap.type
+        }
+
+        if (arr.from is AstNode.ArrayCreate) {
+            val toSwap = AstNode.ArrayCreate(
+                (arr.from as AstNode.ArrayCreate).of,
+                arrayOf(arr.arrIndex, *(arr.from as AstNode.ArrayCreate).amounts),
+                arr.relevantTokens
+            )
             check(toSwap, null)
             swap = toSwap
             return toSwap.type
@@ -716,14 +727,16 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     }
 
     override fun visit(arr: AstNode.ArrayCreate): Datatype {
-        val amType = check(arr.amount, arr)
-        if (amType != Datatype.Integer()) {
-            artError(Errors.InvalidTypeInArrayCreateError(arr, amType, srcCode))
+        for (amount in arr.amounts) {
+            val amType = check(amount, arr)
+            if (amType != Datatype.Integer()) {
+                artError(Errors.InvalidTypeInArrayCreateError(arr, amType, srcCode))
+            }
         }
-        if (arr.of.matches(Datakind.STAT_CLASS)) {
-            val clazz = (arr.of as Datatype.StatClass).clazz
-            return Datatype.ArrayType(Datatype.Object(clazz))
-        } else return Datatype.ArrayType(arr.of)
+
+        var type: Datatype = if (arr.of is Datatype.StatClass) Datatype.Object(arr.of.clazz) else arr.of
+        repeat(arr.amounts.size) { type = Datatype.ArrayType(type) }
+        return type
     }
 
     override fun visit(arr: AstNode.ArrayLiteral): Datatype {

@@ -1096,18 +1096,40 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     override fun visit(arr: AstNode.ArrayCreate) {
+        if (arr.amounts.size == 1) doOneDimensionalArray(arr)
+        else doMultiDimensionalArray(arr)
+    }
+
+    private fun doMultiDimensionalArray(arr: AstNode.ArrayCreate) {
+        for (amount in arr.amounts) compile(amount, false)
+        emit(
+            multianewarray,
+            *Utils.getLastTwoBytes(file.classInfo(file.utf8Info(arr.type.descriptorType))),
+            Utils.getLastTwoBytes(arr.amounts.size)[1]
+        )
+        repeat(arr.amounts.size) { decStack() }
+        incStack(arr.type)
+    }
+
+    private fun doOneDimensionalArray(arr: AstNode.ArrayCreate) {
         when (val kind = (arr.type as Datatype.ArrayType).type.kind) {
             Datakind.INT, Datakind.FLOAT -> {
-                compile(arr.amount, false)
+                compile(arr.amounts[0], false)
                 emit(newarray, getAType(kind))
                 decStack()
                 incStack(arr.type)
             }
             Datakind.OBJECT -> {
-                compile(arr.amount, false)
-                emit(anewarray, *Utils.getLastTwoBytes(file.classInfo(file.utf8Info(
-                    ((arr.type as Datatype.ArrayType).type as Datatype.Object).clazz.jvmName
-                ))))
+                compile(arr.amounts[0], false)
+                emit(
+                    anewarray, *Utils.getLastTwoBytes(
+                        file.classInfo(
+                            file.utf8Info(
+                                ((arr.type as Datatype.ArrayType).type as Datatype.Object).clazz.jvmName
+                            )
+                        )
+                    )
+                )
                 decStack()
                 incStack(arr.type)
             }

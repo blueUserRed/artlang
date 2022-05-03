@@ -2,57 +2,51 @@
 field testField: int = 2
 
 fn main() {
-    const testArr = [[1, 2], [3, 4], [5, 6], [7, 8, 9]]
-    print testArr[0][0]
-    print testArr[3][2]
-    testArr[1] = [10, 11, 12, 13]
+    const catArr = Cat[3][3]
+    catArr[2][1] = BlackCat()
 }
 
-fn getMultiArr(): int[][] {
-    return [[1, 2, 3]]
+fn println(toPrint: str) {
+    print toPrint
 }
 
-//fn println(toPrint: str) {
-//    print toPrint
-//}
-//
-//fn getCat(): Cat {
-//    print "hi"
-//    return BlackCat()
-//}
-//
-//class BlackCat : Cat {
-//
-//    override public fn meow() {
-//        print "meow, but from black cat"
-//    }
-//
-//}
-//
-//class Cat : Animal {
-//
-//    public field catField: int = 21
-//
-//    public fn meow() {
-//        print "meow"
-//    }
-//
-//    override public fn saySomething() {
-//        this.meow()
-//    }
-//
-//}
-//
-//class Animal {
-//
-//    public field animalField: str = "sdsdfsdfjkl"
-//
-//    public fn walk() {
-//        print "Animal walking..."
-//    }
-//
-//    public fn saySomething() {
-//        print "<generic animal sounds>"
-//    }
-//
-//}
+fn getCat(): Cat {
+    print "hi"
+    return BlackCat()
+}
+
+class BlackCat : Cat {
+
+    override public fn meow() {
+        print "meow, but from black cat"
+    }
+
+}
+
+class Cat : Animal {
+
+    public field catField: int = 21
+
+    public fn meow() {
+        print "meow"
+    }
+
+    override public fn saySomething() {
+        this.meow()
+    }
+
+}
+
+class Animal {
+
+    public field animalField: str = "sdsdfsdfjkl"
+
+    public fn walk() {
+        print "Animal walking..."
+    }
+
+    public fn saySomething() {
+        print "<generic animal sounds>"
+    }
+
+}

@@ -654,7 +654,8 @@ class Parser {
                         TokenType.T_BOOLEAN -> Datatype.Bool()
                         TokenType.T_STRING -> Datatype.Str()
                         else -> throw RuntimeException("unreachable")
-                    }, amount, listOf(primitive, rBracket))
+                    }, arrayOf(amount), listOf(primitive, rBracket)
+            )
         }
 
         if (!match(
