@@ -4,12 +4,24 @@ import ast.AstNode
 import ast.AstNodeVisitor
 import Datatype
 import ast.SyntheticNode
-import java.lang.RuntimeException
 import passes.ControlFlowChecker.ControlFlowState
+import kotlin.RuntimeException
 
+/**
+ * ensures that break/continue is only used in loops, return is only used in function, that functions
+ * with return-type != Void always return
+ */
 class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
 
+    /**
+     * the currently (lowest) surrounding loop; null if there is none
+     */
     private var surroundingLoop: AstNode? = null
+
+    /**
+     * the current function; null if not in a function
+     */
+    private var curFunction: AstNode.Function? = null
 
     override fun visit(binary: AstNode.Binary): ControlFlowState {
         return ControlFlowState()
@@ -41,8 +53,11 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
 
     override fun visit(function: AstNode.Function): ControlFlowState {
         function as AstNode.FunctionDeclaration
+        curFunction = function
+        val controlFlowState = check(function.statements)
+        curFunction = null
         if (function.functionDescriptor.returnType == Datatype.Void()) return ControlFlowState()
-        if (!check(function.statements).alwaysReturns) {
+        if (!controlFlowState.alwaysReturns) {
             throw RuntimeException("Function ${function.name} does not always return")
         }
         return ControlFlowState()
@@ -109,7 +124,9 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
     }
 
     override fun visit(whileStmt: AstNode.While): ControlFlowState {
+        val tmp = surroundingLoop
         val result = check(whileStmt.body)
+        surroundingLoop = tmp
         return ControlFlowState(
             alwaysReturns = false,
             alwaysBreaks = false,
@@ -119,6 +136,7 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
     }
 
     override fun visit(returnStmt: AstNode.Return): ControlFlowState {
+        if (curFunction == null) throw RuntimeException("return can only be used in function")
         return ControlFlowState(alwaysReturns = true, sometimesReturns = true)
     }
 
@@ -198,8 +216,18 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
         return ControlFlowState()
     }
 
+    /**
+     * checks the [ControlFlowState] of [node]
+     */
     private fun check(node: AstNode): ControlFlowState = node.accept(this)
 
+    /**
+     * contains details about whether a specific node returns/breaks
+     * @param alwaysReturns true if the node guaranties that it will always return from the enclosing function
+     * @param alwaysBreaks true if the node guaranties that it will always break from the enclosing loop
+     * @param sometimesReturns true if the node will sometimes return from the enclosing function
+     * @param sometimesBreaks true if the node will sometimes break from the enclosing loop
+     */
     data class ControlFlowState(
         val alwaysReturns: Boolean = false,
         val alwaysBreaks: Boolean = false,

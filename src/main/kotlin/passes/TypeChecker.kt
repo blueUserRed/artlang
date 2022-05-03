@@ -8,15 +8,40 @@ import errors.artError
 import tokenizer.Token
 import tokenizer.TokenType
 
+/**
+ * checks type-saftey, checks that function/fields that are referenced exist
+ */
 class TypeChecker : AstNodeVisitor<Datatype> {
 
+    /**
+     * the locals, their indices and types
+     */
     private var vars: MutableMap<Int, Datatype> = mutableMapOf()
+
+    /**
+     * the program currently being compiled
+     */
     private lateinit var program: AstNode.Program
-    private lateinit var curFunction: AstNode.Function
+
+    /**
+     * the current function; null if not in a function
+     */
+    private var curFunction: AstNode.Function? = null
+
+    /**
+     * the current class; null if not in a class
+     */
     private var curClass: AstNode.ArtClass? = null
 
+    /**
+     * used for swapping nodes. if a visit function returns and swap != null, the check-function will attempt to swap
+     * the previous node with the node in swap
+     */
     private var swap: AstNode? = null
 
+    /**
+     * the source code of the program
+     */
     var srcCode: String = ""
 
     override fun visit(binary: AstNode.Binary): Datatype {
@@ -139,7 +164,8 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         for (i in function.functionDescriptor.args.indices) newVars[i] = function.functionDescriptor.args[i].second
         vars = newVars
         function.clazz = curClass
-        function.statements.accept(this)
+        check(function.statements, function)
+        curFunction = null
         return Datatype.Void()
     }
 
@@ -154,6 +180,10 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         return Datatype.Void()
     }
 
+    /**
+     * pre-calculates classes. This is necessary to e.g. determine the types of functions/fields before the main
+     * type-checking phase starts
+     */
     private fun preCalcClasses(clazzes: List<AstNode.ArtClass>) {
         val names = mutableListOf<String>()
 
@@ -179,29 +209,32 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             } ?: SyntheticAst.objectClass
             clazz._extends = superClass
         }
-        for (clazz in clazzes) if (clazz !is SyntheticNode) {
-            clazz as AstNode.ClassDefinition
-            if (clazz === clazz.extends) {
-                artError(Errors.InheritanceLoopError(
-                    "Class ${clazz.name} can't extend itself",
-                    clazz.nameToken,
-                    srcCode
-                ))
-            }
-            else if (clazz === clazz.extends.extends) {
-                artError(Errors.InheritanceLoopError(
-                    "Classes ${clazz.name} and ${clazz.extends.name} can't extend each other",
-                    clazz.nameToken,
-                    srcCode
-                ))
-            }
-        }
+//        for (clazz in clazzes) if (clazz !is SyntheticNode) {
+//            clazz as AstNode.ClassDefinition
+//            if (clazz === clazz.extends) {
+//                artError(Errors.InheritanceLoopError(
+//                    "Class ${clazz.name} can't extend itself",
+//                    clazz.nameToken,
+//                    srcCode
+//                ))
+//            }
+//            else if (clazz === clazz.extends.extends) {
+//                artError(Errors.InheritanceLoopError(
+//                    "Classes ${clazz.name} and ${clazz.extends.name} can't extend each other",
+//                    clazz.nameToken,
+//                    srcCode
+//                ))
+//            }
+//        }
     }
 
+    /**
+     * pre-calculates functions. This is necessary to e.g. determine the types of functions/fields before the main
+     * type-checking phase starts
+     */
     private fun preCalcFuncs(funcs: List<AstNode.Function>, clazz: AstNode.ArtClass?) {
         for (func in funcs) if (func !is SyntheticNode) {
             func as AstNode.FunctionDeclaration
-            curFunction = func
             func.clazz = clazz
             val args = mutableListOf<Pair<String, Datatype>>()
             if (func.hasThis) args.add(Pair("this", Datatype.Object(clazz!!)))
@@ -241,6 +274,10 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         }
     }
 
+    /**
+     * pre-calculates fields. This is necessary to e.g. determine the types of functions/fields before the main
+     * type-checking phase starts
+     */
     private fun preCalcFields(fields: List<AstNode.Field>, clazz: AstNode.ArtClass?) {
         val names = mutableListOf<String>()
         for (field in fields) if (field !is SyntheticNode) {
@@ -506,16 +543,17 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
     override fun visit(returnStmt: AstNode.Return): Datatype {
         val type = returnStmt.toReturn?.let { check(it, returnStmt) } ?: Datatype.Void()
-        if (!type.compatibleWith(curFunction.functionDescriptor.returnType)) {
+        if (curFunction == null) return Datatype.Void()
+        if (!type.compatibleWith(curFunction!!.functionDescriptor.returnType)) {
             artError(Errors.IncompatibleTypesError(
                 returnStmt,
                 "return",
                 type,
-                curFunction.functionDescriptor.returnType,
+                curFunction!!.functionDescriptor.returnType,
                 srcCode
             ))
         }
-        return type
+        return Datatype.Void()
     }
 
     override fun visit(varInc: AstNode.VarIncrement): Datatype {
@@ -772,21 +810,35 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         return Datatype.Void()
     }
 
+    /**
+     * looks up a function in the top level with the name [name] and that can be called using the arguments in [sig]
+     */
     private fun lookupTopLevelFunc(name: String, sig: List<Datatype>): AstNode.Function? {
         for (func in program.funcs) if (func.name == name && func.functionDescriptor.isCompatibleWith(sig)) return func
         return null
     }
 
+    /**
+     * looks up a class in the top level with the name [name]
+     */
     private fun lookupTopLevelClass(name: String): AstNode.ArtClass? {
         for (clazz in program.classes) if (clazz.name == name) return clazz
         return null
     }
 
+    /**
+     * looks up a field in the top level with the name [name]
+     */
     private fun lookupTopLevelField(name: String): AstNode.Field? {
         for (field in program.fields) if (field.name == name) return field
         return null
     }
 
+    /**
+     * checks the type of [node]. Also handles node-swapping and sets the type property of [node] to the return-type.
+     * @param parent the parent of [node]. If [parent] is null and a swap is attempted, a [AstNode.CantSwapException] is
+     * thrown
+     */
     private fun check(node: AstNode, parent: AstNode?): Datatype {
         val res = node.accept(this)
         node.type = res
@@ -797,6 +849,9 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         return res
     }
 
+    /**
+     * converts a type-node to its datatype representation
+     */
     private fun typeNodeToDataType(node: AstNode.DatatypeNode): Datatype {
         var type = when (node.kind) {
             Datakind.BOOLEAN -> Datatype.Bool()
@@ -821,7 +876,10 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         return type
     }
 
-    private fun getDatatypeFromToken(token: TokenType) = when (token) {
+    /**
+     * returns the primitive type for a token
+     */
+    private fun getDatatypeFromToken(token: TokenType): Datatype = when (token) {
         TokenType.BYTE -> Datatype.Byte()
         TokenType.SHORT -> Datatype.Short()
         TokenType.INT -> Datatype.Integer()
@@ -833,6 +891,9 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         else -> throw RuntimeException("unreachable")
     }
 
+    /**
+     * checks which type is the super-type of the other. null the types are not compatible
+     */
     private fun getHigherType(type1: Datatype, type2: Datatype): Datatype? {
         if (type1.compatibleWith(type2)) return type2
         if (type2.compatibleWith(type1)) return type1

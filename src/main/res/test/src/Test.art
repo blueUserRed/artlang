@@ -4,6 +4,7 @@ field testField: int = 2
 fn main() {
     const catArr = Cat[3][3]
     catArr[2][1] = BlackCat()
+    A().test()
 }
 
 fn println(toPrint: str) {
@@ -50,3 +51,8 @@ class Animal {
     }
 
 }
+
+
+class A : C { }
+class B : A { }
+class C : B { }

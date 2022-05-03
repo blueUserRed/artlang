@@ -97,9 +97,10 @@ abstract class Datatype(val kind: Datakind) {
             return StatClass(other.clazz).isSuperClassOf(clazz)
         }
 
-        fun lookupFunc(name: String, sig: List<Datatype>): AstNode.Function? {
+        fun lookupFunc(name: String, sig: List<Datatype>, origClass: AstNode.ArtClass? = null): AstNode.Function? {
             for (func in clazz.funcs) if (func.name == name && func.functionDescriptor.isCompatibleWith(sig)) return func
-            if (clazz.extends != null) return Object(clazz.extends!!).lookupFunc(name, sig)
+            if (clazz.extends === origClass) return null //protect against inheritance loops
+            if (clazz.extends != null) return Object(clazz.extends!!).lookupFunc(name, sig, origClass ?: clazz)
             return null
         }
 

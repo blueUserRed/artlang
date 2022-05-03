@@ -1100,6 +1100,9 @@ class Compiler : AstNodeVisitor<Unit> {
         else doMultiDimensionalArray(arr)
     }
 
+    /**
+     * compiles a multi-dimensional array-create
+     */
     private fun doMultiDimensionalArray(arr: AstNode.ArrayCreate) {
         for (amount in arr.amounts) compile(amount, false)
         emit(
@@ -1111,6 +1114,9 @@ class Compiler : AstNodeVisitor<Unit> {
         incStack(arr.type)
     }
 
+    /**
+     * compiles a single-dimensional array-create
+     */
     private fun doOneDimensionalArray(arr: AstNode.ArrayCreate) {
         when (val kind = (arr.type as Datatype.ArrayType).type.kind) {
             Datakind.INT, Datakind.FLOAT -> {
