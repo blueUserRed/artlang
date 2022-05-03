@@ -1009,7 +1009,7 @@ class Compiler : AstNodeVisitor<Unit> {
      */
     fun emitAStore(type: Datatype) = when (type.kind) {
         Datakind.INT -> emit(iastore)
-        Datakind.OBJECT -> emit(aastore)
+        Datakind.OBJECT, Datakind.ARRAY -> emit(aastore)
         else -> TODO("only int, string and object arrays are implemented")
     }
 
@@ -1019,7 +1019,7 @@ class Compiler : AstNodeVisitor<Unit> {
     fun emitALoad(type: Datatype) = when (type.kind) {
         Datakind.INT -> emit(iaload)
         Datakind.FLOAT -> emit(faload)
-        Datakind.OBJECT -> emit(aaload)
+        Datakind.OBJECT, Datakind.ARRAY -> emit(aaload)
         else -> TODO("only int, string and object arrays are implemented")
     }
 
@@ -1141,6 +1141,25 @@ class Compiler : AstNodeVisitor<Unit> {
                 emit(anewarray, *Utils.getLastTwoBytes(file.classInfo(file.utf8Info(
                     ((arr.type as Datatype.ArrayType).type as Datatype.Object).clazz.jvmName
                 ))))
+                decStack()
+                incStack(arr.type)
+                for (i in arr.elements.indices) {
+                    emit(dup)
+                    incStack(emitterTarget.stack.peek())
+                    emitIntLoad(i)
+                    incStack(Datatype.Integer())
+                    compile(arr.elements[i], false)
+                    emit(aastore)
+                    decStack()
+                    decStack()
+                    decStack()
+                }
+            }
+            Datakind.ARRAY -> {
+                val arrType = arr.type as Datatype.ArrayType
+                emitIntLoad(arr.elements.size)
+                incStack(Datatype.Integer())
+                emit(anewarray, *Utils.getLastTwoBytes(file.classInfo(file.utf8Info(arrType.type.descriptorType))))
                 decStack()
                 incStack(arr.type)
                 for (i in arr.elements.indices) {

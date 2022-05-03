@@ -784,25 +784,28 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         return res
     }
 
-    private fun typeNodeToDataType(node: AstNode.DatatypeNode): Datatype = when (node.kind) {
-        Datakind.BOOLEAN -> if (node.isArray) Datatype.ArrayType(Datatype.Bool()) else Datatype.Bool()
-        Datakind.BYTE -> if (node.isArray) Datatype.ArrayType(Datatype.Byte()) else Datatype.Byte()
-        Datakind.SHORT -> if (node.isArray) Datatype.ArrayType(Datatype.Short()) else Datatype.Short()
-        Datakind.INT -> if (node.isArray) Datatype.ArrayType(Datatype.Integer()) else Datatype.Integer()
-        Datakind.LONG -> if (node.isArray) Datatype.ArrayType(Datatype.Long()) else Datatype.Long()
-        Datakind.FLOAT -> if (node.isArray) Datatype.ArrayType(Datatype.Float()) else Datatype.Float()
-        Datakind.DOUBLE -> if (node.isArray) Datatype.ArrayType(Datatype.Double()) else Datatype.Double()
-        Datakind.OBJECT -> {
-            node as AstNode.ObjectTypeNode
-            var toRet: Datatype? = null
+    private fun typeNodeToDataType(node: AstNode.DatatypeNode): Datatype {
+        var type = when (node.kind) {
+            Datakind.BOOLEAN -> Datatype.Bool()
+            Datakind.BYTE -> Datatype.Byte()
+            Datakind.SHORT -> Datatype.Short()
+            Datakind.INT -> Datatype.Integer()
+            Datakind.LONG -> Datatype.Long()
+            Datakind.FLOAT -> Datatype.Float()
+            Datakind.DOUBLE -> Datatype.Double()
+            Datakind.OBJECT -> {
+                node as AstNode.ObjectTypeNode
+                var toRet: Datatype? = null
 
-            for (c in program.classes) if (c.name == node.identifier.lexeme) {
-                toRet = Datatype.Object(c)
+                for (c in program.classes) if (c.name == node.identifier.lexeme) {
+                    toRet = Datatype.Object(c)
+                }
+                toRet ?: throw RuntimeException("unknown Type: ${node.identifier.lexeme}")
             }
-            toRet ?: throw RuntimeException("unknown Type: ${node.identifier.lexeme}")
-            if (node.isArray) Datatype.ArrayType(toRet) else toRet
+            else -> throw RuntimeException("invalid type")
         }
-        else -> throw RuntimeException("invalid type")
+        repeat(node.arrayDims) { type = Datatype.ArrayType(type) }
+        return type
     }
 
     private fun getDatatypeFromToken(token: TokenType) = when (token) {

@@ -152,6 +152,7 @@ abstract class Datatype(val kind: Datakind) {
     }
 
     class ArrayType(val type: Datatype) : Datatype(Datakind.ARRAY) {
+
         override val descriptorType: String = "[${type.descriptorType}"
 
         override fun equals(other: Any?): Boolean {
@@ -161,11 +162,23 @@ abstract class Datatype(val kind: Datakind) {
         override fun toString(): String {
             return "Array<$type>"
         }
+
         override fun compatibleWith(other: Datatype): Boolean {
             if (other.matches(Datakind.ERROR)) return true
             if (other.matches(Datakind.ARRAY)) return type == (other as ArrayType).type
             return false
         }
+
+        fun countDimensions(): Int {
+            if (type !is ArrayType) return 1
+            return 1 + type.countDimensions()
+        }
+
+        fun getRootType(): Datatype {
+            if (type !is ArrayType) return type
+            return type.getRootType()
+        }
+
     }
 
     class ErrorType : Datatype(Datakind.ERROR) {

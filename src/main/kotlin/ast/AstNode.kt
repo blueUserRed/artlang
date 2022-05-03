@@ -946,10 +946,12 @@ abstract class AstNode(val relevantTokens: List<Token>) {
      */
     abstract class DatatypeNode(val kind: Datakind) {
 
-        /**
-         * true if the type is an array
-         */
-        var isArray: Boolean = false
+//        /**
+//         * true if the type is an array
+//         */
+//        var isArray: Boolean = false
+
+        var arrayDims: Int = 0
 
         abstract override fun toString(): String
     }

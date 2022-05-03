@@ -769,33 +769,26 @@ class Parser {
             TokenType.T_LONG,
             TokenType.T_BOOLEAN
         )
-        if (match(*primitives)) {
-            return AstNode.PrimitiveTypeNode(tokenTypeToDataKind(last().tokenType)).apply {
-                if (matchNSFB(TokenType.L_BRACKET)) {
-                    consumeOrError(TokenType.R_BRACKET, "expected closing bracket")
-                    isArray = true
-                }
-            }
-        }
 
-        if (match(TokenType.T_STRING)) {
-            return AstNode.ObjectTypeNode(
+        val typeNode: AstNode.DatatypeNode
+
+        if (match(*primitives)) typeNode = AstNode.PrimitiveTypeNode(tokenTypeToDataKind(last().tokenType))
+        else if (match(TokenType.T_STRING)) {
+            typeNode = AstNode.ObjectTypeNode(
                 Token(TokenType.IDENTIFIER, "\$String", "\$String", "", -1 ,-1),
-            ).apply {
-                if (matchNSFB(TokenType.L_BRACKET)) {
-                    consumeOrError(TokenType.R_BRACKET, "expected closing bracket")
-                    isArray = true
-                }
-            }
+            )
+        } else {
+            consumeOrError(TokenType.IDENTIFIER, "Expected Type")
+            typeNode = AstNode.ObjectTypeNode(last())
         }
 
-        consumeOrError(TokenType.IDENTIFIER, "Expected Type")
-        val token = last()
-        if (matchNSFB(TokenType.L_BRACKET)) {
-            consumeOrError(TokenType.R_BRACKET, "expected closing bracket")
-            return AstNode.ObjectTypeNode(token).apply { isArray = true }
+        var arrDims = 0
+        while (matchNSFB(TokenType.L_BRACKET)) {
+            consumeOrError(TokenType.R_BRACKET, "Expected closing Bracket")
+            arrDims++
         }
-        return AstNode.ObjectTypeNode(last())
+        typeNode.arrayDims = arrDims
+        return typeNode
     }
 
     /**

@@ -273,7 +273,7 @@ object Tokenizer {
         }
         consume() //consume ending " or '
         val string = code.substring((start + 1)..(cur - 2))
-        emit(TokenType.STRING, string, string, start - lastLineBreakPos)
+        emit(TokenType.STRING, endChar + string + endChar, string, start - lastLineBreakPos)
     }
 
     /**
