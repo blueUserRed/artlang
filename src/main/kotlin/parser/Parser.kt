@@ -621,6 +621,7 @@ class Parser {
      */
     private fun parseLiteralExpression(): AstNode {
         if (match(TokenType.IDENTIFIER)) return AstNode.Get(last(), null, listOf(last()))
+        if (match(TokenType.K_NULL)) return AstNode.Null(listOf(last()))
         if (match(TokenType.L_PAREN)) return groupExpression()
         if (match(TokenType.L_BRACKET)) return parseArrayLiteral()
         if (match(TokenType.YIELD_ARROW)) {

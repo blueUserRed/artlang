@@ -248,6 +248,7 @@ object Tokenizer {
             "return" -> emit(TokenType.K_RETURN, "return", null, start - lastLineBreakPos)
             "break" -> emit(TokenType.K_BREAK, "break", null, start - lastLineBreakPos)
             "continue" -> emit(TokenType.K_CONTINUE, "continue", null, start - lastLineBreakPos)
+            "null" -> emit(TokenType.K_NULL, "null", null, start - lastLineBreakPos)
             else -> emit(TokenType.IDENTIFIER, identifier, identifier, start - lastLineBreakPos)
         }
     }

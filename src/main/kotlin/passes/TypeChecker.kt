@@ -7,6 +7,7 @@ import errors.Errors
 import errors.artError
 import tokenizer.Token
 import tokenizer.TokenType
+import javax.xml.crypto.Data
 
 /**
  * checks type-saftey, checks that function/fields that are referenced exist
@@ -44,10 +45,10 @@ class TypeChecker : AstNodeVisitor<Datatype> {
      */
     var srcCode: String = ""
 
-    override fun visit(binary: AstNode.Binary): Datatype {
+    override fun visit(binary: AstNode.Binary): Datatype { //TODO: rewrite this function
         val type1 = check(binary.left, binary)
         val type2 = check(binary.right, binary)
-        val resultType: Datatype
+        var resultType: Datatype
 
         when (binary.operator.tokenType) {
             TokenType.PLUS -> {
@@ -102,8 +103,27 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                 }
             }
             TokenType.D_EQ, TokenType.NOT_EQ -> {
-                if (!type1.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG,
-                        Datakind.FLOAT, Datakind.DOUBLE) || type1 != type2) {
+
+//                if (
+//                    type1.kind == Datakind.NULL && type2.kind == Datakind.OBJECT ||
+//                    type2.kind == Datakind.NULL && type1.kind == Datakind.OBJECT
+//                ) {
+//                    resultType = Datatype.Bool()
+//                }
+//
+//                if (type1.kind in arrayOf(Datakind.VOID, Datakind.STAT_CLASS)) {
+//                    artError(Errors.ExpectedAnExpressionError(binary.left, srcCode))
+//                    resultType = Datatype.ErrorType()
+//                }
+//                if (type2.kind in arrayOf(Datakind.VOID, Datakind.STAT_CLASS)) {
+//                    artError(Errors.ExpectedAnExpressionError(binary.right, srcCode))
+//                    resultType = Datatype.ErrorType()
+//                }
+
+                if (
+                    !type1.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG, Datakind.FLOAT, Datakind.DOUBLE)
+                    || type1 != type2
+                ) {
                     artError(Errors.IllegalTypesInBinaryOperationError(
                         binary.operator.lexeme, type1, type2, binary, srcCode
                     ))
@@ -317,11 +337,13 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     }
 
     override fun visit(varDec: AstNode.VariableDeclaration): Datatype {
+
         val type = check(varDec.initializer, varDec)
         if (type == Datatype.Void()) {
             artError(Errors.ExpectedAnExpressionError(varDec.initializer, srcCode))
             return Datatype.Void()
         }
+
         var type2: Datatype? = null
         if (varDec.explType != null) {
             type2 = typeNodeToDataType(varDec.explType!!)
@@ -329,6 +351,14 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                 artError(Errors.IncompatibleTypesError(varDec, "variable declaration", type, type2, srcCode))
             }
         }
+
+        if (type == Datatype.NullType() && type2 == null) {
+            artError(Errors.CantInferTypeError(varDec, srcCode))
+            vars[varDec.index] = Datatype.ErrorType()
+            varDec.varType = Datatype.ErrorType()
+            return Datatype.Void()
+        }
+
         vars[varDec.index] = type2 ?: type
         varDec.varType = type2 ?: type
 
@@ -343,7 +373,8 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             if (varAssign.index != -1) {
                 val varType = vars[varAssign.index] ?: throw RuntimeException("unreachable")
 
-                if (!varType.compatibleWith(typeToAssign)) {
+//                if (!varType.compatibleWith(typeToAssign)) {
+                if (!typeToAssign.compatibleWith(varType)) {
                     artError(Errors.IncompatibleTypesError(varAssign, "assignment", varType, typeToAssign, srcCode))
                 }
                 varAssign.type = if (varAssign.isWalrus) varType else Datatype.Void()
@@ -796,6 +827,10 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             artError(Errors.IncompatibleTypesError(el, "array literal", type, lowestType, srcCode))
             lowestType = Datatype.ErrorType()
         }
+
+        //if array literal only contains nulls, set type to Object[]
+        if (lowestType.kind == Datakind.NULL) lowestType = Datatype.Object(SyntheticAst.objectClass)
+
         return Datatype.ArrayType(lowestType)
     }
 
@@ -808,6 +843,10 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         }
         yieldArrow.yieldType = type
         return Datatype.Void()
+    }
+
+    override fun visit(nul: AstNode.Null): Datatype {
+        return Datatype.NullType()
     }
 
     /**

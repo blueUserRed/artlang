@@ -198,4 +198,9 @@ class AstPrinter : AstNodeVisitor<String> {
             else "${varInc.from!!.accept(this)}.${varInc.name.lexeme}"
         } ${varInc.operator.lexeme} ${varInc.toAdd.accept(this)})"
     }
+
+    override fun visit(nul: AstNode.Null): String {
+        return "null"
+    }
+
 }

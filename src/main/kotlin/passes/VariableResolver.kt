@@ -212,4 +212,7 @@ class VariableResolver : AstNodeVisitor<Unit> {
         val index = curVars.indexOf(varInc.name.lexeme)
         varInc.index = index
     }
+
+    override fun visit(nul: AstNode.Null) {
+    }
 }

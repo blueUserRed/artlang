@@ -191,11 +191,23 @@ abstract class Datatype(val kind: Datakind) {
         }
     }
 
+    class NullType : Datatype(Datakind.NULL) {
+        override val descriptorType: String = "Ljava/lang/Object;"
+
+        override fun compatibleWith(other: Datatype): Boolean {
+            return other.kind in arrayOf(Datakind.ERROR, Datakind.OBJECT, Datakind.NULL)
+        }
+
+        override fun equals(other: Any?): Boolean = other != null && other::class == NullType::class
+
+        override fun toString(): String = "NullType"
+    }
+
 }
 
 enum class Datakind {
     INT, LONG, BYTE, SHORT, FLOAT, DOUBLE, VOID, BOOLEAN, OBJECT,
     ARRAY,
-    ERROR,
+    ERROR, NULL,
     STAT_CLASS
 }

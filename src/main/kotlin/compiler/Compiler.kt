@@ -527,7 +527,7 @@ class Compiler : AstNodeVisitor<Unit> {
         )))
         incStack(getObjVerificationType("java/io/PrintStream"))
 
-        var dataTypeToPrint = if (print.toPrint.type.matches(Datakind.OBJECT)) "Ljava/lang/Object;"
+        var dataTypeToPrint = if (print.toPrint.type.kind in arrayOf(Datakind.OBJECT, Datakind.NULL, Datakind.ARRAY)) "Ljava/lang/Object;"
                                 else print.toPrint.type.descriptorType
 
         //convert short and byte to their wrapper types before printing
@@ -680,7 +680,7 @@ class Compiler : AstNodeVisitor<Unit> {
         when (varAssign.toAssign.type.kind) {
             Datakind.INT -> emitIntVarStore(varAssign.index)
             Datakind.FLOAT -> emitFloatVarStore(varAssign.index)
-            Datakind.OBJECT -> emitObjectVarStore(varAssign.index)
+            Datakind.OBJECT, Datakind.NULL -> emitObjectVarStore(varAssign.index)
             Datakind.BOOLEAN -> emitIntVarStore(varAssign.index)
             else -> TODO("type for local assignment not implemented")
         }
@@ -853,7 +853,7 @@ class Compiler : AstNodeVisitor<Unit> {
 //        }
 
         when (returnStmt.toReturn!!.type.kind) {
-            Datakind.OBJECT, Datakind.ARRAY -> emit(areturn)
+            Datakind.OBJECT, Datakind.ARRAY, Datakind.NULL -> emit(areturn)
             Datakind.INT, Datakind.SHORT, Datakind.BYTE -> emit(ireturn)
             Datakind.FLOAT -> emit(freturn)
             else -> TODO("return-type is not yet implemented")
@@ -1009,7 +1009,7 @@ class Compiler : AstNodeVisitor<Unit> {
      */
     fun emitAStore(type: Datatype) = when (type.kind) {
         Datakind.INT -> emit(iastore)
-        Datakind.OBJECT, Datakind.ARRAY -> emit(aastore)
+        Datakind.OBJECT, Datakind.ARRAY, Datakind.NULL -> emit(aastore)
         else -> TODO("only int, string and object arrays are implemented")
     }
 
@@ -1204,6 +1204,11 @@ class Compiler : AstNodeVisitor<Unit> {
             }
             else -> TODO("array literal type not implemented")
         }
+    }
+
+    override fun visit(nul: AstNode.Null) {
+        emit(aconst_null)
+        incStack(Datatype.NullType())
     }
 
     /**
@@ -1441,13 +1446,14 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     /**
-     * returns the VerifactionType for a datatype
+     * returns the VerificationType for a datatype
      */
     private fun getVerificationType(type: Datatype) = when (type.kind) {
         Datakind.INT, Datakind.BOOLEAN, Datakind.BYTE, Datakind.SHORT -> VerificationTypeInfo.Integer()
         Datakind.FLOAT -> VerificationTypeInfo.Float()
         Datakind.OBJECT -> getObjVerificationType((type as Datatype.Object).clazz.jvmName)
         Datakind.ARRAY -> getObjVerificationType(type.descriptorType)
+        Datakind.NULL -> VerificationTypeInfo.Null()
         else -> TODO("not yet implemented")
     }
 
@@ -1708,5 +1714,7 @@ class Compiler : AstNodeVisitor<Unit> {
         const val l2d: Byte = 0x8a.toByte()
         const val l2f: Byte = 0x89.toByte()
         const val l2i: Byte = 0x88.toByte()
+
+        const val aconst_null: Byte = 0x01.toByte()
     }
 }

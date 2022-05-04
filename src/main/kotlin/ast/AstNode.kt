@@ -944,16 +944,20 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
+    class Null(relevantTokens: List<Token>) : AstNode(relevantTokens) {
+
+        override fun swap(orig: AstNode, to: AstNode) {
+            throw CantSwapException()
+        }
+
+        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
+    }
+
     /**
      * the parser-representation of a datatype. Converted to a proper type by the TypeChecker
      * @param kind the kind of data
      */
     abstract class DatatypeNode(val kind: Datakind) {
-
-//        /**
-//         * true if the type is an array
-//         */
-//        var isArray: Boolean = false
 
         var arrayDims: Int = 0
 
