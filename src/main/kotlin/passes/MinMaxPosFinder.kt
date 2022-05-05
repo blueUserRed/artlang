@@ -155,6 +155,10 @@ class MinMaxPosFinder : AstNodeVisitor<MutableMap<Int, Pair<Int, Int>>> {
         return if (varInc.from == null) toRet else combine(find(varInc.from!!), toRet)
     }
 
+    override fun visit(nul: AstNode.Null): MutableMap<Int, Pair<Int, Int>> {
+        return getMinMaxFor(nul.relevantTokens)
+    }
+
     @Suppress("NOTHING_TO_INLINE")
     private inline fun find(node: AstNode): MutableMap<Int, Pair<Int, Int>> = node.accept(this)
 

@@ -887,13 +887,17 @@ abstract class AstNode(val relevantTokens: List<Token>) {
      * represents an array-creation statement (e.g. int[4]). The Parser only emits array-gets, because it can't
      * distinguish between array-accesses and array creations. This node is swapped into the tree by the TypeChecker
      * @param of the type of the array
-     * @param amount the node that when evaluated results in the array size
+     * @param amounts the size of the array in each dimension. The first value is the size of the array in the firs
+     * dimension, the second value the size in the second dimension, etc.
      */
-    class ArrayCreate(val of: Datatype, var amount: AstNode, relevantTokens: List<Token>) : AstNode(relevantTokens) {
+    class ArrayCreate(val of: Datatype, var amounts: Array<AstNode>, relevantTokens: List<Token>) : AstNode(relevantTokens) {
 
         override fun swap(orig: AstNode, to: AstNode) {
-            if (amount !== orig) throw CantSwapException()
-            amount = to
+            for (i in amounts.indices) if (amounts[i] === orig) {
+                amounts[i] = to
+                return
+            }
+            throw CantSwapException()
         }
 
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
@@ -940,16 +944,22 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
+    class Null(relevantTokens: List<Token>) : AstNode(relevantTokens) {
+
+        override fun swap(orig: AstNode, to: AstNode) {
+            throw CantSwapException()
+        }
+
+        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
+    }
+
     /**
      * the parser-representation of a datatype. Converted to a proper type by the TypeChecker
      * @param kind the kind of data
      */
     abstract class DatatypeNode(val kind: Datakind) {
 
-        /**
-         * true if the type is an array
-         */
-        var isArray: Boolean = false
+        var arrayDims: Int = 0
 
         abstract override fun toString(): String
     }

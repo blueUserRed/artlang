@@ -376,4 +376,22 @@ class Errors {
             get() = mutableMapOf(name.line to (name.pos to name.pos + name.lexeme.length))
     }
 
+    class CantInferTypeError(
+        val stmt: AstNode,
+        srcCode: String,
+    ) : ArtError(28, srcCode) {
+        override val message: String = "Cannot infer type, explicit type declaration required."
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = stmt.accept(MinMaxPosFinder())
+    }
+
+    class OperationNotImplementedError(
+        val stmt: AstNode,
+        override val message: String,
+        srcCode: String
+    ) : ArtError(29, srcCode) {
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = stmt.accept(MinMaxPosFinder())
+    }
+
 }

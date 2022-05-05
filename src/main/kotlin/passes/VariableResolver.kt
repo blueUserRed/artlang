@@ -182,7 +182,7 @@ class VariableResolver : AstNodeVisitor<Unit> {
     }
 
     override fun visit(arr: AstNode.ArrayCreate) {
-        resolve(arr.amount, arr)
+        for (amount in arr.amounts) resolve(amount, arr)
     }
 
     override fun visit(arr: AstNode.ArrayLiteral) {
@@ -211,5 +211,8 @@ class VariableResolver : AstNodeVisitor<Unit> {
         }
         val index = curVars.indexOf(varInc.name.lexeme)
         varInc.index = index
+    }
+
+    override fun visit(nul: AstNode.Null) {
     }
 }

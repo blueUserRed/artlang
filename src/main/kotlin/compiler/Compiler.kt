@@ -141,20 +141,8 @@ class Compiler : AstNodeVisitor<Unit> {
 
         val isFloat = binary.type == Datatype.Float()
 
-//        if (
-//            binary.type == Datatype.Float() ||
-//            binary.left.type == Datatype.Float() ||
-//            binary.right.type == Datatype.Float()
-//        ) {
-//            isFloat = true
-//            compile(binary.left, false)
-//            if (binary.left.type != Datatype.Float()) doConvertPrimitive(binary.left.type, Datatype.Float())
-//            compile(binary.right, false)
-//            if (binary.right.type != Datatype.Float()) doConvertPrimitive(binary.right.type, Datatype.Float())
-//        } else {
-            compile(binary.left, false)
-            compile(binary.right, false)
-//        }
+        compile(binary.left, false)
+        compile(binary.right, false)
 
         when (val type = binary.operator.tokenType) {
             TokenType.PLUS -> {
@@ -214,6 +202,7 @@ class Compiler : AstNodeVisitor<Unit> {
         else -> throw RuntimeException("not a comparison")
     }
 
+//may become useful later, so im leaving it in
 //    /**
 //     * emits the instruction to convert the value on the top of the stack from '[from]' to '[to]'
 //     */
@@ -527,7 +516,7 @@ class Compiler : AstNodeVisitor<Unit> {
         )))
         incStack(getObjVerificationType("java/io/PrintStream"))
 
-        var dataTypeToPrint = if (print.toPrint.type.matches(Datakind.OBJECT)) "Ljava/lang/Object;"
+        var dataTypeToPrint = if (print.toPrint.type.kind in arrayOf(Datakind.OBJECT, Datakind.NULL, Datakind.ARRAY)) "Ljava/lang/Object;"
                                 else print.toPrint.type.descriptorType
 
         //convert short and byte to their wrapper types before printing
@@ -680,7 +669,7 @@ class Compiler : AstNodeVisitor<Unit> {
         when (varAssign.toAssign.type.kind) {
             Datakind.INT -> emitIntVarStore(varAssign.index)
             Datakind.FLOAT -> emitFloatVarStore(varAssign.index)
-            Datakind.OBJECT -> emitObjectVarStore(varAssign.index)
+            Datakind.OBJECT, Datakind.NULL -> emitObjectVarStore(varAssign.index)
             Datakind.BOOLEAN -> emitIntVarStore(varAssign.index)
             else -> TODO("type for local assignment not implemented")
         }
@@ -853,7 +842,7 @@ class Compiler : AstNodeVisitor<Unit> {
 //        }
 
         when (returnStmt.toReturn!!.type.kind) {
-            Datakind.OBJECT, Datakind.ARRAY -> emit(areturn)
+            Datakind.OBJECT, Datakind.ARRAY, Datakind.NULL -> emit(areturn)
             Datakind.INT, Datakind.SHORT, Datakind.BYTE -> emit(ireturn)
             Datakind.FLOAT -> emit(freturn)
             else -> TODO("return-type is not yet implemented")
@@ -1009,7 +998,7 @@ class Compiler : AstNodeVisitor<Unit> {
      */
     fun emitAStore(type: Datatype) = when (type.kind) {
         Datakind.INT -> emit(iastore)
-        Datakind.OBJECT -> emit(aastore)
+        Datakind.OBJECT, Datakind.ARRAY, Datakind.NULL -> emit(aastore)
         else -> TODO("only int, string and object arrays are implemented")
     }
 
@@ -1019,7 +1008,7 @@ class Compiler : AstNodeVisitor<Unit> {
     fun emitALoad(type: Datatype) = when (type.kind) {
         Datakind.INT -> emit(iaload)
         Datakind.FLOAT -> emit(faload)
-        Datakind.OBJECT -> emit(aaload)
+        Datakind.OBJECT, Datakind.ARRAY -> emit(aaload)
         else -> TODO("only int, string and object arrays are implemented")
     }
 
@@ -1096,18 +1085,46 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     override fun visit(arr: AstNode.ArrayCreate) {
+        if (arr.amounts.size == 1) doOneDimensionalArray(arr)
+        else doMultiDimensionalArray(arr)
+    }
+
+    /**
+     * compiles a multi-dimensional array-create
+     */
+    private fun doMultiDimensionalArray(arr: AstNode.ArrayCreate) {
+        for (amount in arr.amounts) compile(amount, false)
+        emit(
+            multianewarray,
+            *Utils.getLastTwoBytes(file.classInfo(file.utf8Info(arr.type.descriptorType))),
+            Utils.getLastTwoBytes(arr.amounts.size)[1]
+        )
+        repeat(arr.amounts.size) { decStack() }
+        incStack(arr.type)
+    }
+
+    /**
+     * compiles a single-dimensional array-create
+     */
+    private fun doOneDimensionalArray(arr: AstNode.ArrayCreate) {
         when (val kind = (arr.type as Datatype.ArrayType).type.kind) {
             Datakind.INT, Datakind.FLOAT -> {
-                compile(arr.amount, false)
+                compile(arr.amounts[0], false)
                 emit(newarray, getAType(kind))
                 decStack()
                 incStack(arr.type)
             }
             Datakind.OBJECT -> {
-                compile(arr.amount, false)
-                emit(anewarray, *Utils.getLastTwoBytes(file.classInfo(file.utf8Info(
-                    ((arr.type as Datatype.ArrayType).type as Datatype.Object).clazz.jvmName
-                ))))
+                compile(arr.amounts[0], false)
+                emit(
+                    anewarray, *Utils.getLastTwoBytes(
+                        file.classInfo(
+                            file.utf8Info(
+                                ((arr.type as Datatype.ArrayType).type as Datatype.Object).clazz.jvmName
+                            )
+                        )
+                    )
+                )
                 decStack()
                 incStack(arr.type)
             }
@@ -1155,8 +1172,32 @@ class Compiler : AstNodeVisitor<Unit> {
                     decStack()
                 }
             }
+            Datakind.ARRAY -> {
+                val arrType = arr.type as Datatype.ArrayType
+                emitIntLoad(arr.elements.size)
+                incStack(Datatype.Integer())
+                emit(anewarray, *Utils.getLastTwoBytes(file.classInfo(file.utf8Info(arrType.type.descriptorType))))
+                decStack()
+                incStack(arr.type)
+                for (i in arr.elements.indices) {
+                    emit(dup)
+                    incStack(emitterTarget.stack.peek())
+                    emitIntLoad(i)
+                    incStack(Datatype.Integer())
+                    compile(arr.elements[i], false)
+                    emit(aastore)
+                    decStack()
+                    decStack()
+                    decStack()
+                }
+            }
             else -> TODO("array literal type not implemented")
         }
+    }
+
+    override fun visit(nul: AstNode.Null) {
+        emit(aconst_null)
+        incStack(Datatype.NullType())
     }
 
     /**
@@ -1394,13 +1435,14 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     /**
-     * returns the VerifactionType for a datatype
+     * returns the VerificationType for a datatype
      */
     private fun getVerificationType(type: Datatype) = when (type.kind) {
         Datakind.INT, Datakind.BOOLEAN, Datakind.BYTE, Datakind.SHORT -> VerificationTypeInfo.Integer()
         Datakind.FLOAT -> VerificationTypeInfo.Float()
         Datakind.OBJECT -> getObjVerificationType((type as Datatype.Object).clazz.jvmName)
         Datakind.ARRAY -> getObjVerificationType(type.descriptorType)
+        Datakind.NULL -> VerificationTypeInfo.Null()
         else -> TODO("not yet implemented")
     }
 
@@ -1661,5 +1703,7 @@ class Compiler : AstNodeVisitor<Unit> {
         const val l2d: Byte = 0x8a.toByte()
         const val l2f: Byte = 0x89.toByte()
         const val l2i: Byte = 0x88.toByte()
+
+        const val aconst_null: Byte = 0x01.toByte()
     }
 }
