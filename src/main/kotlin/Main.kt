@@ -1,27 +1,27 @@
 import ast.AstNode
-import ast.AstPrinter
-import ast.SyntheticAst
-import compiler.Compiler
-import errors.ErrorPool
+import java.io.File
 import parser.Parser
+import ast.AstPrinter
+import tokenizer.Token
+import ast.SyntheticAst
+import errors.ErrorPool
+import compiler.Compiler
+import passes.TypeChecker
+import java.nio.file.Path
+import tokenizer.Tokenizer
+import java.io.IOException
+import java.nio.file.Paths
+import java.nio.file.Files
+import passes.VariableResolver
 import passes.ControlFlowChecker
 import passes.InheritanceChecker
-import passes.TypeChecker
-import passes.VariableResolver
-import tokenizer.Token
-import tokenizer.Tokenizer
-import java.io.File
-import java.io.IOException
 import java.lang.RuntimeException
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.Paths
 
 object Main {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        println("\n")
+        if (Settings.verbose) println("\n")
         val instructions = Settings.parseArgs(args)
 
         if (instructions.isEmpty()) {

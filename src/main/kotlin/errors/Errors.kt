@@ -385,4 +385,13 @@ class Errors {
             get() = stmt.accept(MinMaxPosFinder())
     }
 
+    class OperationNotImplementedError(
+        val stmt: AstNode,
+        override val message: String,
+        srcCode: String
+    ) : ArtError(29, srcCode) {
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = stmt.accept(MinMaxPosFinder())
+    }
+
 }

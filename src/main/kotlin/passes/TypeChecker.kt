@@ -7,10 +7,9 @@ import errors.Errors
 import errors.artError
 import tokenizer.Token
 import tokenizer.TokenType
-import javax.xml.crypto.Data
 
 /**
- * checks type-saftey, checks that function/fields that are referenced exist
+ * checks type-safety, checks that function/fields that are referenced exist
  */
 class TypeChecker : AstNodeVisitor<Datatype> {
 
@@ -45,122 +44,70 @@ class TypeChecker : AstNodeVisitor<Datatype> {
      */
     var srcCode: String = ""
 
-    override fun visit(binary: AstNode.Binary): Datatype { //TODO: rewrite this function
-        val type1 = check(binary.left, binary)
-        val type2 = check(binary.right, binary)
-        var resultType: Datatype
 
-        when (binary.operator.tokenType) {
-            TokenType.PLUS -> {
-                if (type1 == type2 && type1 == Datatype.Str()) {
-                    resultType = type1
-                } else {
-                    if (
-                        !type1.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG,
-                        Datakind.FLOAT, Datakind.DOUBLE) ||
-                        !(type1.compatibleWith(type2) || type2.compatibleWith(type1))
-                    ) {
-                        artError(Errors.IllegalTypesInBinaryOperationError(
-                            binary.operator.lexeme, type1, type2, binary, srcCode
-                        ))
-                        resultType = Datatype.ErrorType()
-                    } else {
-                        resultType = getHigherType(type1, type2) ?: throw RuntimeException("unreachable")
-                    }
-                }
-            }
-            TokenType.MINUS -> {
-                if (!type1.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG,
-                    Datakind.FLOAT, Datakind.DOUBLE) || !(type1.compatibleWith(type2) || type2.compatibleWith(type1))) {
-                    artError(Errors.IllegalTypesInBinaryOperationError(
-                        binary.operator.lexeme, type1, type2, binary, srcCode
-                    ))
-                    resultType = Datatype.ErrorType()
-                } else {
-                    resultType = getHigherType(type1, type2) ?: throw RuntimeException("unreachable")
-                }
-            }
-            TokenType.STAR, TokenType.SLASH -> {
-                if (!type1.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG,
-                    Datakind.FLOAT, Datakind.DOUBLE) || !(type1.compatibleWith(type2) || type2.compatibleWith(type1))) {
-                    artError(Errors.IllegalTypesInBinaryOperationError(
-                        binary.operator.lexeme, type1, type2, binary, srcCode
-                    ))
-                    resultType = Datatype.ErrorType()
-                } else {
-                    resultType = getHigherType(type1, type2) ?: throw RuntimeException("unreachable")
-                }
-            }
-            TokenType.MOD -> {
-                if (!type1.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG,
-                        Datakind.FLOAT, Datakind.DOUBLE) || !(type1.compatibleWith(type2) || type2.compatibleWith(type1))) {
-                    artError(Errors.IllegalTypesInBinaryOperationError(
-                        binary.operator.lexeme, type1, type2, binary, srcCode
-                    ))
-                    resultType = Datatype.ErrorType()
-                } else {
-                    resultType = getHigherType(type1, type2) ?: throw RuntimeException("unreachable")
-                }
-            }
-            TokenType.D_EQ, TokenType.NOT_EQ -> {
+    override fun visit(binary: AstNode.Binary): Datatype {
+        val left = check(binary.left, binary)
+        val right = check(binary.right, binary)
 
-//                if (
-//                    type1.kind == Datakind.NULL && type2.kind == Datakind.OBJECT ||
-//                    type2.kind == Datakind.NULL && type1.kind == Datakind.OBJECT
-//                ) {
-//                    resultType = Datatype.Bool()
-//                }
-//
-//                if (type1.kind in arrayOf(Datakind.VOID, Datakind.STAT_CLASS)) {
-//                    artError(Errors.ExpectedAnExpressionError(binary.left, srcCode))
-//                    resultType = Datatype.ErrorType()
-//                }
-//                if (type2.kind in arrayOf(Datakind.VOID, Datakind.STAT_CLASS)) {
-//                    artError(Errors.ExpectedAnExpressionError(binary.right, srcCode))
-//                    resultType = Datatype.ErrorType()
-//                }
-
-                if (
-                    !type1.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG, Datakind.FLOAT, Datakind.DOUBLE)
-                    || type1 != type2
-                ) {
-                    artError(Errors.IllegalTypesInBinaryOperationError(
-                        binary.operator.lexeme, type1, type2, binary, srcCode
-                    ))
-                    resultType = Datatype.ErrorType()
-                } else {
-                    resultType = Datatype.Bool()
-                }
-            }
-            TokenType.D_AND, TokenType.D_OR -> {
-                if (type1 != type2 || !type1.matches(Datakind.BOOLEAN)) {
-                    artError(Errors.IllegalTypesInBinaryOperationError(
-                        binary.operator.lexeme, type1, type2, binary, srcCode
-                    ))
-                    resultType = Datatype.ErrorType()
-                } else resultType = Datatype.Bool()
-            }
-            TokenType.GT, TokenType.GT_EQ, TokenType.LT, TokenType.LT_EQ -> {
-                if (!type1.matches(
-                        Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG,
-                        Datakind.FLOAT, Datakind.DOUBLE
-                    ) || !type1.compatibleWith(type2)
-                ) {
-                    artError(
-                        Errors.IllegalTypesInBinaryOperationError(
-                            binary.operator.lexeme, type1, type2, binary, srcCode
-                        )
-                    )
-                    resultType = Datatype.ErrorType()
-                } else {
-                    resultType = Datatype.Bool()
-                }
-            }
-            else -> throw RuntimeException("unreachable")
+        if (left.matches(Datakind.VOID, Datakind.STAT_CLASS)) {
+            artError(Errors.ExpectedAnExpressionError(binary.left, srcCode))
+        }
+        if (right.matches(Datakind.VOID, Datakind.STAT_CLASS)) {
+            artError(Errors.ExpectedAnExpressionError(binary.right, srcCode))
         }
 
-        binary.type = resultType
-        return resultType
+        when (binary.operator.tokenType) {
+
+            TokenType.PLUS -> {
+                if (left == Datatype.Str() && right == Datatype.Str()) return Datatype.Str()
+                if (
+                    left.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG, Datakind.FLOAT, Datakind.LONG) &&
+                    left == right
+                ) return left
+                artError(Errors.IllegalTypesInBinaryOperationError(
+                    binary.operator.lexeme, left, right, binary, srcCode
+                ))
+                return Datatype.ErrorType()
+            }
+
+            TokenType.MINUS, TokenType.STAR, TokenType.SLASH, TokenType.MOD -> {
+                if (
+                    left.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG, Datakind.FLOAT, Datakind.LONG) &&
+                    left == right
+                ) return left
+                artError(Errors.IllegalTypesInBinaryOperationError(
+                    binary.operator.lexeme, left, right, binary, srcCode
+                ))
+                return Datatype.ErrorType()
+            }
+
+            TokenType.D_EQ, TokenType.NOT_EQ -> {
+                if (left.matches(Datakind.NULL) && right.matches(Datakind.OBJECT)) return Datatype.Bool()
+                if (right.matches(Datakind.NULL) && left.matches(Datakind.OBJECT)) return Datatype.Bool()
+
+                if (left.matches(Datakind.OBJECT) && right.matches(Datakind.OBJECT)) return Datatype.Bool()
+
+                if (
+                    left.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG, Datakind.FLOAT, Datakind.LONG) &&
+                    left == right
+                ) return Datatype.Bool()
+
+                artError(Errors.IllegalTypesInBinaryOperationError(
+                    binary.operator.lexeme, left, right, binary, srcCode
+                ))
+                return Datatype.Bool()
+            }
+
+            TokenType.D_AND, TokenType.D_OR -> {
+                if (left.kind != Datakind.BOOLEAN) artError(Errors.ExpectedConditionError(binary.left, left, srcCode))
+                if (right.kind != Datakind.BOOLEAN) artError(Errors.ExpectedConditionError(binary.right, right, srcCode))
+                return Datatype.Bool()
+            }
+
+            else -> throw RuntimeException("unreachable")
+
+        }
+
     }
 
     override fun visit(literal: AstNode.Literal): Datatype {
@@ -229,23 +176,6 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             } ?: SyntheticAst.objectClass
             clazz._extends = superClass
         }
-//        for (clazz in clazzes) if (clazz !is SyntheticNode) {
-//            clazz as AstNode.ClassDefinition
-//            if (clazz === clazz.extends) {
-//                artError(Errors.InheritanceLoopError(
-//                    "Class ${clazz.name} can't extend itself",
-//                    clazz.nameToken,
-//                    srcCode
-//                ))
-//            }
-//            else if (clazz === clazz.extends.extends) {
-//                artError(Errors.InheritanceLoopError(
-//                    "Classes ${clazz.name} and ${clazz.extends.name} can't extend each other",
-//                    clazz.nameToken,
-//                    srcCode
-//                ))
-//            }
-//        }
     }
 
     /**
@@ -411,7 +341,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                     return if (varAssign.isWalrus) field.fieldType else Datatype.Void()
                 }
                 artError(Errors.UnknownIdentifierError(varAssign.name, srcCode))
-                return Datatype.ErrorType()
+                return if (varAssign.isWalrus) Datatype.ErrorType() else Datatype.Void()
             }
 
             Datakind.OBJECT -> {
@@ -427,10 +357,13 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                     return if (varAssign.isWalrus) field.fieldType else Datatype.Void()
                 }
                 artError(Errors.UnknownIdentifierError(varAssign.name, srcCode))
-                return Datatype.ErrorType()
+                return if (varAssign.isWalrus) Datatype.ErrorType() else Datatype.Void()
             }
 
-            else -> TODO("getting is only implemented for classes and objects")
+            else -> {
+                artError(Errors.OperationNotApplicableError("field-get", from, varAssign, srcCode))
+                return if (varAssign.isWalrus) Datatype.ErrorType() else Datatype.Void()
+            }
 
         }
     }
@@ -509,7 +442,13 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                 return func.functionDescriptor.returnType
             }
             if (curClass != null && funcCall.name.lexeme == curClass!!.name) {
-                if (funcCall.arguments.size != 0) TODO("constructor calls with arguments are not yet implemented")
+                if (funcCall.arguments.size != 0) {
+                    artError(Errors.OperationNotImplementedError(
+                        funcCall,
+                        "Constructors with parameters are not implemented",
+                        srcCode
+                    ))
+                }
                 val toSwap = AstNode.ConstructorCall(curClass!!, funcCall.arguments, funcCall.relevantTokens)
                 toSwap.type = Datatype.Object(curClass!!)
                 swap = toSwap
@@ -517,7 +456,13 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             }
             val clazz = lookupTopLevelClass(funcCall.name.lexeme)
             if (clazz != null) {
-                if (funcCall.arguments.size != 0) TODO("constructor calls with arguments are not yet implemented")
+                if (funcCall.arguments.size != 0) {
+                    artError(Errors.OperationNotImplementedError(
+                        funcCall,
+                        "Constructors with parameters are not implemented",
+                        srcCode
+                    ))
+                }
                 val toSwap = AstNode.ConstructorCall(clazz, funcCall.arguments, funcCall.relevantTokens)
                 toSwap.type = Datatype.Object(clazz)
                 swap = toSwap

@@ -141,20 +141,8 @@ class Compiler : AstNodeVisitor<Unit> {
 
         val isFloat = binary.type == Datatype.Float()
 
-//        if (
-//            binary.type == Datatype.Float() ||
-//            binary.left.type == Datatype.Float() ||
-//            binary.right.type == Datatype.Float()
-//        ) {
-//            isFloat = true
-//            compile(binary.left, false)
-//            if (binary.left.type != Datatype.Float()) doConvertPrimitive(binary.left.type, Datatype.Float())
-//            compile(binary.right, false)
-//            if (binary.right.type != Datatype.Float()) doConvertPrimitive(binary.right.type, Datatype.Float())
-//        } else {
-            compile(binary.left, false)
-            compile(binary.right, false)
-//        }
+        compile(binary.left, false)
+        compile(binary.right, false)
 
         when (val type = binary.operator.tokenType) {
             TokenType.PLUS -> {
@@ -214,6 +202,7 @@ class Compiler : AstNodeVisitor<Unit> {
         else -> throw RuntimeException("not a comparison")
     }
 
+//may become useful later, so im leaving it in
 //    /**
 //     * emits the instruction to convert the value on the top of the stack from '[from]' to '[to]'
 //     */
