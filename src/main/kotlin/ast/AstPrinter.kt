@@ -203,4 +203,7 @@ class AstPrinter : AstNodeVisitor<String> {
         return "null"
     }
 
+    override fun visit(convert: AstNode.TypeConvert): String {
+        return "(${convert.toConvert.accept(this)}.${convert.to.lexeme})"
+    }
 }

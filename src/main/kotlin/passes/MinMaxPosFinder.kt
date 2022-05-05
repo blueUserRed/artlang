@@ -20,7 +20,7 @@ class MinMaxPosFinder : AstNodeVisitor<MutableMap<Int, Pair<Int, Int>>> {
     }
 
     override fun visit(group: AstNode.Group): MutableMap<Int, Pair<Int, Int>> {
-        return combine(find(group), getMinMaxFor(group.relevantTokens))
+        return combine(find(group.grouped), getMinMaxFor(group.relevantTokens))
     }
 
     override fun visit(unary: AstNode.Unary): MutableMap<Int, Pair<Int, Int>> {
@@ -159,16 +159,21 @@ class MinMaxPosFinder : AstNodeVisitor<MutableMap<Int, Pair<Int, Int>>> {
         return getMinMaxFor(nul.relevantTokens)
     }
 
+    override fun visit(convert: AstNode.TypeConvert): MutableMap<Int, Pair<Int, Int>> {
+        return combine(find(convert.toConvert), getMinMaxFor(convert.to))
+    }
+
     @Suppress("NOTHING_TO_INLINE")
     private inline fun find(node: AstNode): MutableMap<Int, Pair<Int, Int>> = node.accept(this)
 
     private fun getMinMaxFor(token: Token): MutableMap<Int, Pair<Int, Int>> {
+        if (token.line == -1) return mutableMapOf()
         return mutableMapOf(token.line to (token.pos to token.pos + token.lexeme.length))
     }
 
     private fun getMinMaxFor(tokens: List<Token>): MutableMap<Int, Pair<Int, Int>> {
         var acc: MutableMap<Int, Pair<Int, Int>> = mutableMapOf()
-        for (t in tokens) acc = combine(acc, getMinMaxFor(t))
+        for (t in tokens) if (t.line != -1) acc = combine(acc, getMinMaxFor(t))
         return acc
     }
 

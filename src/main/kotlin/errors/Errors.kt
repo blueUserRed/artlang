@@ -394,4 +394,14 @@ class Errors {
             get() = stmt.accept(MinMaxPosFinder())
     }
 
+    class ExpectedPrimitiveInTypeConversionError(
+        val notPrimitive: AstNode,
+        val found: Datatype,
+        srcCode: String
+    ) : ArtError(30, srcCode) {
+        override val message: String = "Expected primitive number in type conversion, found $found"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = notPrimitive.accept(MinMaxPosFinder())
+    }
+
 }

@@ -582,8 +582,19 @@ class Parser {
         while (true) {
             if (match(TokenType.DOT)) {
                 val dotToken = last()
-                consumeOrError(TokenType.IDENTIFIER, "Expected indentifier after dot")
-                left = AstNode.Get(last(), left, listOf(last(), dotToken))
+                if (match(
+                        TokenType.T_BYTE,
+                        TokenType.T_SHORT,
+                        TokenType.T_INT,
+                        TokenType.T_LONG,
+                        TokenType.FLOAT,
+                        TokenType.T_DOUBLE
+                )) {
+                    left = AstNode.TypeConvert(left, last(), listOf(last(), dotToken))
+                } else {
+                    consumeOrError(TokenType.IDENTIFIER, "Expected indentifier after dot")
+                    left = AstNode.Get(last(), left, listOf(last(), dotToken))
+                }
             } else if (matchNSFB(TokenType.L_PAREN)) {
                 left = parseFunctionCall(left)
             } else if (match(TokenType.D_PLUS)) {

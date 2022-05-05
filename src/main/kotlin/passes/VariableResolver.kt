@@ -172,15 +172,6 @@ class VariableResolver : AstNodeVisitor<Unit> {
         resolve(field.initializer, field)
     }
 
-    private fun resolve(node: AstNode, parent: AstNode?) {
-        val res = node.accept(this)
-        if (swap == null) return res
-        if (parent == null) throw AstNode.CantSwapException()
-        parent.swap(node, swap!!)
-        swap = null
-        return res
-    }
-
     override fun visit(arr: AstNode.ArrayCreate) {
         for (amount in arr.amounts) resolve(amount, arr)
     }
@@ -214,5 +205,18 @@ class VariableResolver : AstNodeVisitor<Unit> {
     }
 
     override fun visit(nul: AstNode.Null) {
+    }
+
+    override fun visit(convert: AstNode.TypeConvert) {
+        resolve(convert.toConvert, convert)
+    }
+
+    private fun resolve(node: AstNode, parent: AstNode?) {
+        val res = node.accept(this)
+        if (swap == null) return res
+        if (parent == null) throw AstNode.CantSwapException()
+        parent.swap(node, swap!!)
+        swap = null
+        return res
     }
 }

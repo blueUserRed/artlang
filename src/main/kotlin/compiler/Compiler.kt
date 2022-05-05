@@ -146,23 +146,38 @@ class Compiler : AstNodeVisitor<Unit> {
 
         when (val type = binary.operator.tokenType) {
             TokenType.PLUS -> {
-                if (!isFloat) emit(iadd) else emit(fadd)
+                if (!isFloat) {
+                    emit(iadd)
+                    if (binary.type != Datatype.Integer()) doConvertPrimitive(Datatype.Integer(), binary.type)
+                } else emit(fadd)
                 decStack()
             }
             TokenType.MINUS -> {
-                if (!isFloat) emit(isub) else emit(fsub)
+                if (!isFloat) {
+                    emit(isub)
+                    if (binary.type != Datatype.Integer()) doConvertPrimitive(Datatype.Integer(), binary.type)
+                } else emit(fsub)
                 decStack()
             }
             TokenType.STAR -> {
-                if (!isFloat) emit(imul) else emit(fmul)
+                if (!isFloat) {
+                    emit(imul)
+                    if (binary.type != Datatype.Integer()) doConvertPrimitive(Datatype.Integer(), binary.type)
+                } else emit(fmul)
                 decStack()
             }
             TokenType.SLASH -> {
-                if (!isFloat) emit(idiv) else emit(fdiv)
+                if (!isFloat) {
+                    emit(idiv)
+                    if (binary.type != Datatype.Integer()) doConvertPrimitive(Datatype.Integer(), binary.type)
+                } else emit(fdiv)
                 decStack()
             }
             TokenType.MOD -> {
-                if (!isFloat) emit(irem) else emit(frem)
+                if (!isFloat) {
+                    emit(irem)
+                    if (binary.type != Datatype.Integer()) doConvertPrimitive(Datatype.Integer(), binary.type)
+                } else emit(frem)
                 decStack()
             }
             TokenType.GT -> if (!isFloat) doCompare(if_icmpgt) else doFloatCompare(type)
@@ -202,41 +217,40 @@ class Compiler : AstNodeVisitor<Unit> {
         else -> throw RuntimeException("not a comparison")
     }
 
-//may become useful later, so im leaving it in
-//    /**
-//     * emits the instruction to convert the value on the top of the stack from '[from]' to '[to]'
-//     */
-//    private fun doConvertPrimitive(from: Datatype, to: Datatype) {
-//        when (from.kind) {
-//            Datakind.BYTE -> when (to.kind) {
-//                Datakind.SHORT -> { }
-//                Datakind.INT -> { }
-//                Datakind.LONG -> emit(i2l)
-//                Datakind.FLOAT -> emit(i2f)
-//                Datakind.DOUBLE -> emit(i2d)
-//                else -> throw RuntimeException("unsupported type")
-//            }
-//            Datakind.SHORT -> when (to.kind) {
-//                Datakind.BYTE -> emit(i2b)
-//                Datakind.INT -> { }
-//                Datakind.LONG -> emit(i2l)
-//                Datakind.FLOAT -> emit(i2f)
-//                Datakind.DOUBLE -> emit(i2d)
-//                else -> throw RuntimeException("unsupported type")
-//            }
-//            Datakind.INT -> when (to.kind) {
-//                Datakind.BYTE -> emit(i2b)
-//                Datakind.SHORT -> emit(i2s)
-//                Datakind.LONG -> emit(i2l)
-//                Datakind.FLOAT -> emit(i2f)
-//                Datakind.DOUBLE -> emit(i2d)
-//                else -> throw RuntimeException("unsupported type")
-//            }
-//            else -> throw RuntimeException("unsupported type")
-//        }
-//        decStack()
-//        incStack(to)
-//    }
+    /**
+     * emits the instruction to convert the value on the top of the stack from '[from]' to '[to]'
+     */
+    private fun doConvertPrimitive(from: Datatype, to: Datatype) {
+        when (from.kind) {
+            Datakind.BYTE -> when (to.kind) {
+                Datakind.SHORT -> { }
+                Datakind.INT -> { }
+                Datakind.LONG -> emit(i2l)
+                Datakind.FLOAT -> emit(i2f)
+                Datakind.DOUBLE -> emit(i2d)
+                else -> throw RuntimeException("unsupported type")
+            }
+            Datakind.SHORT -> when (to.kind) {
+                Datakind.BYTE -> emit(i2b)
+                Datakind.INT -> { }
+                Datakind.LONG -> emit(i2l)
+                Datakind.FLOAT -> emit(i2f)
+                Datakind.DOUBLE -> emit(i2d)
+                else -> throw RuntimeException("unsupported type")
+            }
+            Datakind.INT -> when (to.kind) {
+                Datakind.BYTE -> emit(i2b)
+                Datakind.SHORT -> emit(i2s)
+                Datakind.LONG -> emit(i2l)
+                Datakind.FLOAT -> emit(i2f)
+                Datakind.DOUBLE -> emit(i2d)
+                else -> throw RuntimeException("unsupported type")
+            }
+            else -> throw RuntimeException("unsupported type")
+        }
+        decStack()
+        incStack(to)
+    }
 
     /**
      * compiles a binary addition of strings using StringBuilders
@@ -523,8 +537,8 @@ class Compiler : AstNodeVisitor<Unit> {
         if (dataTypeToPrint == "S" || dataTypeToPrint == "B") {
             val className = if (dataTypeToPrint == "S") "java/lang/Short" else "java/lang/Byte"
             val valueOfInfo = file.methodRefInfo(
-                file.utf8Info(className),
-                file.nameAndTypeInfo(file.utf8Info("valueOf"), file.utf8Info("($dataTypeToPrint)$className;"))
+                file.classInfo(file.utf8Info(className)),
+                file.nameAndTypeInfo(file.utf8Info("valueOf"), file.utf8Info("($dataTypeToPrint)L$className;"))
             )
             compile(print.toPrint, false)
             emit(invokestatic, *Utils.getLastTwoBytes(valueOfInfo))
@@ -1198,6 +1212,11 @@ class Compiler : AstNodeVisitor<Unit> {
     override fun visit(nul: AstNode.Null) {
         emit(aconst_null)
         incStack(Datatype.NullType())
+    }
+
+    override fun visit(convert: AstNode.TypeConvert) {
+        compile(convert.toConvert, false)
+        doConvertPrimitive(convert.toConvert.type, convert.type)
     }
 
     /**

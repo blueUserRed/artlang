@@ -220,6 +220,10 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
         return ControlFlowState()
     }
 
+    override fun visit(convert: AstNode.TypeConvert): ControlFlowState {
+        return ControlFlowState()
+    }
+
     /**
      * checks the [ControlFlowState] of [node]
      */

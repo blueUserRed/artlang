@@ -794,6 +794,34 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         return Datatype.NullType()
     }
 
+    override fun visit(convert: AstNode.TypeConvert): Datatype {
+        val toConvertType = check(convert.toConvert, convert)
+
+        if (toConvertType.matches(Datakind.LONG, Datakind.DOUBLE) ||
+            convert.to.tokenType in arrayOf(TokenType.T_LONG, TokenType.T_DOUBLE)
+        ) {
+            artError(Errors.OperationNotImplementedError(
+                //wrap token in variable, so that only the 'to' token is highlighted, not the entire statement
+                AstNode.Variable(convert.to, listOf(convert.to)),
+                "long and double is not yet implemented",
+                srcCode
+            ))
+        }
+
+        if (!toConvertType.matches(
+                Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG, Datakind.FLOAT, Datakind.DOUBLE
+        )) {
+            artError(Errors.ExpectedPrimitiveInTypeConversionError(
+                convert.toConvert,
+                toConvertType,
+                srcCode
+            ))
+        }
+
+        return getDatatypeFromTypeToken(convert.to.tokenType)
+
+    }
+
     /**
      * looks up a function in the top level with the name [name] and that can be called using the arguments in [sig]
      */
@@ -831,6 +859,19 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         parent.swap(node, swap!!)
         swap = null
         return res
+    }
+
+    /**
+     * gets the corresponding Datatype from a type-token (e.g. T_INT, T_BYTE)
+     */
+    private fun getDatatypeFromTypeToken(type: TokenType): Datatype = when (type) {
+        TokenType.T_BYTE -> Datatype.Byte()
+        TokenType.T_SHORT -> Datatype.Short()
+        TokenType.T_INT -> Datatype.Integer()
+        TokenType.T_LONG -> Datatype.Long()
+        TokenType.T_FLOAT -> Datatype.Float()
+        TokenType.T_DOUBLE -> Datatype.Double()
+        else -> throw RuntimeException("unreachable")
     }
 
     /**
