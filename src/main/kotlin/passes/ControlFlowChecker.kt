@@ -4,6 +4,8 @@ import ast.AstNode
 import ast.AstNodeVisitor
 import Datatype
 import ast.SyntheticNode
+import errors.Errors
+import errors.artError
 import passes.ControlFlowChecker.ControlFlowState
 import kotlin.RuntimeException
 
@@ -12,6 +14,8 @@ import kotlin.RuntimeException
  * with return-type != Void always return
  */
 class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
+    
+    private lateinit var srcCode: String
 
     /**
      * the currently (lowest) surrounding loop; null if there is none
@@ -24,7 +28,14 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
     private var curFunction: AstNode.Function? = null
 
     override fun visit(binary: AstNode.Binary): ControlFlowState {
-        return ControlFlowState()
+        val s1 = check(binary.left)
+        val s2 = check(binary.right)
+        return ControlFlowState(
+            s1.alwaysReturns || s2.alwaysReturns,
+            s1.alwaysBreaks || s2.alwaysBreaks,
+            s1.sometimesReturns || s2.sometimesReturns,
+            s1.sometimesBreaks || s2.sometimesBreaks
+        )
     }
 
     override fun visit(literal: AstNode.Literal): ControlFlowState {
@@ -36,11 +47,11 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
     }
 
     override fun visit(group: AstNode.Group): ControlFlowState {
-        return ControlFlowState()
+        return check(group.grouped)
     }
 
     override fun visit(unary: AstNode.Unary): ControlFlowState {
-        return ControlFlowState()
+        return check(unary.on)
     }
 
     override fun visit(funcCall: AstNode.FunctionCall): ControlFlowState {
@@ -58,12 +69,13 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
         curFunction = null
         if (function.functionDescriptor.returnType == Datatype.Void()) return ControlFlowState()
         if (!controlFlowState.alwaysReturns) {
-            throw RuntimeException("Function ${function.name} does not always return")
+           artError(Errors.FunctionDoesNotAlwaysReturnError(function.statements.relevantTokens[1], srcCode))
         }
         return ControlFlowState()
     }
 
     override fun visit(program: AstNode.Program): ControlFlowState {
+        srcCode = program.srcCode
         for (field in program.fields) if (field !is SyntheticNode) check(field)
         for (func in program.funcs) if (func !is SyntheticNode) check(func)
         for (c in program.classes) if (c !is SyntheticNode) check(c)
@@ -71,7 +83,7 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
     }
 
     override fun visit(print: AstNode.Print): ControlFlowState {
-        return ControlFlowState()
+        return check(print.toPrint)
     }
 
     override fun visit(block: AstNode.Block): ControlFlowState {
@@ -90,11 +102,11 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
     }
 
     override fun visit(varDec: AstNode.VariableDeclaration): ControlFlowState {
-        return ControlFlowState()
+        return check(varDec.initializer)
     }
 
     override fun visit(varAssign: AstNode.Assignment): ControlFlowState {
-        return ControlFlowState()
+        return check(varAssign.toAssign)
     }
 
     override fun visit(loop: AstNode.Loop): ControlFlowState {
@@ -136,12 +148,19 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
     }
 
     override fun visit(returnStmt: AstNode.Return): ControlFlowState {
-        if (curFunction == null) throw RuntimeException("return can only be used in function")
+        if (curFunction == null) {
+            artError(Errors.CanOnlyBeUsedInError(
+                "return",
+                "function",
+                returnStmt,
+                srcCode
+            ))
+        }
         return ControlFlowState(alwaysReturns = true, sometimesReturns = true)
     }
 
     override fun visit(varInc: AstNode.VarIncrement): ControlFlowState {
-        return ControlFlowState()
+        return check(varInc.name)
     }
 
     override fun visit(clazz: AstNode.ArtClass): ControlFlowState {
@@ -153,16 +172,30 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
     }
 
     override fun visit(get: AstNode.Get): ControlFlowState {
-        return ControlFlowState()
+        return get.from?.let { check(it) } ?: ControlFlowState()
     }
 
     override fun visit(cont: AstNode.Continue): ControlFlowState {
-        if (surroundingLoop == null) throw RuntimeException("Used continue outside of a loop")
+        if (surroundingLoop == null) {
+            artError(Errors.CanOnlyBeUsedInError(
+                "continue",
+                "loop",
+                cont,
+                srcCode
+            ))
+        }
         return ControlFlowState()
     }
 
     override fun visit(breac: AstNode.Break): ControlFlowState {
-        if (surroundingLoop == null) throw RuntimeException("Used break outside of a loop")
+        if (surroundingLoop == null) {
+            artError(Errors.CanOnlyBeUsedInError(
+                "break",
+                "loop",
+                breac,
+                srcCode
+            ))
+        }
         return ControlFlowState(
             alwaysReturns = false,
             alwaysBreaks = true,
@@ -172,25 +205,49 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
     }
 
     override fun visit(constructorCall: AstNode.ConstructorCall): ControlFlowState {
-        return ControlFlowState()
+        return ControlFlowState() //TODO: fix when constructor-parameters are added
     }
 
     override fun visit(field: AstNode.Field): ControlFlowState {
         field as AstNode.FieldDeclaration
-        check(field.initializer)
-        return ControlFlowState()
+        return check(field.initializer)
     }
 
     override fun visit(arr: AstNode.ArrGet): ControlFlowState {
-        return ControlFlowState()
+        val s1 = check(arr.from)
+        val s2 = check(arr.arrIndex)
+        return ControlFlowState(
+            s1.alwaysReturns || s2.alwaysReturns,
+            s1.alwaysBreaks || s2.alwaysBreaks,
+            s1.sometimesReturns || s2.sometimesReturns,
+            s1.sometimesBreaks || s2.sometimesBreaks
+        )
     }
 
     override fun visit(arr: AstNode.ArrSet): ControlFlowState {
-        return ControlFlowState()
+        val s1 = check(arr.from)
+        val s2 = check(arr.arrIndex)
+        val s3 = check(arr.to)
+        return ControlFlowState(
+            s1.alwaysReturns || s2.alwaysReturns || s3.alwaysReturns,
+            s1.alwaysBreaks || s2.alwaysBreaks || s3.alwaysBreaks,
+            s1.sometimesReturns || s2.sometimesReturns || s3.sometimesReturns,
+            s1.sometimesBreaks || s2.sometimesBreaks || s3.sometimesBreaks
+        )
     }
 
     override fun visit(arr: AstNode.ArrayCreate): ControlFlowState {
-        return ControlFlowState()
+        var combined = ControlFlowState()
+        for (el in arr.amounts) {
+            val s = check(el)
+            combined = ControlFlowState(
+                combined.alwaysReturns || s.alwaysReturns,
+                combined.alwaysBreaks || s.alwaysBreaks,
+                combined.sometimesReturns || s.sometimesReturns,
+                combined.sometimesBreaks || s.sometimesBreaks
+            )
+        }
+        return combined
     }
 
     override fun visit(arr: AstNode.ArrayLiteral): ControlFlowState {
@@ -213,11 +270,15 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
     }
 
     override fun visit(yieldArrow: AstNode.YieldArrow): ControlFlowState {
-        return ControlFlowState()
+        return check(yieldArrow.expr)
     }
 
     override fun visit(nul: AstNode.Null): ControlFlowState {
         return ControlFlowState()
+    }
+
+    override fun visit(convert: AstNode.TypeConvert): ControlFlowState {
+        return check(convert.toConvert)
     }
 
     /**

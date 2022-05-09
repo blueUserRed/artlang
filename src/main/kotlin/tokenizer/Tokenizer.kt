@@ -354,13 +354,17 @@ object Tokenizer {
             return
         }
 
+        val dotIndex = cur - 1
+
         var afterComma = 0.0
         var numIts = 1
         var isFirstIt = true
+        var wasntFloat = false
         while(!end()) {
             if (consume() == '_') continue
             if (!last().isDigit()) {
                 if (isFirstIt) cur--
+                if (isFirstIt) wasntFloat = true
                 break
             }
             isFirstIt = false
@@ -368,6 +372,12 @@ object Tokenizer {
             numIts++
         }
         cur--
+
+        if (wasntFloat) {
+            emit(TokenType.INT, code.substring(start until cur), num.toInt(), start - lastLineBreakPos)
+            cur = dotIndex
+            return
+        }
 
         val commaNum = num + afterComma
         if (!tryConsume('#')) {

@@ -3,6 +3,8 @@ package passes
 import ast.AstNode
 import ast.AstNodeVisitor
 import ast.SyntheticNode
+import errors.Errors
+import errors.artError
 import kotlin.RuntimeException
 
 class VariableResolver : AstNodeVisitor<Unit> {
@@ -13,7 +15,8 @@ class VariableResolver : AstNodeVisitor<Unit> {
 
     private var swap: AstNode? = null
 
-    private lateinit var curProgram: AstNode.Program
+    private lateinit var program: AstNode.Program
+    private lateinit var srcCode: String
 
     override fun visit(binary: AstNode.Binary) {
         resolve(binary.left, binary)
@@ -49,7 +52,8 @@ class VariableResolver : AstNodeVisitor<Unit> {
     }
 
     override fun visit(program: AstNode.Program) {
-        curProgram = program
+        this.program = program
+        srcCode = program.srcCode
 
         for (field in program.fields) if (field !is SyntheticNode) resolve(field, program)
         for (func in program.funcs) if (func !is SyntheticNode) resolve(func, program)
@@ -134,6 +138,15 @@ class VariableResolver : AstNodeVisitor<Unit> {
             return
         }
         val index = curVars.indexOf(varInc.name.name.lexeme)
+        if (index != -1) {
+            if (varDeclarations[index]!!.isConst) {
+                artError(Errors.AssignToConstError(
+                    varInc,
+                    varDeclarations[index]!!.name.lexeme,
+                    srcCode
+                ))
+            }
+        }
         varInc.index = index
     }
 
@@ -172,15 +185,6 @@ class VariableResolver : AstNodeVisitor<Unit> {
         resolve(field.initializer, field)
     }
 
-    private fun resolve(node: AstNode, parent: AstNode?) {
-        val res = node.accept(this)
-        if (swap == null) return res
-        if (parent == null) throw AstNode.CantSwapException()
-        parent.swap(node, swap!!)
-        swap = null
-        return res
-    }
-
     override fun visit(arr: AstNode.ArrayCreate) {
         for (amount in arr.amounts) resolve(amount, arr)
     }
@@ -214,5 +218,18 @@ class VariableResolver : AstNodeVisitor<Unit> {
     }
 
     override fun visit(nul: AstNode.Null) {
+    }
+
+    override fun visit(convert: AstNode.TypeConvert) {
+        resolve(convert.toConvert, convert)
+    }
+
+    private fun resolve(node: AstNode, parent: AstNode?) {
+        val res = node.accept(this)
+        if (swap == null) return res
+        if (parent == null) throw AstNode.CantSwapException()
+        parent.swap(node, swap!!)
+        swap = null
+        return res
     }
 }

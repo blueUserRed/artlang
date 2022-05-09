@@ -191,6 +191,7 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         val funcs: MutableList<Function>,
         val classes: MutableList<ArtClass>,
         val fields: MutableList<Field>,
+        val srcCode: String,
         relevantTokens: List<Token>
     ) : AstNode(relevantTokens) {
 
@@ -944,10 +945,26 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
+    /**
+     * represents a literal 'null'
+     */
     class Null(relevantTokens: List<Token>) : AstNode(relevantTokens) {
 
         override fun swap(orig: AstNode, to: AstNode) {
             throw CantSwapException()
+        }
+
+        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
+    }
+
+    /**
+     * represents a type conversion (3.byte)
+     */
+    class TypeConvert(var toConvert: AstNode, val to: Token, relevantTokens: List<Token>) : AstNode(relevantTokens) {
+
+        override fun swap(orig: AstNode, to: AstNode) {
+            if (toConvert !== orig) throw CantSwapException()
+            toConvert = to
         }
 
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)

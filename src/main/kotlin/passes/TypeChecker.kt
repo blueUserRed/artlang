@@ -3,6 +3,7 @@ package passes
 import Datakind
 import Datatype
 import ast.*
+import errors.ErrorPool
 import errors.Errors
 import errors.artError
 import tokenizer.Token
@@ -42,7 +43,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     /**
      * the source code of the program
      */
-    var srcCode: String = ""
+    private lateinit var srcCode: String
 
 
     override fun visit(binary: AstNode.Binary): Datatype {
@@ -98,6 +99,18 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                 return Datatype.Bool()
             }
 
+            TokenType.GT, TokenType.GT_EQ, TokenType.LT, TokenType.LT_EQ -> {
+                if (
+                    left.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG, Datakind.FLOAT, Datakind.LONG) &&
+                    left == right
+                ) return Datatype.Bool()
+
+                artError(Errors.IllegalTypesInBinaryOperationError(
+                    binary.operator.lexeme, left, right, binary, srcCode
+                ))
+                return Datatype.Bool()
+            }
+
             TokenType.D_AND, TokenType.D_OR -> {
                 if (left.kind != Datakind.BOOLEAN) artError(Errors.ExpectedConditionError(binary.left, left, srcCode))
                 if (right.kind != Datakind.BOOLEAN) artError(Errors.ExpectedConditionError(binary.right, right, srcCode))
@@ -138,6 +151,8 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
     override fun visit(program: AstNode.Program): Datatype {
         this.program = program
+        srcCode = program.srcCode
+
         preCalcFields(program.fields, null)
         preCalcFuncs(program.funcs, null)
         preCalcClasses(program.classes)
@@ -551,14 +566,15 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         val toSwap = AstNode.VarAssignShorthand(
             varInc.name.from,
             varInc.name.name,
-            Token(TokenType.PLUS_EQ, "++", null, "", -1, -1),
+            Token(TokenType.PLUS_EQ, "+=", null, "", -1, -1),
             AstNode.Literal(
-                Token(TokenType.INT, "", varInc.toAdd, "", -1, -1),
+                Token(TokenType.INT, "", varInc.toAdd.toInt(), "", -1, -1),
                 listOf()
             ),
-            listOf()
+            varInc.relevantTokens
         )
         check(toSwap, null)
+        swap = toSwap
         return toSwap.type
     }
 
@@ -575,13 +591,49 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
     override fun visit(varInc: AstNode.VarAssignShorthand): Datatype {
         check(varInc.toAdd, varInc)
-        if (varInc.toAdd.type != Datatype.Integer()) TODO("only int is implemented for shorthand operators")
+        if (
+            (varInc.toAdd.type != Datatype.Str() || varInc.operator.tokenType != TokenType.PLUS_EQ)
+            && varInc.toAdd.type != Datatype.Integer()
+        ) {
+            artError(Errors.OperationNotImplementedError(
+                varInc,
+                "Shorthand operators are only implemented for int and string types",
+                srcCode
+            ))
+        }
         if (varInc.index != -1) return Datatype.Void()
         //temporarily create Get and use its visit function to avoid duplicate logic
-        val tmpGet = AstNode.Get(varInc.name, varInc.from, listOf()) //easier this way
+        val tmpGet = AstNode.Get(varInc.name, varInc.from, varInc.relevantTokens) //easier this way
         check(tmpGet, null)
-        if (tmpGet.type != Datatype.Integer()) TODO("only int is implemented for shorthand operators")
+        if (tmpGet.type != varInc.toAdd.type) {
+            artError(Errors.IllegalTypesInBinaryOperationError(
+                varInc.operator.lexeme,
+                varInc.toAdd.type,
+                tmpGet.type,
+                varInc,
+                srcCode
+            ))
+        }
         varInc.fieldDef = tmpGet.fieldDef
+
+        if (varInc.fieldDef == null) return Datatype.Void()
+
+        if (varInc.fieldDef!!.isConst) {
+            artError(Errors.AssignToConstError(
+                varInc,
+                varInc.fieldDef!!.name,
+                srcCode
+            ))
+        }
+
+//        if (varInc.fieldDef!!.isPrivate) {
+//            artError(Errors.PrivateMemberAccessError(
+//                varInc,
+//                "field",
+//                varInc.fieldDef!!.name,
+//                srcCode
+//            ))
+//        }
 
         return Datatype.Void()
     }
@@ -794,6 +846,34 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         return Datatype.NullType()
     }
 
+    override fun visit(convert: AstNode.TypeConvert): Datatype {
+        val toConvertType = check(convert.toConvert, convert)
+
+        if (toConvertType.matches(Datakind.LONG, Datakind.DOUBLE) ||
+            convert.to.tokenType in arrayOf(TokenType.T_LONG, TokenType.T_DOUBLE)
+        ) {
+            artError(Errors.OperationNotImplementedError(
+                //wrap token in variable, so that only the 'to' token is highlighted, not the entire statement
+                AstNode.Variable(convert.to, listOf(convert.to)),
+                "long and double is not yet implemented",
+                srcCode
+            ))
+        }
+
+        if (!toConvertType.matches(
+                Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG, Datakind.FLOAT, Datakind.DOUBLE
+        )) {
+            artError(Errors.ExpectedPrimitiveInTypeConversionError(
+                convert.toConvert,
+                toConvertType,
+                srcCode
+            ))
+        }
+
+        return getDatatypeFromTypeToken(convert.to.tokenType)
+
+    }
+
     /**
      * looks up a function in the top level with the name [name] and that can be called using the arguments in [sig]
      */
@@ -831,6 +911,19 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         parent.swap(node, swap!!)
         swap = null
         return res
+    }
+
+    /**
+     * gets the corresponding Datatype from a type-token (e.g. T_INT, T_BYTE)
+     */
+    private fun getDatatypeFromTypeToken(type: TokenType): Datatype = when (type) {
+        TokenType.T_BYTE -> Datatype.Byte()
+        TokenType.T_SHORT -> Datatype.Short()
+        TokenType.T_INT -> Datatype.Integer()
+        TokenType.T_LONG -> Datatype.Long()
+        TokenType.T_FLOAT -> Datatype.Float()
+        TokenType.T_DOUBLE -> Datatype.Double()
+        else -> throw RuntimeException("unreachable")
     }
 
     /**

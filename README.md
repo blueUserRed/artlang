@@ -1,6 +1,10 @@
 ## Artlang (work in progress)
 
+![logo](https://raw.githubusercontent.com/blueUserRed/artlang/master/logo.png)
+
 <br>
+
+###### _Note: like the language, this readme is work in progress too_
 
 ### _Introduction_
 Artlang is a programming language that compiles to 
@@ -64,7 +68,7 @@ A function is declared using the fn keyword. It is followed by the
 name of the function, parentheses containing the arguments, and then
 a code block containing the code of the function. An Argument
 consists of the name of the argument followed by a colon and the type.
-Multiple arguments are seperated by commas. Trailing
+Multiple arguments are separated by commas. Trailing
 commas are allowed. If the function has a return type, it is put
 after a colon at the end of the function.
 
