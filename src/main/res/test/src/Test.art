@@ -1,13 +1,8 @@
 
 
 fn main() {
-//    const test = Test()
-    Test.test += 210
-    print Test.test
-}
-
-class Test {
-    public static field test: int = 123
+    print 10#L
+//    print 4#L + 6#L
 }
 
 //class BlackCat : Cat {

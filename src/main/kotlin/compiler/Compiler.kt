@@ -333,11 +333,13 @@ class Compiler : AstNodeVisitor<Unit> {
 
     override fun visit(literal: AstNode.Literal) {
         when (literal.type) {
+            //literal.literal.literal.literal.literal.literal.literal.literal.literal.literal.liter...
             Datatype.Byte() -> emit(bipush, literal.literal.literal as Byte)
             Datatype.Short() -> emit(sipush, *Utils.getShortAsBytes(literal.literal.literal as Short))
             Datatype.Integer() -> emitIntLoad(literal.literal.literal as Int)
             Datatype.Float() -> emitFloatLoad(literal.literal.literal as Float)
             Datatype.Str() -> emitStringLoad(literal.literal.literal as String)
+            Datatype.Long() -> emitLongLoad(literal.literal.literal as Long)
             Datatype.Bool() -> {
                 if (literal.literal.literal as Boolean) emit(iconst_1)
                 else emit(iconst_0)
@@ -1144,7 +1146,8 @@ class Compiler : AstNodeVisitor<Unit> {
         compile(arr.to, false)
         if (arr.isWalrus) {
             emit(dup_x2)
-            emitterTarget.stack.add(emitterTarget.stack.size - 2, getVerificationType(arr.to.type))
+            incStackAt(emitterTarget.stack.size - 2, arr.to.type) //TODO: make sure this actually works
+//            emitterTarget.stack.add(emitterTarget.stack.size - 2, getVerificationType(arr.to.type))
         }
         emitAStore(arr.to.type)
         decStack()
@@ -1461,6 +1464,18 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     /**
+     * loads a long constant
+     */
+    private fun emitLongLoad(l: Long) = when (l) {
+        0L -> emit(lconst_0)
+        1L -> emit(lconst_1)
+        else -> {
+            val longIndex = file.longInfo(l)
+            emit(ldc2_w, *Utils.getLastTwoBytes(longIndex))
+        }
+    }
+
+    /**
      * loads an integer constant
      */
     private fun emitFloatLoad(f: Float) = when (f) {
@@ -1550,6 +1565,15 @@ class Compiler : AstNodeVisitor<Unit> {
     private fun emitStringLoad(s: String) = emitLdc(file.stringInfo(file.utf8Info(s)))
 
     /**
+     * emits the correct pop-instruction for the datatype on top of the stack
+     */
+    private fun doPop() {
+        if (emitterTarget.stack.peek() is VerificationTypeInfo.Top) emit(pop2)
+        else emit(pop)
+        decStack()
+    }
+
+    /**
      * compiles a node
      * @param node the node to compile
      * @param forceNoValueOnStack if true, the compile function will check if the compiled node left a value on the
@@ -1559,8 +1583,7 @@ class Compiler : AstNodeVisitor<Unit> {
         node.accept(this)
         if (forceNoValueOnStack && emitterTarget.stack.size != 0) {
             println(emitterTarget.stack.size)
-            emit(pop)
-            decStack()
+            doPop()
         }
     }
 
@@ -1594,27 +1617,63 @@ class Compiler : AstNodeVisitor<Unit> {
      * increments the stack of the current [emitterTarget] and sets the maxStack property if necessary
      */
     private fun incStack(type: Datatype) {
-        emitterTarget.stack.push(getVerificationType(type))
+        when (type.kind) {
+            Datakind.INT, Datakind.BOOLEAN, Datakind.BYTE, Datakind.SHORT -> {
+                emitterTarget.stack.push(VerificationTypeInfo.Integer())
+            }
+            Datakind.FLOAT -> emitterTarget.stack.push(VerificationTypeInfo.Float())
+            Datakind.OBJECT -> emitterTarget.stack.push(getObjVerificationType((type as Datatype.Object).clazz.jvmName))
+            Datakind.ARRAY -> emitterTarget.stack.push(getObjVerificationType(type.descriptorType))
+            Datakind.NULL -> emitterTarget.stack.push(VerificationTypeInfo.Null())
+            Datakind.LONG -> {
+                emitterTarget.stack.push(VerificationTypeInfo.Long())
+                emitterTarget.stack.push(VerificationTypeInfo.Top())
+            }
+            else -> TODO("not yet implemented")
+        }
         if (emitterTarget.stack.size > emitterTarget.maxStack) emitterTarget.maxStack = emitterTarget.stack.size
     }
 
     /**
-     * returns the VerificationType for a datatype
+     * adds an element at [at] to the stack of the current [emitterTarget]. Sets the maxStack property if necessary.
+     * If [type] is Long or Double, VerificationType.Long/Double is inserted at `at - 1` and VerificationType.Top is
+     * inserted at `at`.
      */
-    private fun getVerificationType(type: Datatype) = when (type.kind) {
-        Datakind.INT, Datakind.BOOLEAN, Datakind.BYTE, Datakind.SHORT -> VerificationTypeInfo.Integer()
-        Datakind.FLOAT -> VerificationTypeInfo.Float()
-        Datakind.OBJECT -> getObjVerificationType((type as Datatype.Object).clazz.jvmName)
-        Datakind.ARRAY -> getObjVerificationType(type.descriptorType)
-        Datakind.NULL -> VerificationTypeInfo.Null()
-        else -> TODO("not yet implemented")
+    private fun incStackAt(at: Int, type: Datatype) {
+        when (type.kind) {
+            Datakind.INT, Datakind.BOOLEAN, Datakind.BYTE, Datakind.SHORT -> {
+                emitterTarget.stack.add(at, VerificationTypeInfo.Integer())
+            }
+            Datakind.FLOAT -> emitterTarget.stack.add(at, VerificationTypeInfo.Float())
+            Datakind.OBJECT -> emitterTarget.stack.add(at, getObjVerificationType((type as Datatype.Object).clazz.jvmName))
+            Datakind.ARRAY -> emitterTarget.stack.add(at, getObjVerificationType(type.descriptorType))
+            Datakind.NULL -> emitterTarget.stack.add(at, VerificationTypeInfo.Null())
+            Datakind.LONG -> {
+                emitterTarget.stack.add(at - 1, VerificationTypeInfo.Long())
+                emitterTarget.stack.add(at, VerificationTypeInfo.Top())
+            }
+            else -> TODO("not yet implemented")
+        }
+        if (emitterTarget.stack.size > emitterTarget.maxStack) emitterTarget.maxStack = emitterTarget.stack.size
     }
 
+//    /**
+//     * returns the VerificationType for a datatype
+//     */
+//    private fun getVerificationType(type: Datatype) = when (type.kind) {
+//        Datakind.INT, Datakind.BOOLEAN, Datakind.BYTE, Datakind.SHORT -> VerificationTypeInfo.Integer()
+//        Datakind.FLOAT -> VerificationTypeInfo.Float()
+//        Datakind.OBJECT -> getObjVerificationType((type as Datatype.Object).clazz.jvmName)
+//        Datakind.ARRAY -> getObjVerificationType(type.descriptorType)
+//        Datakind.NULL -> VerificationTypeInfo.Null()
+//        else -> TODO("not yet implemented")
+//    }
+
     /**
-     * decrements the stack of the current [emitterTarget]
+     * decrements the stack of the current [emitterTarget]; twice if VerificationType.Top is at the top of the stack
      */
     private fun decStack() {
-        emitterTarget.stack.pop()
+        if (emitterTarget.stack.pop() is VerificationTypeInfo.Top) emitterTarget.stack.pop()
     }
 
     /**
@@ -1746,6 +1805,11 @@ class Compiler : AstNodeVisitor<Unit> {
         const val fconst_1: Byte = 0x0c.toByte()
         const val fconst_2: Byte = 0x0d.toByte()
 
+        const val lconst_0: Byte = 0x09.toByte()
+        const val lconst_1: Byte = 0x0A.toByte()
+
+        const val aconst_null: Byte = 0x01.toByte()
+
         const val bipush: Byte = 0x10.toByte()
         const val sipush: Byte = 0x11.toByte()
 
@@ -1869,6 +1933,5 @@ class Compiler : AstNodeVisitor<Unit> {
         const val l2f: Byte = 0x89.toByte()
         const val l2i: Byte = 0x88.toByte()
 
-        const val aconst_null: Byte = 0x01.toByte()
     }
 }
