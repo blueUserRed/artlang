@@ -124,7 +124,7 @@ object Main {
         if (Settings.verbose) println("done in ${variableResolverTime}ms\n")
 
         if (Settings.verbose) println("running type checker")
-        val typeCheckingTime = Stopwatch.time { program.accept(TypeChecker().apply { srcCode = code }) }
+        val typeCheckingTime = Stopwatch.time { program.accept(TypeChecker()) }
         if (ErrorPool.errors.size != lastErrors) {
             if (Settings.verbose) {
                 println("${Ansi.yellow}Accumulated ${ErrorPool.errors.size - lastErrors} error(s)${Ansi.reset}")
@@ -143,7 +143,7 @@ object Main {
         if (Settings.verbose) println("done in ${controlFlowCheckingTime}ms\n")
 
         if (Settings.verbose) println("running inheritance checker")
-        val inheritanceCheckingTime = Stopwatch.time { program.accept(InheritanceChecker().apply { srcCode = code }) }
+        val inheritanceCheckingTime = Stopwatch.time { program.accept(InheritanceChecker()) }
         if (ErrorPool.errors.size != lastErrors) {
             if (Settings.verbose) {
                 println("${Ansi.yellow}Accumulated ${ErrorPool.errors.size - lastErrors} error(s)${Ansi.reset}")

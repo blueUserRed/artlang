@@ -74,13 +74,13 @@ class Parser {
             resyncTopLevel()
             continue
         }
-        return AstNode.Program(functions, classes, fields, listOf())
+        return AstNode.Program(functions, classes, fields, srcCode, listOf())
     }
 
     /**
      * attempts to resync the parser in the context of the top-level
      */
-    fun resyncTopLevel() {
+    private fun resyncTopLevel() {
         while (peek().tokenType !in arrayOf(TokenType.K_FN, TokenType.K_CLASS, TokenType.K_CONST, TokenType.EOF) &&
             !(peek().tokenType == TokenType.IDENTIFIER && peek().lexeme == "field")) cur++
     }
@@ -311,12 +311,10 @@ class Parser {
      * parses a statement
      */
     private fun parseStatement(): AstNode {
-        if (match(TokenType.L_BRACE)) return parseBlock()
         if (match(TokenType.K_PRINT)) return parsePrint()
         if (match(TokenType.K_LET)) return parseVariableDeclaration(false)
         if (match(TokenType.K_CONST)) return parseVariableDeclaration(true)
         if (match(TokenType.K_LOOP)) return parseLoop()
-        if (match(TokenType.K_IF)) return parseIf()
         if (match(TokenType.K_WHILE)) return parseWhileLoop()
         if (match(TokenType.K_RETURN)) return parseReturn()
         if (match(TokenType.K_BREAK)) return AstNode.Break(last(), listOf(last()))
@@ -338,30 +336,30 @@ class Parser {
                 variable.name,
                 op,
                 num,
-                listOf()
+                variable.relevantTokens
             )
             TokenType.PLUS_EQ -> {
                 if (num is AstNode.Literal && num.literal.literal is Int && num.literal.literal in Byte.MIN_VALUE..Byte.MAX_VALUE) {
-                    return AstNode.VarIncrement(variable, num.literal.literal.toByte(), listOf())
+                    return AstNode.VarIncrement(variable, num.literal.literal.toByte(), variable.relevantTokens)
                 }
                 return AstNode.VarAssignShorthand(
                     variable.from,
                     variable.name,
                     op,
                     num,
-                    listOf()
+                    variable.relevantTokens
                 )
             }
             TokenType.MINUS_EQ -> {
                 if (num is AstNode.Literal && num.literal.literal is Int && num.literal.literal in Byte.MIN_VALUE..Byte.MAX_VALUE) {
-                    return AstNode.VarIncrement(variable, (-num.literal.literal).toByte(), listOf())
+                    return AstNode.VarIncrement(variable, (-num.literal.literal).toByte(),  variable.relevantTokens)
                 }
                 return AstNode.VarAssignShorthand(
                     variable.from,
                     variable.name,
                     op,
                     num,
-                    listOf()
+                    variable.relevantTokens
                 )
             }
             else -> throw RuntimeException("unreachable")
@@ -587,7 +585,7 @@ class Parser {
                         TokenType.T_SHORT,
                         TokenType.T_INT,
                         TokenType.T_LONG,
-                        TokenType.FLOAT,
+                        TokenType.T_FLOAT,
                         TokenType.T_DOUBLE
                 )) {
                     left = AstNode.TypeConvert(left, last(), listOf(last(), dotToken))
@@ -631,6 +629,8 @@ class Parser {
      * parses a literal expression (e.g. numbers, strings, variables, groups, etc.)
      */
     private fun parseLiteralExpression(): AstNode {
+        if (match(TokenType.L_BRACE)) return parseBlock()
+        if (match(TokenType.K_IF)) return parseIf()
         if (match(TokenType.IDENTIFIER)) return AstNode.Get(last(), null, listOf(last()))
         if (match(TokenType.K_NULL)) return AstNode.Null(listOf(last()))
         if (match(TokenType.L_PAREN)) return groupExpression()

@@ -191,6 +191,7 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         val funcs: MutableList<Function>,
         val classes: MutableList<ArtClass>,
         val fields: MutableList<Field>,
+        val srcCode: String,
         relevantTokens: List<Token>
     ) : AstNode(relevantTokens) {
 

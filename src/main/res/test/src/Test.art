@@ -1,7 +1,13 @@
 
-field testField: int = 2
 
 fn main() {
+//    const test = Test()
+    Test.test += 210
+    print Test.test
+}
+
+class Test {
+    public static field test: int = 123
 }
 
 //class BlackCat : Cat {
@@ -14,7 +20,7 @@ fn main() {
 //
 //class Cat : Animal {
 //
-//    public field catField: int = 21
+//    public const field catField: int = 21
 //
 //    public fn meow() {
 //        print "meow"

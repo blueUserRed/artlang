@@ -11,7 +11,7 @@ import errors.artError
  */
 class InheritanceChecker : AstNodeVisitor<Unit> {
 
-    lateinit var srcCode: String
+    private lateinit var srcCode: String
 
     override fun visit(binary: AstNode.Binary) = throw RuntimeException("unreachable")
 
@@ -67,6 +67,7 @@ class InheritanceChecker : AstNodeVisitor<Unit> {
     }
 
     override fun visit(program: AstNode.Program) {
+        srcCode = program.srcCode
         program.classes.filter { it !is SyntheticNode }.forEach { it.accept(this) }
         program.funcs.filter { it !is SyntheticNode }.forEach { it.accept(this) }
     }

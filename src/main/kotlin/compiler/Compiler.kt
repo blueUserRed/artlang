@@ -221,6 +221,7 @@ class Compiler : AstNodeVisitor<Unit> {
      * emits the instruction to convert the value on the top of the stack from '[from]' to '[to]'
      */
     private fun doConvertPrimitive(from: Datatype, to: Datatype) {
+        if (from == to) return
         when (from.kind) {
             Datakind.BYTE -> when (to.kind) {
                 Datakind.SHORT -> { }
@@ -244,6 +245,14 @@ class Compiler : AstNodeVisitor<Unit> {
                 Datakind.LONG -> emit(i2l)
                 Datakind.FLOAT -> emit(i2f)
                 Datakind.DOUBLE -> emit(i2d)
+                else -> throw RuntimeException("unsupported type")
+            }
+            Datakind.FLOAT -> when (to.kind) {
+                Datakind.BYTE -> emit(f2i, i2b)
+                Datakind.SHORT -> emit(f2i, i2s)
+                Datakind.INT -> emit(f2i)
+                Datakind.LONG -> emit(f2l)
+                Datakind.DOUBLE -> emit(f2d)
                 else -> throw RuntimeException("unsupported type")
             }
             else -> throw RuntimeException("unsupported type")
@@ -872,13 +881,25 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     override fun visit(varInc: AstNode.VarAssignShorthand) {
+
+        if (varInc.toAdd.type == Datatype.Str()) {
+            doVarAssignShortHandForStringConcat(varInc)
+            return
+        }
+
         if (varInc.index != -1) {
-            emitIntLoad(varInc.index)
+            when (varInc.toAdd.type.kind) {
+                Datakind.BYTE, Datakind.SHORT, Datakind.INT -> emitIntVarLoad(varInc.index)
+                Datakind.FLOAT -> emitFloatVarLoad(varInc.index)
+                else -> throw RuntimeException("unsupported type")
+            }
             incStack(emitterTarget.locals[varInc.index]!!)
-            compile(varInc.toAdd, false)
-            emit(iadd)
-            decStack()
-            emitIntVarStore(varInc.index)
+            doVarAssignShortHandCalc(varInc)
+            when (varInc.toAdd.type.kind) {
+                Datakind.BYTE, Datakind.SHORT, Datakind.INT -> emitIntVarStore(varInc.index)
+                Datakind.FLOAT -> emitFloatVarStore(varInc.index)
+                else -> throw RuntimeException("unsupported type")
+            }
             decStack()
             return
         }
@@ -901,9 +922,7 @@ class Compiler : AstNodeVisitor<Unit> {
         }
 
         incStack(varInc.fieldDef!!.fieldType)
-        compile(varInc.toAdd, false)
-        emit(iadd)
-        decStack()
+        doVarAssignShortHandCalc(varInc)
 
         if (varInc.fieldDef!!.isStatic) emit(putstatic, *Utils.getLastTwoBytes(fieldIndex))
         else {
@@ -913,7 +932,148 @@ class Compiler : AstNodeVisitor<Unit> {
         decStack()
     }
 
+    private fun doVarAssignShortHandForStringConcat(varAssign: AstNode.VarAssignShorthand) {
+        val stringBuilderIndex = file.classInfo(file.utf8Info("java/lang/StringBuilder"))
+
+        val initMethodInfo = file.methodRefInfo(
+            stringBuilderIndex,
+            file.nameAndTypeInfo(
+                file.utf8Info("<init>"),
+                file.utf8Info("()V")
+            )
+        )
+
+        val appendMethodInfo = file.methodRefInfo(
+            stringBuilderIndex,
+            file.nameAndTypeInfo(
+                file.utf8Info("append"),
+                file.utf8Info("(Ljava/lang/String;)Ljava/lang/StringBuilder;")
+            )
+        )
+
+        val toStringMethodInfo = file.methodRefInfo(
+            stringBuilderIndex,
+            file.nameAndTypeInfo(
+                file.utf8Info("toString"),
+                file.utf8Info("()Ljava/lang/String;")
+            )
+        )
+
+        fun getStringBuilder() {
+            emit(new, *Utils.getLastTwoBytes(stringBuilderIndex))
+            incStack(getObjVerificationType("java/lang/StringBuilder"))
+            emit(dup)
+            incStack(emitterTarget.stack.peek())
+            emit(invokespecial, *Utils.getLastTwoBytes(initMethodInfo))
+            decStack()
+        }
+
+        if (varAssign.index != -1) {
+
+            getStringBuilder()
+
+            emitObjectVarLoad(varAssign.index)
+            incStack(Datatype.Str())
+
+            emit(invokevirtual, *Utils.getLastTwoBytes(appendMethodInfo))
+            decStack()
+
+            compile(varAssign.toAdd, false)
+            emit(invokevirtual, *Utils.getLastTwoBytes(appendMethodInfo))
+            decStack()
+
+            emit(invokevirtual, *Utils.getLastTwoBytes(toStringMethodInfo))
+            decStack()
+            incStack(Datatype.Str())
+            emitObjectVarStore(varAssign.index)
+            decStack()
+            return
+        }
+
+        val fieldIndex = file.fieldRefInfo(
+            file.classInfo(file.utf8Info(varAssign.fieldDef!!.clazz?.jvmName ?: topLevelName)),
+            file.nameAndTypeInfo(
+                file.utf8Info(varAssign.fieldDef!!.name),
+                file.utf8Info(varAssign.fieldDef!!.fieldType.descriptorType)
+            )
+        )
+
+        if (varAssign.fieldDef!!.isStatic) {
+
+            getStringBuilder()
+
+            emit(getstatic, *Utils.getLastTwoBytes(fieldIndex))
+            incStack(varAssign.fieldDef!!.fieldType)
+
+            emit(invokevirtual, *Utils.getLastTwoBytes(appendMethodInfo))
+            decStack()
+
+            compile(varAssign.toAdd, false)
+            emit(invokevirtual, *Utils.getLastTwoBytes(appendMethodInfo))
+            decStack()
+
+            emit(invokevirtual, *Utils.getLastTwoBytes(toStringMethodInfo))
+            decStack()
+            incStack(Datatype.Str())
+
+            emit(putstatic, *Utils.getLastTwoBytes(fieldIndex))
+            decStack()
+        } else {
+            compile(varAssign.from!!, false)
+            emit(dup)
+            incStack(emitterTarget.stack.peek())
+            emit(getfield, *Utils.getLastTwoBytes(fieldIndex))
+
+            getStringBuilder()
+
+            emit(swap)
+            decStack()
+            decStack()
+            incStack(getObjVerificationType("java/lang/StringBuilder"))
+            incStack(Datatype.Str())
+
+            emit(invokevirtual, *Utils.getLastTwoBytes(appendMethodInfo))
+            decStack()
+
+            compile(varAssign.toAdd, false)
+            emit(invokevirtual, *Utils.getLastTwoBytes(appendMethodInfo))
+            decStack()
+
+            emit(invokevirtual, *Utils.getLastTwoBytes(toStringMethodInfo))
+            decStack()
+            incStack(Datatype.Str())
+
+            emit(putfield, *Utils.getLastTwoBytes(fieldIndex))
+            decStack()
+            decStack()
+        }
+    }
+
+    private fun doVarAssignShortHandCalc(varAssign: AstNode.VarAssignShorthand) {
+        compile(varAssign.toAdd, false)
+
+        when (varAssign.toAdd.type.kind) {
+            Datakind.BYTE, Datakind.SHORT, Datakind.INT -> emit(iadd)
+            Datakind.FLOAT -> emit(fadd)
+            else -> throw RuntimeException("unsupported type")
+        }
+
+        decStack()
+    }
+
     override fun visit(get: AstNode.Get) {
+
+        if (get.from != null && get.from!!.type.matches(Datakind.ARRAY) && get.name.lexeme == "size") {
+            //special case for array size
+            compile(get.from!!, false)
+            emit(arraylength)
+            decStack()
+            incStack(Datatype.Integer())
+            return
+        }
+
+        if (get.fieldDef == null) return //reference to static class, doesn't need to be compiled
+
         if (get.from == null) {
             //direct reference to either static field or top level field
             emit(getstatic)
@@ -931,15 +1091,6 @@ class Compiler : AstNodeVisitor<Unit> {
             return
         }
 
-        if (get.from!!.type.matches(Datakind.ARRAY) && get.name.lexeme == "size") {
-            //special case for array size
-            compile(get.from!!, false)
-            emit(arraylength)
-            decStack()
-            incStack(Datatype.Integer())
-            return
-        }
-
         if (get.fieldDef!!.isStatic || get.fieldDef!!.isTopLevel) {
             //reference to static or top level field with a from specified
             emit(getstatic)
@@ -952,13 +1103,7 @@ class Compiler : AstNodeVisitor<Unit> {
             )
             emit(*Utils.getLastTwoBytes(fieldRef))
             incStack(get.fieldDef!!.fieldType)
-//            if (get.arrIndex == null) return
-//            compile(get.arrIndex!!, false)
-//            emitALoad(get.type)
-//            decStack()
-//            decStack()
-//            incStack(get.type)
-//            return
+            return
         }
 
         //a non-static field
@@ -1649,6 +1794,7 @@ class Compiler : AstNodeVisitor<Unit> {
         const val dup: Byte = 0x59.toByte()
         const val dup_x1: Byte = 0x5A.toByte()
         const val dup_x2: Byte = 0x5B.toByte()
+        const val swap: Byte = 0x5F.toByte()
 
         const val _goto: Byte = 0xA7.toByte()
         const val goto_w: Byte = 0xC8.toByte()

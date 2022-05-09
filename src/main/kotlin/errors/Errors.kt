@@ -404,4 +404,24 @@ class Errors {
             get() = notPrimitive.accept(MinMaxPosFinder())
     }
 
+    class FunctionDoesNotAlwaysReturnError(
+        val rBracket: Token,
+        srcCode: String
+    ) : ArtError(31, srcCode) {
+        override val message: String = "Non-void function must always return"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = mutableMapOf(rBracket.line to (rBracket.pos to rBracket.pos + rBracket.lexeme.length))
+    }
+
+    class CanOnlyBeUsedInError(
+        val thingThatCanBeUsed: String,
+        val whereThingCanBeUsed: String,
+        val stmt: AstNode,
+        srcCode: String
+    ) : ArtError(32, srcCode) {
+        override val message: String = "$thingThatCanBeUsed can only be used in $whereThingCanBeUsed"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = stmt.accept(MinMaxPosFinder())
+    }
+
 }
