@@ -139,63 +139,89 @@ class Compiler : AstNodeVisitor<Unit> {
             return
         }
 
-        val isFloat = binary.type == Datatype.Float()
-
         compile(binary.left, false)
         compile(binary.right, false)
 
-        when (val type = binary.operator.tokenType) {
+        if (binary.type == Datatype.Bool()) { //gt, lt, gt_eq, etc.
+
+            when (binary.left.type.kind) {
+
+                Datakind.BYTE, Datakind.SHORT, Datakind.INT -> {
+                    when (binary.operator.tokenType) {
+                        TokenType.GT -> doIntCompare(if_icmpgt)
+                        TokenType.GT_EQ -> doIntCompare(if_icmpge)
+                        TokenType.LT -> doIntCompare(if_icmplt)
+                        TokenType.LT_EQ -> doIntCompare(if_icmple)
+                        TokenType.D_EQ -> doIntCompare(if_icmpeq)
+                        TokenType.NOT_EQ -> doIntCompare(if_icmpne)
+                        else -> throw RuntimeException("unreachable")
+                    }
+                    doConvertPrimitive(binary.left.type, binary.type)
+                }
+
+                Datakind.FLOAT -> doFloatCompare(binary.operator.tokenType)
+
+                else -> throw RuntimeException("unreachable")
+
+            }
+
+            return
+        }
+
+//        val isFloat = binary.type == Datatype.Float()
+
+        val instructions = arrayOf(
+            arrayOf(iadd, fadd, ladd),
+            arrayOf(isub, fsub, lsub),
+            arrayOf(imul, fmul, lmul),
+            arrayOf(idiv, fdiv, ldiv),
+            arrayOf(irem, frem, lrem)
+        )
+
+        val typeIndex = when (binary.type.kind) {
+            Datakind.LONG -> 2
+            Datakind.FLOAT -> 1
+            Datakind.BYTE, Datakind.SHORT, Datakind.INT -> 0
+            Datakind.BOOLEAN -> -1
+            else -> throw RuntimeException("unreachable")
+        }
+
+        when (binary.operator.tokenType) {
             TokenType.PLUS -> {
-                if (!isFloat) {
-                    emit(iadd)
-                    if (binary.type != Datatype.Integer()) doConvertPrimitive(Datatype.Integer(), binary.type)
-                } else emit(fadd)
+                emit(instructions[0][typeIndex])
+                doConvertPrimitive(binary.left.type, binary.type)
                 decStack()
             }
             TokenType.MINUS -> {
-                if (!isFloat) {
-                    emit(isub)
-                    if (binary.type != Datatype.Integer()) doConvertPrimitive(Datatype.Integer(), binary.type)
-                } else emit(fsub)
+                emit(instructions[1][typeIndex])
+                doConvertPrimitive(binary.left.type, binary.type)
                 decStack()
             }
             TokenType.STAR -> {
-                if (!isFloat) {
-                    emit(imul)
-                    if (binary.type != Datatype.Integer()) doConvertPrimitive(Datatype.Integer(), binary.type)
-                } else emit(fmul)
+                emit(instructions[2][typeIndex])
+                doConvertPrimitive(binary.left.type, binary.type)
                 decStack()
             }
             TokenType.SLASH -> {
-                if (!isFloat) {
-                    emit(idiv)
-                    if (binary.type != Datatype.Integer()) doConvertPrimitive(Datatype.Integer(), binary.type)
-                } else emit(fdiv)
+                emit(instructions[3][typeIndex])
+                doConvertPrimitive(binary.left.type, binary.type)
                 decStack()
             }
             TokenType.MOD -> {
-                if (!isFloat) {
-                    emit(irem)
-                    if (binary.type != Datatype.Integer()) doConvertPrimitive(Datatype.Integer(), binary.type)
-                } else emit(frem)
+                emit(instructions[4][typeIndex])
+                doConvertPrimitive(binary.left.type, binary.type)
                 decStack()
             }
-            TokenType.GT -> if (!isFloat) doCompare(if_icmpgt) else doFloatCompare(type)
-            TokenType.GT_EQ -> if (!isFloat) doCompare(if_icmpge) else doFloatCompare(type)
-            TokenType.LT -> if (!isFloat) doCompare(if_icmplt) else doFloatCompare(type)
-            TokenType.LT_EQ -> if (!isFloat) doCompare(if_icmple) else doFloatCompare(type)
-            TokenType.D_EQ -> if (!isFloat) doCompare(if_icmpeq) else doFloatCompare(type)
-            TokenType.NOT_EQ -> if (!isFloat) doCompare(if_icmpne) else doFloatCompare(type)
             else -> TODO("not yet implemented")
         }
 
-//        if (binary.type.kind in arrayOf(Datakind.BYTE, Datakind.SHORT)) {
-//            doConvertPrimitive(Datatype.Integer(), binary.type)
-//        }
+        if (binary.type.kind in arrayOf(Datakind.BYTE, Datakind.SHORT)) {
+            doConvertPrimitive(Datatype.Integer(), binary.type)
+        }
     }
 
     /**
-     * emits the instruction to compare to floats
+     * emits the instruction to compare two floats
      */
     private fun doFloatCompare(comparison: TokenType) = when (comparison) {
         TokenType.GT -> {
@@ -204,16 +230,111 @@ class Compiler : AstNodeVisitor<Unit> {
             decStack()
             incStack(Datatype.Integer())
             incStack(Datatype.Integer())
-            emit(if_icmpne, *Utils.getLastTwoBytes(4))
+            emit(if_icmpne, *Utils.getLastTwoBytes(7))
             decStack()
             decStack()
             emit(iconst_1)
             incStack(Datatype.Integer())
             emitStackMapFrame()
-            emit(_goto, *Utils.getLastTwoBytes(1))
+            emit(_goto, *Utils.getLastTwoBytes(4))
+            decStack() // Because the first iconst instruction can be skipped by if_icmpne
+            emitStackMapFrame()
             emit(iconst_0)
+            incStack(Datatype.Integer())
             emitStackMapFrame()
         }
+        TokenType.LT -> {
+            emit(fcmpg, iconst_1)
+            decStack()
+            decStack()
+            incStack(Datatype.Integer())
+            incStack(Datatype.Integer())
+            emit(if_icmpne, *Utils.getLastTwoBytes(7))
+            decStack()
+            decStack()
+            emit(iconst_0)
+            incStack(Datatype.Integer())
+            emitStackMapFrame()
+            emit(_goto, *Utils.getLastTwoBytes(4))
+            decStack() // Because the first iconst instruction can be skipped by if_icmpne
+            emitStackMapFrame()
+            emit(iconst_1)
+            incStack(Datatype.Integer())
+            emitStackMapFrame()
+        }
+        TokenType.GT_EQ -> {
+            emit(fcmpg, iconst_m1)
+            decStack()
+            decStack()
+            incStack(Datatype.Integer())
+            incStack(Datatype.Integer())
+            emit(if_icmpne, *Utils.getLastTwoBytes(7))
+            decStack()
+            decStack()
+            emit(iconst_0)
+            incStack(Datatype.Integer())
+            emitStackMapFrame()
+            emit(_goto, *Utils.getLastTwoBytes(4))
+            decStack() // Because the first iconst instruction can be skipped by if_icmpne
+            emitStackMapFrame()
+            emit(iconst_1)
+            incStack(Datatype.Integer())
+            emitStackMapFrame()
+        }
+        TokenType.LT_EQ -> {
+            emit(fcmpg, iconst_1)
+            decStack()
+            decStack()
+            incStack(Datatype.Integer())
+            incStack(Datatype.Integer())
+            emit(if_icmpne, *Utils.getLastTwoBytes(7))
+            decStack()
+            decStack()
+            emit(iconst_0)
+            incStack(Datatype.Integer())
+            emitStackMapFrame()
+            emit(_goto, *Utils.getLastTwoBytes(4))
+            decStack() // Because the first iconst instruction can be skipped by ifne
+            emitStackMapFrame()
+            emit(iconst_1)
+            incStack(Datatype.Integer())
+            emitStackMapFrame()
+        }
+        TokenType.D_EQ -> {
+            emit(fcmpg)
+            decStack()
+            decStack()
+            incStack(Datatype.Integer())
+            emit(ifne, *Utils.getLastTwoBytes(7))
+            decStack()
+            emit(iconst_1)
+            incStack(Datatype.Integer())
+            emitStackMapFrame()
+            emit(_goto, *Utils.getLastTwoBytes(4))
+            decStack() // Because the first iconst instruction can be skipped by ifne
+            emitStackMapFrame()
+            emit(iconst_0)
+            incStack(Datatype.Integer())
+            emitStackMapFrame()
+        }
+        TokenType.NOT_EQ -> {
+            emit(fcmpg)
+            decStack()
+            decStack()
+            incStack(Datatype.Integer())
+            emit(ifne, *Utils.getLastTwoBytes(7))
+            decStack()
+            emit(iconst_0)
+            incStack(Datatype.Integer())
+            emitStackMapFrame()
+            emit(_goto, *Utils.getLastTwoBytes(4))
+            decStack() // Because the first iconst instruction can be skipped by ifne
+            emitStackMapFrame()
+            emit(iconst_1)
+            incStack(Datatype.Integer())
+            emitStackMapFrame()
+        }
+
         else -> throw RuntimeException("not a comparison")
     }
 
@@ -1403,7 +1524,7 @@ class Compiler : AstNodeVisitor<Unit> {
      * compiles a comparison for a given compare instruction (e.g. [if_icmpeq], [if_icmpgt], [if_icmple]).
      * leaves a boolean (0 or 1) on the stack
      */
-    private fun doCompare(compareInstruction: Byte) {
+    private fun doIntCompare(compareInstruction: Byte) {
         emitStackMapFrame()
         emit(compareInstruction, *Utils.getShortAsBytes(7.toShort()))
         decStack()
@@ -1793,6 +1914,13 @@ class Compiler : AstNodeVisitor<Unit> {
         const val frem: Byte = 0x72.toByte()
         const val fsub: Byte = 0x66.toByte()
 
+        const val ladd: Byte = 0x61.toByte()
+        const val lsub: Byte = 0x65.toByte()
+        const val lmul: Byte = 0x69.toByte()
+        const val ldiv: Byte = 0x6D.toByte()
+        const val lneg: Byte = 0x6D.toByte()
+        const val lrem: Byte = 0x71.toByte()
+
         const val iconst_m1: Byte = 0x02.toByte()
         const val iconst_0: Byte = 0x03.toByte()
         const val iconst_1: Byte = 0x04.toByte()
@@ -1899,6 +2027,8 @@ class Compiler : AstNodeVisitor<Unit> {
 
         const val fcmpg: Byte = 0x96.toByte()
         const val fcmpl: Byte = 0x95.toByte()
+
+        const val lcmp: Byte = 0x94.toByte()
 
         const val aaload: Byte = 0x32.toByte()
         const val aastore: Byte = 0x53.toByte()

@@ -849,16 +849,16 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     override fun visit(convert: AstNode.TypeConvert): Datatype {
         val toConvertType = check(convert.toConvert, convert)
 
-        if (toConvertType.matches(Datakind.LONG, Datakind.DOUBLE) ||
-            convert.to.tokenType in arrayOf(TokenType.T_LONG, TokenType.T_DOUBLE)
-        ) {
-            artError(Errors.OperationNotImplementedError(
-                //wrap token in variable, so that only the 'to' token is highlighted, not the entire statement
-                AstNode.Variable(convert.to, listOf(convert.to)),
-                "long and double is not yet implemented",
-                srcCode
-            ))
-        }
+//        if (toConvertType.matches(Datakind.LONG, Datakind.DOUBLE) ||
+//            convert.to.tokenType in arrayOf(TokenType.T_LONG, TokenType.T_DOUBLE)
+//        ) {
+//            artError(Errors.OperationNotImplementedError(
+//                //wrap token in variable, so that only the 'to' token is highlighted, not the entire statement
+//                AstNode.Variable(convert.to, listOf(convert.to)),
+//                "long and double is not yet implemented",
+//                srcCode
+//            ))
+//        }
 
         if (!toConvertType.matches(
                 Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG, Datakind.FLOAT, Datakind.DOUBLE
