@@ -1,35 +1,27 @@
-import ast.AstPrinter
-import parser.Parser
-import passes.ControlFlowChecker
-import passes.TypeChecker
-import passes.VariableResolver
-import tokenizer.Tokenizer
 import java.io.File
 import java.nio.file.Files
-import java.nio.file.Path
 import java.nio.file.Paths
-import kotlin.io.path.name
 
 fun main() {
     val test = Test("HelloWorld.art")
     test.test()
 }
 
-class Test(val testfileName: String, val printOutput: Boolean = true) {
+class Test(private val testfileName: String, private val printOutput: Boolean = true) {
 
-    var sampleOutput = Files.readAllLines(Paths.get("$sampleOutDir/$testfileName")).toString().substring(1)
+    private var sampleOutput = Files.readAllLines(Paths.get("$sampleOutDir/$testfileName")).toString().substring(1)
 
     fun test() {
         sampleOutput = sampleOutput.substring(0, sampleOutput.length - 1) //TODO beautify
-        var args = arrayOf("compile", "$srcDir$testfileName", "-v")
+        val args = arrayOf("compile", "$srcDir$testfileName", "-v")
         Main.main(args)
         val output = runProgram()
         if (printOutput) println(output)
         if (sampleOutput == output) {
-            println("Test s")
-            println(Ansi.green + "Test succeeded [\u2713]")
+            println("kotlin.Test s")
+            println(Ansi.green + "kotlin.Test succeeded [\u2713]")
         } else {
-            println(Ansi.red + "Test failed [\u2718]")
+            println(Ansi.red + "kotlin.Test failed [\u2718]")
             // TODO compare is to should - Output
             println("Program Output: «$output»")
             println("Sample Output: «$sampleOutput»")
