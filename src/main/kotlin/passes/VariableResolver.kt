@@ -11,7 +11,6 @@ class VariableResolver : AstNodeVisitor<Unit> {
 
     private var curVars: MutableList<String> = mutableListOf()
     private var varDeclarations: MutableList<AstNode.VariableDeclaration?> = mutableListOf()
-    private var maxLocals: Int = 0
 
     private var swap: AstNode? = null
 
@@ -46,9 +45,7 @@ class VariableResolver : AstNodeVisitor<Unit> {
         for (arg in function.args) varDecs.add(null)
         curVars = vars
         varDeclarations = varDecs
-        maxLocals = vars.size
         resolve(function.statements, function)
-        function.amountLocals = maxLocals
     }
 
     override fun visit(program: AstNode.Program) {
@@ -68,7 +65,6 @@ class VariableResolver : AstNodeVisitor<Unit> {
         val before = curVars.toMutableList()
         val beforeDecs = varDeclarations.toMutableList()
         for (s in block.statements) resolve(s, block)
-        if (curVars.size > maxLocals) maxLocals = curVars.size
         curVars = before
         varDeclarations = beforeDecs
     }

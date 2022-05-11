@@ -1,11 +1,5 @@
 
-
 fn main() {
-    print 30#f != 20#f
-    print 20#f != 20#f
-    print 10#f != 20#f
-//    print 10#L + 1.long
-//    print 4#L + 6#L
 }
 
 //class BlackCat : Cat {

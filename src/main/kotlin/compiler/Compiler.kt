@@ -14,6 +14,7 @@ import ast.SyntheticNode
 import tokenizer.TokenType
 import java.io.File
 import java.util.*
+import java.util.stream.Stream
 
 /**
  * compiles the AST into a binary class file
@@ -159,7 +160,8 @@ class Compiler : AstNodeVisitor<Unit> {
                     doConvertPrimitive(binary.left.type, binary.type)
                 }
 
-                Datakind.FLOAT -> doFloatCompare(binary.operator.tokenType)
+                Datakind.FLOAT -> doNonIntCompare(binary.operator.tokenType, fcmpg)
+                Datakind.LONG -> doNonIntCompare(binary.operator.tokenType, lcmp)
 
                 else -> throw RuntimeException("unreachable")
 
@@ -167,8 +169,6 @@ class Compiler : AstNodeVisitor<Unit> {
 
             return
         }
-
-//        val isFloat = binary.type == Datatype.Float()
 
         val instructions = arrayOf(
             arrayOf(iadd, fadd, ladd),
@@ -214,94 +214,82 @@ class Compiler : AstNodeVisitor<Unit> {
             }
             else -> TODO("not yet implemented")
         }
-
-        if (binary.type.kind in arrayOf(Datakind.BYTE, Datakind.SHORT)) {
-            doConvertPrimitive(Datatype.Integer(), binary.type)
-        }
     }
 
     /**
-     * emits the instruction to compare two floats
+     * emits the instruction to compare two non-integers
      */
-    private fun doFloatCompare(comparison: TokenType) = when (comparison) {
+    private fun doNonIntCompare(comparison: TokenType, compareInstruction: Byte) = when (comparison) {
         TokenType.GT -> {
-            emit(fcmpg, iconst_1)
+            emit(compareInstruction)
             decStack()
             decStack()
             incStack(Datatype.Integer())
-            incStack(Datatype.Integer())
-            emit(if_icmpne, *Utils.getLastTwoBytes(7))
+            emit(ifgt, *Utils.getLastTwoBytes(7))
             decStack()
-            decStack()
-            emit(iconst_1)
+            emit(iconst_0)
             incStack(Datatype.Integer())
             emitStackMapFrame()
             emit(_goto, *Utils.getLastTwoBytes(4))
-            decStack() // Because the first iconst instruction can be skipped by if_icmpne
+            decStack() // Because the first iconst instruction can be skipped
             emitStackMapFrame()
-            emit(iconst_0)
+            emit(iconst_1)
             incStack(Datatype.Integer())
             emitStackMapFrame()
         }
         TokenType.LT -> {
-            emit(fcmpg, iconst_1)
+            emit(compareInstruction)
             decStack()
             decStack()
             incStack(Datatype.Integer())
-            incStack(Datatype.Integer())
-            emit(if_icmpne, *Utils.getLastTwoBytes(7))
-            decStack()
+            emit(iflt, *Utils.getLastTwoBytes(7))
             decStack()
             emit(iconst_0)
             incStack(Datatype.Integer())
             emitStackMapFrame()
             emit(_goto, *Utils.getLastTwoBytes(4))
-            decStack() // Because the first iconst instruction can be skipped by if_icmpne
+            decStack() // Because the first iconst instruction can be skipped
             emitStackMapFrame()
             emit(iconst_1)
             incStack(Datatype.Integer())
             emitStackMapFrame()
         }
         TokenType.GT_EQ -> {
-            emit(fcmpg, iconst_m1)
+            emit(compareInstruction)
             decStack()
             decStack()
             incStack(Datatype.Integer())
-            incStack(Datatype.Integer())
-            emit(if_icmpne, *Utils.getLastTwoBytes(7))
+            emit(iflt, *Utils.getLastTwoBytes(7))
             decStack()
-            decStack()
-            emit(iconst_0)
+            emit(iconst_1)
             incStack(Datatype.Integer())
             emitStackMapFrame()
             emit(_goto, *Utils.getLastTwoBytes(4))
-            decStack() // Because the first iconst instruction can be skipped by if_icmpne
+            decStack() // Because the first iconst instruction can be skipped
             emitStackMapFrame()
-            emit(iconst_1)
+            emit(iconst_0)
             incStack(Datatype.Integer())
             emitStackMapFrame()
         }
         TokenType.LT_EQ -> {
-            emit(fcmpg, iconst_1)
+            emit(compareInstruction)
             decStack()
             decStack()
             incStack(Datatype.Integer())
-            incStack(Datatype.Integer())
-            emit(if_icmpne, *Utils.getLastTwoBytes(7))
+            emit(ifgt, *Utils.getLastTwoBytes(7))
             decStack()
-            decStack()
-            emit(iconst_0)
+            emit(iconst_1)
             incStack(Datatype.Integer())
             emitStackMapFrame()
             emit(_goto, *Utils.getLastTwoBytes(4))
-            decStack() // Because the first iconst instruction can be skipped by ifne
+            decStack() // Because the first iconst instruction can be skipped
             emitStackMapFrame()
-            emit(iconst_1)
+            emit(iconst_0)
             incStack(Datatype.Integer())
             emitStackMapFrame()
         }
         TokenType.D_EQ -> {
-            emit(fcmpg)
+            emit(compareInstruction)
             decStack()
             decStack()
             incStack(Datatype.Integer())
@@ -311,14 +299,14 @@ class Compiler : AstNodeVisitor<Unit> {
             incStack(Datatype.Integer())
             emitStackMapFrame()
             emit(_goto, *Utils.getLastTwoBytes(4))
-            decStack() // Because the first iconst instruction can be skipped by ifne
+            decStack() // Because the first iconst instruction can be skipped
             emitStackMapFrame()
             emit(iconst_0)
             incStack(Datatype.Integer())
             emitStackMapFrame()
         }
         TokenType.NOT_EQ -> {
-            emit(fcmpg)
+            emit(compareInstruction)
             decStack()
             decStack()
             incStack(Datatype.Integer())
@@ -328,7 +316,7 @@ class Compiler : AstNodeVisitor<Unit> {
             incStack(Datatype.Integer())
             emitStackMapFrame()
             emit(_goto, *Utils.getLastTwoBytes(4))
-            decStack() // Because the first iconst instruction can be skipped by ifne
+            decStack() // Because the first iconst instruction can be skipped
             emitStackMapFrame()
             emit(iconst_1)
             incStack(Datatype.Integer())
@@ -416,8 +404,7 @@ class Compiler : AstNodeVisitor<Unit> {
             )
         )
 
-        emit(dup)
-        incStack(getObjVerificationType("java/lang/StringBuilder"))
+        doDup()
         emit(invokespecial, *Utils.getLastTwoBytes(initMethodInfo))
         decStack()
 
@@ -438,8 +425,7 @@ class Compiler : AstNodeVisitor<Unit> {
     private fun doBooleanComparison(exp: AstNode.Binary) {
         val isAnd = exp.operator.tokenType == TokenType.D_AND
         compile(exp.left, false)
-        emit(dup)
-        incStack(Datatype.Bool())
+        doDup()
         if (isAnd) emit(ifeq) else emit(ifne)
         decStack()
         emit(0x00.toByte(), 0x00.toByte())
@@ -702,9 +688,10 @@ class Compiler : AstNodeVisitor<Unit> {
 
     override fun visit(variable: AstNode.Variable) {
         when (variable.type.kind) {
-            Datakind.INT, Datakind.BOOLEAN, Datakind.SHORT, Datakind.BYTE -> emitIntVarLoad(variable.index)
-            Datakind.OBJECT, Datakind.ARRAY -> emitObjectVarLoad(variable.index)
-            Datakind.FLOAT -> emitFloatVarLoad(variable.index)
+            Datakind.INT, Datakind.BOOLEAN, Datakind.SHORT, Datakind.BYTE -> emitIntVarLoad(variable.jvmIndex)
+            Datakind.OBJECT, Datakind.ARRAY -> emitObjectVarLoad(variable.jvmIndex)
+            Datakind.FLOAT -> emitFloatVarLoad(variable.jvmIndex)
+            Datakind.LONG -> emitLongVarLoad(variable.jvmIndex)
             else -> TODO("variable load type not implemented")
         }
         incStack(variable.type)
@@ -715,7 +702,7 @@ class Compiler : AstNodeVisitor<Unit> {
 //        if (varDec.varType == Datatype.Float() && varDec.initializer.type != Datatype.Float()) {
 //            doConvertPrimitive(varDec.initializer.type, Datatype.Float())
 //        }
-        putTypeInLocals(varDec.index, varDec.varType, true)
+        putTypeInLocals(varDec.jvmIndex, varDec.varType, true)
         decStack()
     }
 
@@ -740,11 +727,16 @@ class Compiler : AstNodeVisitor<Unit> {
             if (emitStore) emitObjectVarStore(index)
             emitterTarget.locals[index] = getObjVerificationType(type.descriptorType)
         }
+        Datakind.LONG -> {
+            if (emitStore) emitLongVarStore(index)
+            emitterTarget.locals[index] = VerificationTypeInfo.Long()
+            emitterTarget.locals[index + 1] = VerificationTypeInfo.Top()
+        }
         else -> TODO("local store type not implemented")
     }
 
     override fun visit(varAssign: AstNode.Assignment) {
-        if (varAssign.index != -1) {
+        if (varAssign.jvmIndex != -1) {
             doVarAssignForLocal(varAssign)
             return
         }
@@ -767,10 +759,7 @@ class Compiler : AstNodeVisitor<Unit> {
         compile(varAssign.from!!, false)
         compile(varAssign.toAssign, false)
 
-        if (varAssign.isWalrus) {
-            emit(dup_x1)
-            incStack(emitterTarget.stack[emitterTarget.stack.size - 1])
-        }
+        if (varAssign.isWalrus) doDupBelow()
 
         emit(putfield)
 
@@ -793,10 +782,7 @@ class Compiler : AstNodeVisitor<Unit> {
         )
 
         compile(varAssign.toAssign, false)
-        if (varAssign.isWalrus) {
-            emit(dup)
-            incStack(emitterTarget.stack.peek())
-        }
+        if (varAssign.isWalrus) doDup()
         emit(putstatic)
         emit(*Utils.getLastTwoBytes(fieldRef))
         decStack()
@@ -808,15 +794,12 @@ class Compiler : AstNodeVisitor<Unit> {
      */
     private fun doVarAssignForLocal(varAssign: AstNode.Assignment) {
         compile(varAssign.toAssign, false)
-        if (varAssign.isWalrus) {
-            emit(dup)
-            incStack(emitterTarget.stack.peek())
-        }
+        if (varAssign.isWalrus) doDup()
         when (varAssign.toAssign.type.kind) {
-            Datakind.INT -> emitIntVarStore(varAssign.index)
-            Datakind.FLOAT -> emitFloatVarStore(varAssign.index)
-            Datakind.OBJECT, Datakind.NULL -> emitObjectVarStore(varAssign.index)
-            Datakind.BOOLEAN -> emitIntVarStore(varAssign.index)
+            Datakind.INT -> emitIntVarStore(varAssign.jvmIndex)
+            Datakind.FLOAT -> emitFloatVarStore(varAssign.jvmIndex)
+            Datakind.OBJECT, Datakind.NULL -> emitObjectVarStore(varAssign.jvmIndex)
+            Datakind.BOOLEAN -> emitIntVarStore(varAssign.jvmIndex)
             else -> TODO("type for local assignment not implemented")
         }
         decStack()
@@ -980,13 +963,6 @@ class Compiler : AstNodeVisitor<Unit> {
 
         compile(returnStmt.toReturn!!, false)
 
-//        if (
-//            returnStmt.toReturn!!.type.kind == Datakind.FLOAT
-//            && curFunction!!.functionDescriptor.returnType.kind != Datakind.FLOAT
-//        ) {
-//            doConvertPrimitive(returnStmt.toReturn!!.type, Datatype.Float())
-//        }
-
         when (returnStmt.toReturn!!.type.kind) {
             Datakind.OBJECT, Datakind.ARRAY, Datakind.NULL -> emit(areturn)
             Datakind.INT, Datakind.SHORT, Datakind.BYTE -> emit(ireturn)
@@ -1000,7 +976,7 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     override fun visit(varInc: AstNode.VarIncrement) {
-        emit(iinc, (varInc.index and 0xFF).toByte(), varInc.toAdd)
+        emit(iinc, (varInc.jvmIndex and 0xFF).toByte(), varInc.toAdd)
     }
 
     override fun visit(varInc: AstNode.VarAssignShorthand) {
@@ -1010,17 +986,17 @@ class Compiler : AstNodeVisitor<Unit> {
             return
         }
 
-        if (varInc.index != -1) {
+        if (varInc.jvmIndex != -1) {
             when (varInc.toAdd.type.kind) {
-                Datakind.BYTE, Datakind.SHORT, Datakind.INT -> emitIntVarLoad(varInc.index)
-                Datakind.FLOAT -> emitFloatVarLoad(varInc.index)
+                Datakind.BYTE, Datakind.SHORT, Datakind.INT -> emitIntVarLoad(varInc.jvmIndex)
+                Datakind.FLOAT -> emitFloatVarLoad(varInc.jvmIndex)
                 else -> throw RuntimeException("unsupported type")
             }
-            incStack(emitterTarget.locals[varInc.index]!!)
+            incStack(emitterTarget.locals[varInc.jvmIndex]!!)
             doVarAssignShortHandCalc(varInc)
             when (varInc.toAdd.type.kind) {
-                Datakind.BYTE, Datakind.SHORT, Datakind.INT -> emitIntVarStore(varInc.index)
-                Datakind.FLOAT -> emitFloatVarStore(varInc.index)
+                Datakind.BYTE, Datakind.SHORT, Datakind.INT -> emitIntVarStore(varInc.jvmIndex)
+                Datakind.FLOAT -> emitFloatVarStore(varInc.jvmIndex)
                 else -> throw RuntimeException("unsupported type")
             }
             decStack()
@@ -1038,8 +1014,7 @@ class Compiler : AstNodeVisitor<Unit> {
         if (varInc.fieldDef!!.isStatic) emit(getstatic, *Utils.getLastTwoBytes(fieldIndex))
         else {
             compile(varInc.from!!, false)
-            emit(dup)
-            incStack(emitterTarget.stack.peek())
+            doDup()
             emit(getfield, *Utils.getLastTwoBytes(fieldIndex))
             decStack()
         }
@@ -1085,17 +1060,16 @@ class Compiler : AstNodeVisitor<Unit> {
         fun getStringBuilder() {
             emit(new, *Utils.getLastTwoBytes(stringBuilderIndex))
             incStack(getObjVerificationType("java/lang/StringBuilder"))
-            emit(dup)
-            incStack(emitterTarget.stack.peek())
+            doDup()
             emit(invokespecial, *Utils.getLastTwoBytes(initMethodInfo))
             decStack()
         }
 
-        if (varAssign.index != -1) {
+        if (varAssign.jvmIndex != -1) {
 
             getStringBuilder()
 
-            emitObjectVarLoad(varAssign.index)
+            emitObjectVarLoad(varAssign.jvmIndex)
             incStack(Datatype.Str())
 
             emit(invokevirtual, *Utils.getLastTwoBytes(appendMethodInfo))
@@ -1108,7 +1082,7 @@ class Compiler : AstNodeVisitor<Unit> {
             emit(invokevirtual, *Utils.getLastTwoBytes(toStringMethodInfo))
             decStack()
             incStack(Datatype.Str())
-            emitObjectVarStore(varAssign.index)
+            emitObjectVarStore(varAssign.jvmIndex)
             decStack()
             return
         }
@@ -1143,13 +1117,12 @@ class Compiler : AstNodeVisitor<Unit> {
             decStack()
         } else {
             compile(varAssign.from!!, false)
-            emit(dup)
-            incStack(emitterTarget.stack.peek())
+            doDup()
             emit(getfield, *Utils.getLastTwoBytes(fieldIndex))
 
             getStringBuilder()
 
-            emit(swap)
+            emit(swap) //TODO: are swaps dangerous with two byte data types?
             decStack()
             decStack()
             incStack(getObjVerificationType("java/lang/StringBuilder"))
@@ -1244,12 +1217,6 @@ class Compiler : AstNodeVisitor<Unit> {
         emit(*Utils.getLastTwoBytes(fieldRef))
         decStack()
         incStack(get.fieldDef!!.fieldType)
-//        if (get.arrIndex == null) return
-//        compile(get.arrIndex!!, false)
-//        emitALoad(get.type)
-//        decStack()
-//        decStack()
-//        incStack(get.type)
     }
 
     override fun visit(arr: AstNode.ArrGet) {
@@ -1265,11 +1232,9 @@ class Compiler : AstNodeVisitor<Unit> {
         compile(arr.from, false)
         compile(arr.arrIndex, false)
         compile(arr.to, false)
-        if (arr.isWalrus) {
-            emit(dup_x2)
-            incStackAt(emitterTarget.stack.size - 2, arr.to.type) //TODO: make sure this actually works
-//            emitterTarget.stack.add(emitterTarget.stack.size - 2, getVerificationType(arr.to.type))
-        }
+
+        if (arr.isWalrus) doDupX2()
+
         emitAStore(arr.to.type)
         decStack()
         decStack()
@@ -1280,7 +1245,9 @@ class Compiler : AstNodeVisitor<Unit> {
      * emits the array store instruction for the type
      */
     fun emitAStore(type: Datatype) = when (type.kind) {
-        Datakind.INT -> emit(iastore)
+        Datakind.BYTE, Datakind.SHORT, Datakind.INT -> emit(iastore)
+        Datakind.FLOAT -> emit(fastore)
+        Datakind.LONG -> emit(lastore)
         Datakind.OBJECT, Datakind.ARRAY, Datakind.NULL -> emit(aastore)
         else -> TODO("only int, string and object arrays are implemented")
     }
@@ -1289,9 +1256,10 @@ class Compiler : AstNodeVisitor<Unit> {
      * emits the array load instruction for the type
      */
     fun emitALoad(type: Datatype) = when (type.kind) {
-        Datakind.INT -> emit(iaload)
+        Datakind.BYTE, Datakind.SHORT, Datakind.INT -> emit(iaload)
         Datakind.FLOAT -> emit(faload)
         Datakind.OBJECT, Datakind.ARRAY -> emit(aaload)
+        Datakind.LONG -> emit(laload)
         else -> TODO("only int, string and object arrays are implemented")
     }
 
@@ -1307,8 +1275,7 @@ class Compiler : AstNodeVisitor<Unit> {
     override fun visit(constructorCall: AstNode.ConstructorCall) {
         emit(new, *Utils.getLastTwoBytes(file.classInfo(file.utf8Info(constructorCall.clazz.jvmName))))
         incStack(constructorCall.type)
-        emit(dup)
-        incStack(constructorCall.type)
+        doDup()
 
         val methodIndex = file.methodRefInfo(
             file.classInfo(file.utf8Info(constructorCall.clazz.name)),
@@ -1391,7 +1358,7 @@ class Compiler : AstNodeVisitor<Unit> {
      */
     private fun doOneDimensionalArray(arr: AstNode.ArrayCreate) {
         when (val kind = (arr.type as Datatype.ArrayType).type.kind) {
-            Datakind.INT, Datakind.FLOAT -> {
+            Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.FLOAT, Datakind.LONG -> {
                 compile(arr.amounts[0], false)
                 emit(newarray, getAType(kind))
                 decStack()
@@ -1417,19 +1384,27 @@ class Compiler : AstNodeVisitor<Unit> {
 
     override fun visit(arr: AstNode.ArrayLiteral) {
         when (val kind = (arr.type as Datatype.ArrayType).type.kind) {
-            Datakind.INT, Datakind.FLOAT -> {
+
+            Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.FLOAT, Datakind.LONG -> {
+
+                val storeInstruction = when (kind) {
+                    Datakind.INT -> iastore
+                    Datakind.FLOAT -> fastore
+                    Datakind.LONG -> lastore
+                    else -> throw RuntimeException("unreachable")
+                }
+
                 emitIntLoad(arr.elements.size)
                 incStack(Datatype.Integer())
                 emit(newarray, getAType(kind))
                 decStack()
                 incStack(arr.type)
                 for (i in arr.elements.indices) {
-                    emit(dup)
-                    incStack(emitterTarget.stack.peek())
+                    doDup()
                     emitIntLoad(i)
                     incStack(Datatype.Integer())
                     compile(arr.elements[i], false)
-                    if (kind == Datakind.INT) emit(iastore) else emit(fastore)
+                    emit(storeInstruction)
                     decStack()
                     decStack()
                     decStack()
@@ -1444,8 +1419,7 @@ class Compiler : AstNodeVisitor<Unit> {
                 decStack()
                 incStack(arr.type)
                 for (i in arr.elements.indices) {
-                    emit(dup)
-                    incStack(emitterTarget.stack.peek())
+                    doDup()
                     emitIntLoad(i)
                     incStack(Datatype.Integer())
                     compile(arr.elements[i], false)
@@ -1463,8 +1437,7 @@ class Compiler : AstNodeVisitor<Unit> {
                 decStack()
                 incStack(arr.type)
                 for (i in arr.elements.indices) {
-                    emit(dup)
-                    incStack(emitterTarget.stack.peek())
+                    doDup()
                     emitIntLoad(i)
                     incStack(Datatype.Integer())
                     compile(arr.elements[i], false)
@@ -1496,6 +1469,7 @@ class Compiler : AstNodeVisitor<Unit> {
         Datakind.INT -> 10
         Datakind.BOOLEAN -> 4
         Datakind.FLOAT -> 6
+        Datakind.LONG -> 11
         else -> TODO("Not yet implemented")
     }
 
@@ -1542,6 +1516,79 @@ class Compiler : AstNodeVisitor<Unit> {
     private fun emitGoto(offset: Int) {
         if (offset !in Short.MIN_VALUE..Short.MAX_VALUE) emit(goto_w, *Utils.getIntAsBytes(offset))
         else emit(_goto, *Utils.getShortAsBytes(offset.toShort()))
+    }
+
+    /**
+     * emits either a dup or dup2 instruction depending on the type and updates the stack
+     */
+    private fun doDup() {
+        if (emitterTarget.stack.peek() is VerificationTypeInfo.Top) {
+            emit(dup2)
+            incStack(emitterTarget.stack[emitterTarget.stack.size - 2])
+            incStack(emitterTarget.stack[emitterTarget.stack.size - 2])
+        } else {
+            emit(dup)
+            incStack(emitterTarget.stack.peek())
+        }
+    }
+
+    /**
+     * emits either a dup_x1 or dup2_x1 instruction depending on the type and updates the stack
+     */
+    private fun doDupBelow() {
+        if (emitterTarget.stack.peek() is VerificationTypeInfo.Top) {
+            if (emitterTarget.stack[emitterTarget.stack.size - 3] is VerificationTypeInfo.Top) doDupX2()
+            else doDupX1()
+        } else {
+            if (emitterTarget.stack[emitterTarget.stack.size - 2] is VerificationTypeInfo.Top) doDupX2()
+            else doDupX1()
+        }
+    }
+
+    private fun doDupX1() {
+        if (emitterTarget.stack.peek() is VerificationTypeInfo.Top) {
+            emit(dup2_x1)
+            val top = emitterTarget.stack.pop()
+            val middle = emitterTarget.stack.pop()
+            val bottom = emitterTarget.stack.pop()
+            incStack(middle)
+            incStack(top)
+            incStack(bottom)
+            incStack(middle)
+            incStack(top)
+        } else {
+            emit(dup_x1)
+            val top = emitterTarget.stack.pop()
+            val bottom = emitterTarget.stack.pop()
+            incStack(top)
+            incStack(bottom)
+            incStack(top)
+        }
+    }
+
+    private fun doDupX2() {
+        if (emitterTarget.stack.peek() is VerificationTypeInfo.Top) {
+            emit(dup2_x2)
+            val top1 = emitterTarget.stack.pop()
+            val top2 = emitterTarget.stack.pop()
+            val m1 = emitterTarget.stack.pop()
+            val m2 = emitterTarget.stack.pop()
+            incStack(top2)
+            incStack(top1)
+            incStack(m2)
+            incStack(m1)
+            incStack(top2)
+            incStack(top1)
+        } else {
+            emit(dup_x2)
+            val top = emitterTarget.stack.pop()
+            val m1 = emitterTarget.stack.pop()
+            val m2 = emitterTarget.stack.pop()
+            incStack(top)
+            incStack(m2)
+            incStack(m1)
+            incStack(top)
+        }
     }
 
     /**
@@ -1629,6 +1676,17 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     /**
+     * loads a long variable
+     */
+    private fun emitLongVarLoad(index: Int) = when (index) {
+        0 -> emit(lload_0)
+        1 -> emit(lload_1)
+        2 -> emit(lload_2)
+        3 -> emit(lload_3)
+        else -> emit(lload, (index and 0xFF).toByte())
+    }
+
+    /**
      * stores an integer in a variable
      */
     private fun emitIntVarStore(index: Int) = when (index) {
@@ -1648,6 +1706,17 @@ class Compiler : AstNodeVisitor<Unit> {
         2 -> emit(fstore_2)
         3 -> emit(fstore_3)
         else -> emit(fstore, (index and 0xFF).toByte()) //TODO: wide
+    }
+
+    /**
+     * stores a long in a variable
+     */
+    private fun emitLongVarStore(index: Int) = when (index) {
+        0 -> emit(lstore_0)
+        1 -> emit(lstore_1)
+        2 -> emit(lstore_2)
+        3 -> emit(lstore_3)
+        else -> emit(lstore, (index and 0xFF).toByte())
     }
 
     /**
@@ -1777,18 +1846,6 @@ class Compiler : AstNodeVisitor<Unit> {
         }
         if (emitterTarget.stack.size > emitterTarget.maxStack) emitterTarget.maxStack = emitterTarget.stack.size
     }
-
-//    /**
-//     * returns the VerificationType for a datatype
-//     */
-//    private fun getVerificationType(type: Datatype) = when (type.kind) {
-//        Datakind.INT, Datakind.BOOLEAN, Datakind.BYTE, Datakind.SHORT -> VerificationTypeInfo.Integer()
-//        Datakind.FLOAT -> VerificationTypeInfo.Float()
-//        Datakind.OBJECT -> getObjVerificationType((type as Datatype.Object).clazz.jvmName)
-//        Datakind.ARRAY -> getObjVerificationType(type.descriptorType)
-//        Datakind.NULL -> VerificationTypeInfo.Null()
-//        else -> TODO("not yet implemented")
-//    }
 
     /**
      * decrements the stack of the current [emitterTarget]; twice if VerificationType.Top is at the top of the stack
@@ -1981,12 +2038,28 @@ class Compiler : AstNodeVisitor<Unit> {
         const val astore_2: Byte = 0x4d.toByte()
         const val astore_3: Byte = 0x4e.toByte()
 
+        const val lstore: Byte = 0x37.toByte()
+        const val lstore_0: Byte = 0x3f.toByte()
+        const val lstore_1: Byte = 0x40.toByte()
+        const val lstore_2: Byte = 0x41.toByte()
+        const val lstore_3: Byte = 0x42.toByte()
+
+        const val lload: Byte = 0x16.toByte()
+        const val lload_0: Byte = 0x1E.toByte()
+        const val lload_1: Byte = 0x1F.toByte()
+        const val lload_2: Byte = 0x20.toByte()
+        const val lload_3: Byte = 0x21.toByte()
+
         const val pop: Byte = 0x57.toByte()
         const val pop2: Byte = 0x58.toByte()
+        const val swap: Byte = 0x5F.toByte()
+
         const val dup: Byte = 0x59.toByte()
         const val dup_x1: Byte = 0x5A.toByte()
         const val dup_x2: Byte = 0x5B.toByte()
-        const val swap: Byte = 0x5F.toByte()
+        const val dup2: Byte = 0x5C.toByte()
+        const val dup2_x1: Byte = 0x5D.toByte()
+        const val dup2_x2: Byte = 0x5E.toByte()
 
         const val _goto: Byte = 0xA7.toByte()
         const val goto_w: Byte = 0xC8.toByte()
@@ -2038,9 +2111,11 @@ class Compiler : AstNodeVisitor<Unit> {
 
         const val iastore: Byte = 0x4F.toByte()
         const val fastore: Byte = 0x51.toByte()
+        const val lastore: Byte = 0x50.toByte()
 
         const val iaload: Byte = 0x2E.toByte()
         const val faload: Byte = 0x30.toByte()
+        const val laload: Byte = 0x2F.toByte()
 
         const val newarray: Byte = 0xBC.toByte()
 

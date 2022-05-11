@@ -6,15 +6,12 @@ import tokenizer.Token
 import ast.SyntheticAst
 import errors.ErrorPool
 import compiler.Compiler
-import passes.TypeChecker
+import passes.*
 import java.nio.file.Path
 import tokenizer.Tokenizer
 import java.io.IOException
 import java.nio.file.Paths
 import java.nio.file.Files
-import passes.VariableResolver
-import passes.ControlFlowChecker
-import passes.InheritanceChecker
 import java.lang.RuntimeException
 
 object Main {
@@ -150,6 +147,10 @@ object Main {
             }
         }
         if (Settings.verbose) println("done in ${inheritanceCheckingTime}ms\n")
+
+        if (Settings.verbose) println("running jvm variable resolver")
+        val jvmVariableResolvingTime = Stopwatch.time { program.accept(JvmVariableResolver()) }
+        if (Settings.verbose) println("done in ${jvmVariableResolvingTime}ms\n")
 
         if (Settings.printAst) {
             println("------------revised AST-------------")
