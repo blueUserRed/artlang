@@ -118,6 +118,18 @@ class ClassFileBuilder {
     }
 
     /**
+     * adds a double info to the constant pool and returns its index
+     */
+    fun doubleInfo(d: Double): Int {
+        val toAdd = ConstantDoubleInfo(d)
+        val find = findInfo(toAdd)
+        if (find != null) return find + 1
+        constantPool.add(toAdd)
+        placeholderInfo()
+        return constantPool.size - 1
+    }
+
+    /**
      * adds a fieldRef info to the constant pool and returns its index
      */
     fun fieldRefInfo(classIndex: Int, nameAndTypeIndex: Int): Int {
@@ -432,6 +444,23 @@ class ConstantLongInfo(val l: Long) : ConstantInfo(5) {
         if (other == null || this::class != other::class) return false
         other as ConstantLongInfo
         return other.l == this.l
+    }
+}
+
+/**
+ * represents a double info
+ */
+class ConstantDoubleInfo(val d: Double) : ConstantInfo(6) {
+
+    override fun toBytes(): ByteArray = Utils.arrayConcat(
+        arrayOf(tag).toByteArray(),
+        Utils.getLongAsBytes(d.toRawBits())
+    )
+
+    override fun equals(other: Any?): Boolean {
+        if (other == null || this::class != other::class) return false
+        other as ConstantDoubleInfo
+        return other.d == this.d
     }
 }
 

@@ -162,6 +162,7 @@ class Compiler : AstNodeVisitor<Unit> {
 
                 Datakind.FLOAT -> doNonIntCompare(binary.operator.tokenType, fcmpg)
                 Datakind.LONG -> doNonIntCompare(binary.operator.tokenType, lcmp)
+                Datakind.DOUBLE -> doNonIntCompare(binary.operator.tokenType, dcmpg)
 
                 else -> throw RuntimeException("unreachable")
 
@@ -171,14 +172,15 @@ class Compiler : AstNodeVisitor<Unit> {
         }
 
         val instructions = arrayOf(
-            arrayOf(iadd, fadd, ladd),
-            arrayOf(isub, fsub, lsub),
-            arrayOf(imul, fmul, lmul),
-            arrayOf(idiv, fdiv, ldiv),
-            arrayOf(irem, frem, lrem)
+            arrayOf(iadd, fadd, ladd, dadd),
+            arrayOf(isub, fsub, lsub, dsub),
+            arrayOf(imul, fmul, lmul, dmul),
+            arrayOf(idiv, fdiv, ldiv, ddiv),
+            arrayOf(irem, frem, lrem, drem)
         )
 
         val typeIndex = when (binary.type.kind) {
+            Datakind.DOUBLE -> 3
             Datakind.LONG -> 2
             Datakind.FLOAT -> 1
             Datakind.BYTE, Datakind.SHORT, Datakind.INT -> 0
@@ -361,7 +363,26 @@ class Compiler : AstNodeVisitor<Unit> {
                 Datakind.SHORT -> emit(f2i, i2s)
                 Datakind.INT -> emit(f2i)
                 Datakind.LONG -> emit(f2l)
+                Datakind.FLOAT -> { }
                 Datakind.DOUBLE -> emit(f2d)
+                else -> throw RuntimeException("unsupported type")
+            }
+            Datakind.LONG -> when (to.kind) {
+                Datakind.BYTE -> emit(l2i, i2b)
+                Datakind.SHORT -> emit(l2i, i2s)
+                Datakind.INT -> emit(l2i)
+                Datakind.LONG -> { }
+                Datakind.FLOAT -> emit(l2f)
+                Datakind.DOUBLE -> emit(l2d)
+                else -> throw RuntimeException("unsupported type")
+            }
+            Datakind.DOUBLE -> when (to.kind) {
+                Datakind.BYTE -> emit(d2i, i2b)
+                Datakind.SHORT -> emit(d2i, i2s)
+                Datakind.INT -> emit(d2i)
+                Datakind.LONG -> emit(d2l)
+                Datakind.FLOAT -> emit(d2f)
+                Datakind.DOUBLE -> { }
                 else -> throw RuntimeException("unsupported type")
             }
             else -> throw RuntimeException("unsupported type")
@@ -447,6 +468,7 @@ class Compiler : AstNodeVisitor<Unit> {
             Datatype.Float() -> emitFloatLoad(literal.literal.literal as Float)
             Datatype.Str() -> emitStringLoad(literal.literal.literal as String)
             Datatype.Long() -> emitLongLoad(literal.literal.literal as Long)
+            Datatype.Double() -> emitDoubleLoad(literal.literal.literal as Double)
             Datatype.Bool() -> {
                 if (literal.literal.literal as Boolean) emit(iconst_1)
                 else emit(iconst_0)
@@ -692,6 +714,7 @@ class Compiler : AstNodeVisitor<Unit> {
             Datakind.OBJECT, Datakind.ARRAY -> emitObjectVarLoad(variable.jvmIndex)
             Datakind.FLOAT -> emitFloatVarLoad(variable.jvmIndex)
             Datakind.LONG -> emitLongVarLoad(variable.jvmIndex)
+            Datakind.DOUBLE -> emitDoubleVarLoad(variable.jvmIndex)
             else -> TODO("variable load type not implemented")
         }
         incStack(variable.type)
@@ -730,6 +753,11 @@ class Compiler : AstNodeVisitor<Unit> {
         Datakind.LONG -> {
             if (emitStore) emitLongVarStore(index)
             emitterTarget.locals[index] = VerificationTypeInfo.Long()
+            emitterTarget.locals[index + 1] = VerificationTypeInfo.Top()
+        }
+        Datakind.DOUBLE -> {
+            if (emitStore) emitDoubleVarStore(index)
+            emitterTarget.locals[index] = VerificationTypeInfo.Double()
             emitterTarget.locals[index + 1] = VerificationTypeInfo.Top()
         }
         else -> TODO("local store type not implemented")
@@ -874,7 +902,13 @@ class Compiler : AstNodeVisitor<Unit> {
     override fun visit(unary: AstNode.Unary) {
         compile(unary.on, false)
         when (unary.operator.tokenType) {
-            TokenType.MINUS -> emit(ineg)
+            TokenType.MINUS -> when (unary.on.type.kind) {
+                Datakind.BYTE, Datakind.SHORT, Datakind.INT -> emit(ineg)
+                Datakind.LONG -> emit(lneg)
+                Datakind.FLOAT -> emit(fneg)
+                Datakind.DOUBLE -> emit(dneg)
+                else -> throw RuntimeException("unreachable")
+            }
             TokenType.NOT -> {
                 emitStackMapFrame()
                 emit(ifeq, *Utils.getShortAsBytes(7.toShort()))
@@ -967,6 +1001,7 @@ class Compiler : AstNodeVisitor<Unit> {
             Datakind.OBJECT, Datakind.ARRAY, Datakind.NULL -> emit(areturn)
             Datakind.INT, Datakind.SHORT, Datakind.BYTE -> emit(ireturn)
             Datakind.FLOAT -> emit(freturn)
+            Datakind.LONG -> emit(lreturn)
             else -> TODO("return-type is not yet implemented")
         }
 
@@ -989,14 +1024,18 @@ class Compiler : AstNodeVisitor<Unit> {
         if (varInc.jvmIndex != -1) {
             when (varInc.toAdd.type.kind) {
                 Datakind.BYTE, Datakind.SHORT, Datakind.INT -> emitIntVarLoad(varInc.jvmIndex)
+                Datakind.LONG -> emitLongVarLoad(varInc.jvmIndex)
                 Datakind.FLOAT -> emitFloatVarLoad(varInc.jvmIndex)
+                Datakind.DOUBLE -> emitDoubleVarLoad(varInc.jvmIndex)
                 else -> throw RuntimeException("unsupported type")
             }
-            incStack(emitterTarget.locals[varInc.jvmIndex]!!)
+            incStack(varInc.toAdd.type)
             doVarAssignShortHandCalc(varInc)
             when (varInc.toAdd.type.kind) {
                 Datakind.BYTE, Datakind.SHORT, Datakind.INT -> emitIntVarStore(varInc.jvmIndex)
+                Datakind.LONG -> emitLongVarStore(varInc.jvmIndex)
                 Datakind.FLOAT -> emitFloatVarStore(varInc.jvmIndex)
+                Datakind.DOUBLE -> emitDoubleVarStore(varInc.jvmIndex)
                 else -> throw RuntimeException("unsupported type")
             }
             decStack()
@@ -1122,7 +1161,7 @@ class Compiler : AstNodeVisitor<Unit> {
 
             getStringBuilder()
 
-            emit(swap) //TODO: are swaps dangerous with two byte data types?
+            emit(swap) //TODO: are swaps dangerous with two byte data types? edit: doesn't matter here
             decStack()
             decStack()
             incStack(getObjVerificationType("java/lang/StringBuilder"))
@@ -1148,11 +1187,32 @@ class Compiler : AstNodeVisitor<Unit> {
     private fun doVarAssignShortHandCalc(varAssign: AstNode.VarAssignShorthand) {
         compile(varAssign.toAdd, false)
 
-        when (varAssign.toAdd.type.kind) {
-            Datakind.BYTE, Datakind.SHORT, Datakind.INT -> emit(iadd)
-            Datakind.FLOAT -> emit(fadd)
+        val instructions = arrayOf(
+            arrayOf(iadd, ladd, fadd, dadd),
+            arrayOf(isub, lsub, fsub, dsub),
+            arrayOf(imul, lmul, fmul, dmul),
+            arrayOf(idiv, ldiv, fdiv, ddiv)
+        )
+
+        val opIndex = when (varAssign.operator.tokenType) {
+            TokenType.PLUS_EQ -> 0
+            TokenType.MINUS_EQ -> 1
+            TokenType.STAR_EQ -> 2
+            TokenType.SLASH_EQ -> 3
+            else -> throw RuntimeException("unsupported operation")
+        }
+
+        val typeIndex = when (varAssign.toAdd.type.kind) {
+            Datakind.BYTE, Datakind.SHORT, Datakind.INT -> 0
+            Datakind.LONG -> 1
+            Datakind.FLOAT -> 2
+            Datakind.DOUBLE -> 3
             else -> throw RuntimeException("unsupported type")
         }
+
+        emit(instructions[opIndex][typeIndex])
+
+        if (varAssign.type.matches(Datakind.BYTE, Datakind.SHORT)) doConvertPrimitive(varAssign.type, Datatype.Integer())
 
         decStack()
     }
@@ -1246,8 +1306,9 @@ class Compiler : AstNodeVisitor<Unit> {
      */
     fun emitAStore(type: Datatype) = when (type.kind) {
         Datakind.BYTE, Datakind.SHORT, Datakind.INT -> emit(iastore)
-        Datakind.FLOAT -> emit(fastore)
         Datakind.LONG -> emit(lastore)
+        Datakind.FLOAT -> emit(fastore)
+        Datakind.DOUBLE -> emit(dastore)
         Datakind.OBJECT, Datakind.ARRAY, Datakind.NULL -> emit(aastore)
         else -> TODO("only int, string and object arrays are implemented")
     }
@@ -1260,6 +1321,7 @@ class Compiler : AstNodeVisitor<Unit> {
         Datakind.FLOAT -> emit(faload)
         Datakind.OBJECT, Datakind.ARRAY -> emit(aaload)
         Datakind.LONG -> emit(laload)
+        Datakind.DOUBLE -> emit(daload)
         else -> TODO("only int, string and object arrays are implemented")
     }
 
@@ -1358,7 +1420,7 @@ class Compiler : AstNodeVisitor<Unit> {
      */
     private fun doOneDimensionalArray(arr: AstNode.ArrayCreate) {
         when (val kind = (arr.type as Datatype.ArrayType).type.kind) {
-            Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.FLOAT, Datakind.LONG -> {
+            Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.FLOAT, Datakind.LONG, Datakind.DOUBLE -> {
                 compile(arr.amounts[0], false)
                 emit(newarray, getAType(kind))
                 decStack()
@@ -1385,12 +1447,13 @@ class Compiler : AstNodeVisitor<Unit> {
     override fun visit(arr: AstNode.ArrayLiteral) {
         when (val kind = (arr.type as Datatype.ArrayType).type.kind) {
 
-            Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.FLOAT, Datakind.LONG -> {
+            Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.FLOAT, Datakind.LONG, Datakind.DOUBLE -> {
 
                 val storeInstruction = when (kind) {
                     Datakind.INT -> iastore
                     Datakind.FLOAT -> fastore
                     Datakind.LONG -> lastore
+                    Datakind.DOUBLE -> dastore
                     else -> throw RuntimeException("unreachable")
                 }
 
@@ -1470,6 +1533,7 @@ class Compiler : AstNodeVisitor<Unit> {
         Datakind.BOOLEAN -> 4
         Datakind.FLOAT -> 6
         Datakind.LONG -> 11
+        Datakind.DOUBLE -> 7
         else -> TODO("Not yet implemented")
     }
 
@@ -1607,10 +1671,13 @@ class Compiler : AstNodeVisitor<Unit> {
         val frame = StackMapTableAttribute.FullStackMapFrame(offsetDelta)
 
         val newLocals = mutableListOf<VerificationTypeInfo>()
-        for (local in emitterTarget.locals) if (local != null) newLocals.add(local)
-
+        for (local in emitterTarget.locals) if (local != null && local !is VerificationTypeInfo.Top) newLocals.add(local)
         frame.locals = newLocals
-        frame.stack = emitterTarget.stack.toMutableList()
+
+        val newStack = mutableListOf<VerificationTypeInfo>()
+        for (item in emitterTarget.stack) if (item !is VerificationTypeInfo.Top) newStack.add(item)
+        frame.stack = newStack
+
         emitterTarget.lastStackMapFrameOffset = emitterTarget.curCodeOffset
         emitterTarget.addStackMapFrame(frame)
     }
@@ -1635,10 +1702,23 @@ class Compiler : AstNodeVisitor<Unit> {
      * loads a long constant
      */
     private fun emitLongLoad(l: Long) = when (l) {
-        0L -> emit(lconst_0)
-        1L -> emit(lconst_1)
+            0L -> emit(lconst_0)
+            1L -> emit(lconst_1)
+            else -> {
+                val longIndex = file.longInfo(l)
+                emit(ldc2_w, *Utils.getLastTwoBytes(longIndex))
+            }
+        }
+
+
+    /**
+     * loads a double constant
+     */
+    private fun emitDoubleLoad(d: Double) = when (d) {
+        0.0 -> emit(dconst_0)
+        1.0 -> emit(dconst_1)
         else -> {
-            val longIndex = file.longInfo(l)
+            val longIndex = file.doubleInfo(d)
             emit(ldc2_w, *Utils.getLastTwoBytes(longIndex))
         }
     }
@@ -1687,6 +1767,17 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     /**
+     * loads a double variable
+     */
+    private fun emitDoubleVarLoad(index: Int) = when (index) {
+        0 -> emit(dload_0)
+        1 -> emit(dload_1)
+        2 -> emit(dload_2)
+        3 -> emit(dload_3)
+        else -> emit(dload, (index and 0xFF).toByte())
+    }
+
+    /**
      * stores an integer in a variable
      */
     private fun emitIntVarStore(index: Int) = when (index) {
@@ -1717,6 +1808,17 @@ class Compiler : AstNodeVisitor<Unit> {
         2 -> emit(lstore_2)
         3 -> emit(lstore_3)
         else -> emit(lstore, (index and 0xFF).toByte())
+    }
+
+    /**
+     * stores a double in a variable
+     */
+    private fun emitDoubleVarStore(index: Int) = when (index) {
+        0 -> emit(dstore_0)
+        1 -> emit(dstore_1)
+        2 -> emit(dstore_2)
+        3 -> emit(dstore_3)
+        else -> emit(dstore, (index and 0xFF).toByte())
     }
 
     /**
@@ -1817,6 +1919,10 @@ class Compiler : AstNodeVisitor<Unit> {
             Datakind.NULL -> emitterTarget.stack.push(VerificationTypeInfo.Null())
             Datakind.LONG -> {
                 emitterTarget.stack.push(VerificationTypeInfo.Long())
+                emitterTarget.stack.push(VerificationTypeInfo.Top())
+            }
+            Datakind.DOUBLE -> {
+                emitterTarget.stack.push(VerificationTypeInfo.Double())
                 emitterTarget.stack.push(VerificationTypeInfo.Top())
             }
             else -> TODO("not yet implemented")
@@ -1978,6 +2084,13 @@ class Compiler : AstNodeVisitor<Unit> {
         const val lneg: Byte = 0x6D.toByte()
         const val lrem: Byte = 0x71.toByte()
 
+        const val dadd: Byte = 0x63.toByte()
+        const val dsub: Byte = 0x67.toByte()
+        const val dmul: Byte = 0x6B.toByte()
+        const val ddiv: Byte = 0x6F.toByte()
+        const val dneg: Byte = 0x77.toByte()
+        const val drem: Byte = 0x73.toByte()
+
         const val iconst_m1: Byte = 0x02.toByte()
         const val iconst_0: Byte = 0x03.toByte()
         const val iconst_1: Byte = 0x04.toByte()
@@ -1992,6 +2105,9 @@ class Compiler : AstNodeVisitor<Unit> {
 
         const val lconst_0: Byte = 0x09.toByte()
         const val lconst_1: Byte = 0x0A.toByte()
+
+        const val dconst_0: Byte = 0x0E.toByte()
+        const val dconst_1: Byte = 0x0F.toByte()
 
         const val aconst_null: Byte = 0x01.toByte()
 
@@ -2050,6 +2166,18 @@ class Compiler : AstNodeVisitor<Unit> {
         const val lload_2: Byte = 0x20.toByte()
         const val lload_3: Byte = 0x21.toByte()
 
+        const val dstore: Byte = 0x39.toByte()
+        const val dstore_0: Byte = 0x47.toByte()
+        const val dstore_1: Byte = 0x48.toByte()
+        const val dstore_2: Byte = 0x49.toByte()
+        const val dstore_3: Byte = 0x4A.toByte()
+
+        const val dload: Byte = 0x18.toByte()
+        const val dload_0: Byte = 0x26.toByte()
+        const val dload_1: Byte = 0x27.toByte()
+        const val dload_2: Byte = 0x28.toByte()
+        const val dload_3: Byte = 0x29.toByte()
+
         const val pop: Byte = 0x57.toByte()
         const val pop2: Byte = 0x58.toByte()
         const val swap: Byte = 0x5F.toByte()
@@ -2083,6 +2211,7 @@ class Compiler : AstNodeVisitor<Unit> {
         const val areturn: Byte = 0xB0.toByte()
         const val ireturn: Byte = 0xAC.toByte()
         const val freturn: Byte = 0xAE.toByte()
+        const val lreturn: Byte = 0xAD.toByte()
 
         const val if_icmpeq: Byte = 0x9F.toByte()
         const val if_icmpge: Byte = 0xA2.toByte()
@@ -2101,6 +2230,9 @@ class Compiler : AstNodeVisitor<Unit> {
         const val fcmpg: Byte = 0x96.toByte()
         const val fcmpl: Byte = 0x95.toByte()
 
+        const val dcmpg: Byte = 0x98.toByte()
+        const val dcmpl: Byte = 0x97.toByte()
+
         const val lcmp: Byte = 0x94.toByte()
 
         const val aaload: Byte = 0x32.toByte()
@@ -2112,10 +2244,12 @@ class Compiler : AstNodeVisitor<Unit> {
         const val iastore: Byte = 0x4F.toByte()
         const val fastore: Byte = 0x51.toByte()
         const val lastore: Byte = 0x50.toByte()
+        const val dastore: Byte = 0x52.toByte()
 
         const val iaload: Byte = 0x2E.toByte()
         const val faload: Byte = 0x30.toByte()
         const val laload: Byte = 0x2F.toByte()
+        const val daload: Byte = 0x31.toByte()
 
         const val newarray: Byte = 0xBC.toByte()
 

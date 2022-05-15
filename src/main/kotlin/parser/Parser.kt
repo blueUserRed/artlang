@@ -81,7 +81,7 @@ class Parser {
      * attempts to resync the parser in the context of the top-level
      */
     private fun resyncTopLevel() {
-        while (peek().tokenType !in arrayOf(TokenType.K_FN, TokenType.K_CLASS, TokenType.K_CONST, TokenType.EOF) &&
+        while (cur < tokens.size - 1 && peek().tokenType !in arrayOf(TokenType.K_FN, TokenType.K_CLASS, TokenType.K_CONST, TokenType.EOF) &&
             !(peek().tokenType == TokenType.IDENTIFIER && peek().lexeme == "field")) cur++
     }
 
@@ -189,6 +189,12 @@ class Parser {
         val staticFields = mutableListOf<AstNode.Field>()
 
         while (!match(TokenType.R_BRACE)) try {
+
+            if (peek().tokenType == TokenType.EOF) {
+                artError(Errors.SyntaxError(peek(), "Expected closing brace, reached end of file instead", srcCode))
+                break
+            }
+
             val modifiers = parseModifiers()
 
             if (match(TokenType.K_FN)) {
@@ -209,8 +215,8 @@ class Parser {
                 if (field.isStatic) staticFields.add(field) else fields.add(field)
                 continue
             }
-            artError(Errors.SyntaxError(consume(), "Expected a function or field declaration in class", srcCode))
-            resyncClass()
+            artError(Errors.SyntaxError(peek(), "Expected a function or field declaration in class", srcCode))
+//            resyncClass()
         } catch (e: ParserResyncException) {
             resyncClass()
             continue
@@ -233,8 +239,14 @@ class Parser {
      * attempts to resync the parser in the context of a class
      */
     private fun resyncClass() {
-        while (peek().tokenType !in arrayOf(TokenType.K_FN, TokenType.K_CONST, TokenType.EOF) &&
-            !(peek().tokenType == TokenType.IDENTIFIER && peek().lexeme == "field")) cur++
+        while (
+            cur < tokens.size &&
+            peek().tokenType !in arrayOf(TokenType.K_FN, TokenType.K_CONST, TokenType.EOF) &&
+            !(peek().tokenType == TokenType.IDENTIFIER && peek().lexeme == "field") &&
+            peek().tokenType != TokenType.R_BRACE
+        ) {
+            cur++
+        }
     }
 
     /**
@@ -780,6 +792,7 @@ class Parser {
             TokenType.T_LONG,
             TokenType.T_FLOAT,
             TokenType.T_LONG,
+            TokenType.T_DOUBLE,
             TokenType.T_BOOLEAN
         )
 
@@ -812,6 +825,7 @@ class Parser {
         TokenType.T_SHORT -> Datakind.SHORT
         TokenType.T_INT -> Datakind.INT
         TokenType.T_LONG -> Datakind.LONG
+        TokenType.T_DOUBLE -> Datakind.DOUBLE
         TokenType.T_FLOAT -> Datakind.FLOAT
         TokenType.T_BOOLEAN -> Datakind.BOOLEAN
         TokenType.T_STRING -> Datakind.OBJECT
@@ -827,7 +841,7 @@ class Parser {
      */
     private fun match(vararg types: TokenType): Boolean {
         val start = cur
-        while (tokens[cur].tokenType == TokenType.SOFT_BREAK) cur++
+        while (tokens[cur].tokenType == TokenType.SOFT_BREAK) if (cur >= tokens.size -1) return false else cur++
         for (type in types) if (tokens[cur].tokenType == type) {
             cur++
             return true
