@@ -8,6 +8,7 @@ import errors.Errors
 import errors.artError
 import tokenizer.Token
 import tokenizer.TokenType
+import javax.xml.crypto.Data
 
 /**
  * checks type-safety, checks that function/fields that are referenced exist
@@ -62,7 +63,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             TokenType.PLUS -> {
                 if (left == Datatype.Str() && right == Datatype.Str()) return Datatype.Str()
                 if (
-                    left.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG, Datakind.FLOAT, Datakind.LONG) &&
+                    left.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG, Datakind.FLOAT, Datakind.DOUBLE) &&
                     left == right
                 ) return left
                 artError(Errors.IllegalTypesInBinaryOperationError(
@@ -73,7 +74,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
             TokenType.MINUS, TokenType.STAR, TokenType.SLASH, TokenType.MOD -> {
                 if (
-                    left.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG, Datakind.FLOAT, Datakind.LONG) &&
+                    left.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG, Datakind.FLOAT, Datakind.DOUBLE) &&
                     left == right
                 ) return left
                 artError(Errors.IllegalTypesInBinaryOperationError(
@@ -89,7 +90,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                 if (left.matches(Datakind.OBJECT) && right.matches(Datakind.OBJECT)) return Datatype.Bool()
 
                 if (
-                    left.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG, Datakind.FLOAT, Datakind.LONG) &&
+                    left.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG, Datakind.FLOAT, Datakind.DOUBLE) &&
                     left == right
                 ) return Datatype.Bool()
 
@@ -101,7 +102,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
             TokenType.GT, TokenType.GT_EQ, TokenType.LT, TokenType.LT_EQ -> {
                 if (
-                    left.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG, Datakind.FLOAT, Datakind.LONG) &&
+                    left.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG, Datakind.FLOAT, Datakind.DOUBLE) &&
                     left == right
                 ) return Datatype.Bool()
 
@@ -176,10 +177,8 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                 continue
             }
             names.add(clazz.name)
-            preCalcFields(clazz.fields, clazz)
-            preCalcFields(clazz.staticFields, clazz)
-            preCalcFuncs(clazz.staticFuncs, clazz)
-            preCalcFuncs(clazz.funcs, clazz)
+            preCalcFields(clazz.fields + clazz.staticFields, clazz)
+            preCalcFuncs(clazz.funcs + clazz.staticFuncs, clazz)
         }
         for (clazz in clazzes) if (clazz !is SyntheticNode) {
             clazz as AstNode.ClassDefinition
@@ -216,11 +215,16 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                     ))
                 }
                 if (func.functionDescriptor.args.isNotEmpty()) {
-                    artError(Errors.InvalidMainFunctionDeclarationError(
-                        "the main function must not take any arguments",
-                        srcCode,
-                        listOf(func.nameToken)
-                    ))
+                    if (
+                        func.functionDescriptor.args.size != 1 &&
+                        func.functionDescriptor.args[0].second != Datatype.ArrayType(Datatype.Str())
+                    ) {
+                        artError(Errors.InvalidMainFunctionDeclarationError(
+                            "the main function must not take any arguments",
+                            srcCode,
+                            listOf(func.nameToken)
+                        ))
+                    }
                 }
                 if (func.functionDescriptor.returnType != Datatype.Void()) {
                     artError(Errors.InvalidMainFunctionDeclarationError(
@@ -329,7 +333,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             val field = lookupTopLevelField(varAssign.name.lexeme)
             if (field != null) {
                 val varType = field.fieldType
-                if (varType.compatibleWith(typeToAssign)) {
+                if (!varType.compatibleWith(typeToAssign)) {
                     artError(Errors.IncompatibleTypesError(varAssign, "assignment", varType, typeToAssign, srcCode))
                 }
                 varAssign.fieldDef = field
@@ -348,6 +352,9 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
                 val field = from.lookupField(varAssign.name.lexeme)
                 if (field != null) {
+                    if (!field.fieldType.compatibleWith(typeToAssign)) {
+                        artError(Errors.IncompatibleTypesError(varAssign, "assignment", field.fieldType, typeToAssign, srcCode))
+                    }
                     if (field.isConst) artError(Errors.AssignToConstError(varAssign, field.name, srcCode))
                     if (field.isPrivate && curClass !== field.clazz) {
                         artError(Errors.PrivateMemberAccessError(varAssign, "field", varAssign.name.lexeme, srcCode))
@@ -364,6 +371,9 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
                 val field = from.lookupField(varAssign.name.lexeme)
                 if (field != null) {
+                    if (!field.fieldType.compatibleWith(typeToAssign)) {
+                        artError(Errors.IncompatibleTypesError(varAssign, "assignment", field.fieldType, typeToAssign, srcCode))
+                    }
                     if (field.isConst) artError(Errors.AssignToConstError(varAssign, field.name, srcCode))
                     if (field.isPrivate && curClass !== field.clazz) {
                         artError(Errors.PrivateMemberAccessError(varAssign, "field", varAssign.name.lexeme, srcCode))
@@ -412,7 +422,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     override fun visit(unary: AstNode.Unary): Datatype {
         val type = check(unary.on, unary)
         if (unary.operator.tokenType == TokenType.MINUS) {
-            if (type != Datatype.Integer()) {
+            if (!type.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG, Datakind.FLOAT, Datakind.DOUBLE)) {
                 artError(Errors.OperationNotApplicableError("unary minus", type, unary, srcCode))
             }
         } else {
@@ -591,29 +601,65 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
     override fun visit(varInc: AstNode.VarAssignShorthand): Datatype {
         check(varInc.toAdd, varInc)
-        if (
-            (varInc.toAdd.type != Datatype.Str() || varInc.operator.tokenType != TokenType.PLUS_EQ)
-            && varInc.toAdd.type != Datatype.Integer()
-        ) {
-            artError(Errors.OperationNotImplementedError(
-                varInc,
-                "Shorthand operators are only implemented for int and string types",
-                srcCode
-            ))
+//        if (
+//            (varInc.toAdd.type != Datatype.Str() || varInc.operator.tokenType != TokenType.PLUS_EQ)
+//            && varInc.toAdd.type != Datatype.Integer()
+//        ) {
+//            artError(Errors.OperationNotImplementedError(
+//                varInc,
+//                "Shorthand operators are only implemented for int and string types",
+//                srcCode
+//            ))
+//        }
+
+        if (varInc.index != -1) {
+
+            val local = vars[varInc.index]!!
+
+            if (
+                varInc.toAdd.type == Datatype.Str() &&
+                local == Datatype.Str() &&
+                varInc.operator.tokenType == TokenType.PLUS_EQ
+            ) return Datatype.Void()
+
+            if (
+                !varInc.toAdd.type.compatibleWith(local) ||
+                !varInc.toAdd.type.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG, Datakind.FLOAT, Datakind.DOUBLE)
+            ) {
+                artError(Errors.IllegalTypesInBinaryOperationError(
+                    varInc.operator.lexeme,
+                    varInc.toAdd.type,
+                    local,
+                    varInc,
+                    srcCode
+                ))
+            }
+            return Datatype.Void()
         }
-        if (varInc.index != -1) return Datatype.Void()
+
         //temporarily create Get and use its visit function to avoid duplicate logic
         val tmpGet = AstNode.Get(varInc.name, varInc.from, varInc.relevantTokens) //easier this way
         check(tmpGet, null)
-        if (tmpGet.type != varInc.toAdd.type) {
-            artError(Errors.IllegalTypesInBinaryOperationError(
-                varInc.operator.lexeme,
-                varInc.toAdd.type,
-                tmpGet.type,
-                varInc,
-                srcCode
-            ))
+
+        if (
+            !(varInc.toAdd.type == Datatype.Str() &&
+            tmpGet.type == Datatype.Str() &&
+            varInc.operator.tokenType == TokenType.PLUS_EQ)
+        ) {
+            if (
+                !varInc.toAdd.type.compatibleWith(tmpGet.type) ||
+                !varInc.toAdd.type.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG, Datakind.FLOAT, Datakind.DOUBLE)
+            ) {
+                artError(Errors.IllegalTypesInBinaryOperationError(
+                    varInc.operator.lexeme,
+                    varInc.toAdd.type,
+                    tmpGet.type,
+                    varInc,
+                    srcCode
+                ))
+            }
         }
+
         varInc.fieldDef = tmpGet.fieldDef
 
         if (varInc.fieldDef == null) return Datatype.Void()
@@ -625,15 +671,6 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                 srcCode
             ))
         }
-
-//        if (varInc.fieldDef!!.isPrivate) {
-//            artError(Errors.PrivateMemberAccessError(
-//                varInc,
-//                "field",
-//                varInc.fieldDef!!.name,
-//                srcCode
-//            ))
-//        }
 
         return Datatype.Void()
     }
@@ -778,6 +815,10 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
     override fun visit(field: AstNode.Field): Datatype {
         field as AstNode.FieldDeclaration
+
+        vars.clear()
+        if (!field.isStatic && !field.isTopLevel) vars[0] = Datatype.Object(curClass!!)
+
         check(field.initializer, field)
         if (!field.fieldType.compatibleWith(field.initializer.type)) {
             artError(Errors.IncompatibleTypesError(
@@ -848,17 +889,6 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
     override fun visit(convert: AstNode.TypeConvert): Datatype {
         val toConvertType = check(convert.toConvert, convert)
-
-        if (toConvertType.matches(Datakind.LONG, Datakind.DOUBLE) ||
-            convert.to.tokenType in arrayOf(TokenType.T_LONG, TokenType.T_DOUBLE)
-        ) {
-            artError(Errors.OperationNotImplementedError(
-                //wrap token in variable, so that only the 'to' token is highlighted, not the entire statement
-                AstNode.Variable(convert.to, listOf(convert.to)),
-                "long and double is not yet implemented",
-                srcCode
-            ))
-        }
 
         if (!toConvertType.matches(
                 Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG, Datakind.FLOAT, Datakind.DOUBLE

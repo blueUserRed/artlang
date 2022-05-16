@@ -106,6 +106,30 @@ class ClassFileBuilder {
     }
 
     /**
+     * adds a long info to the constant pool and returns its index
+     */
+    fun longInfo(l: Long): Int {
+        val toAdd = ConstantLongInfo(l)
+        val find = findInfo(toAdd)
+        if (find != null) return find + 1
+        constantPool.add(toAdd)
+        placeholderInfo()
+        return constantPool.size - 1
+    }
+
+    /**
+     * adds a double info to the constant pool and returns its index
+     */
+    fun doubleInfo(d: Double): Int {
+        val toAdd = ConstantDoubleInfo(d)
+        val find = findInfo(toAdd)
+        if (find != null) return find + 1
+        constantPool.add(toAdd)
+        placeholderInfo()
+        return constantPool.size - 1
+    }
+
+    /**
      * adds a fieldRef info to the constant pool and returns its index
      */
     fun fieldRefInfo(classIndex: Int, nameAndTypeIndex: Int): Int {
@@ -136,6 +160,14 @@ class ClassFileBuilder {
         if (find != null) return find + 1
         constantPool.add(toAdd)
         return constantPool.size
+    }
+
+    /**
+     * adds a placeholder to the constant pool
+     * @see [ConstantPoolPlaceHolder]
+     */
+    fun placeholderInfo() {
+        constantPool.add(ConstantPoolPlaceHolder())
     }
 
     /**
@@ -396,6 +428,52 @@ class ConstantFloatInfo(val f: Float) : ConstantInfo(4) {
         other as ConstantFloatInfo
         return other.f == this.f
     }
+}
+
+/**
+ * represents a long info
+ */
+class ConstantLongInfo(val l: Long) : ConstantInfo(5) {
+
+    override fun toBytes(): ByteArray = Utils.arrayConcat(
+        arrayOf(tag).toByteArray(),
+        Utils.getLongAsBytes(l)
+    )
+
+    override fun equals(other: Any?): Boolean {
+        if (other == null || this::class != other::class) return false
+        other as ConstantLongInfo
+        return other.l == this.l
+    }
+}
+
+/**
+ * represents a double info
+ */
+class ConstantDoubleInfo(val d: Double) : ConstantInfo(6) {
+
+    override fun toBytes(): ByteArray = Utils.arrayConcat(
+        arrayOf(tag).toByteArray(),
+        Utils.getLongAsBytes(d.toRawBits())
+    )
+
+    override fun equals(other: Any?): Boolean {
+        if (other == null || this::class != other::class) return false
+        other as ConstantDoubleInfo
+        return other.d == this.d
+    }
+}
+
+/**
+ * used to mark a space in the constant pool that is unusable, for example after a long, because it takes two spaces in
+ * the constant pool
+ *
+ *  Even the documentation says this was a bad idea: [https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.4.5]
+ */
+class ConstantPoolPlaceHolder : ConstantInfo(-1) {
+    override fun toBytes(): ByteArray = ByteArray(0)
+
+    override fun equals(other: Any?): Boolean = other is ConstantPoolPlaceHolder
 }
 
 /**

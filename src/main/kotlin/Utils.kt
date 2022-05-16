@@ -43,6 +43,20 @@ object Utils {
     ).toByteArray()
 
     /**
+     * returns a long as byte array
+     */
+    fun getLongAsBytes(l: Long): ByteArray = arrayOf(
+        ((l shr 56) and 0xFF).toByte(),
+        ((l shr 48) and 0xFF).toByte(),
+        ((l shr 40) and 0xFF).toByte(),
+        ((l shr 32) and 0xFF).toByte(),
+        ((l shr 24) and 0xFF).toByte(),
+        ((l shr 16) and 0xFF).toByte(),
+        ((l shr 8) and 0xFF).toByte(),
+        ((l shr 0) and 0xFF).toByte(),
+    ).toByteArray()
+
+    /**
      * returns a short as byte array
      */
     fun getShortAsBytes(s: Short): ByteArray = arrayOf(

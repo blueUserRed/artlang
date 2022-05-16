@@ -173,6 +173,9 @@ abstract class AstNode(val relevantTokens: List<Token>) {
             statements = to
         }
 
+        /**
+         * checks if the function has a specific modifier
+         */
         fun hasModifier(modifier: String): Boolean {
             for (mod in modifiers) if (mod.tokenType == TokenType.IDENTIFIER && mod.lexeme == modifier) return true
             return false
@@ -342,11 +345,16 @@ abstract class AstNode(val relevantTokens: List<Token>) {
     ) : AstNode(relevantTokens) {
 
         /**
-         * the local variable index; the index into the locals array of the jvm at which the variable can be found
+         * the local variable index; the index into the locals array at which the variable can be found
          *
          * set by the parser
          */
         var index: Int = 0
+
+        /**
+         * the local variable index on the jvm; in this array longs/doubles take twice the space
+         */
+        var jvmIndex: Int = 0
 
         /**
          * the explicitly stated type (node) of the variable. null if none is present
@@ -382,10 +390,15 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         var fieldDef: Field? = null
 
         /**
-         * the local variable index; the index into the locals array of the jvm at which the variable can be found;
+         * the local variable index; the index into the locals array at which the variable can be found;
          * if the assignment target is not a local, the index is -1
          */
         var index: Int = -1
+
+        /**
+         * the local variable index on the jvm; in this array longs/doubles take twice the space
+         */
+        var jvmIndex: Int = -1
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (from === orig) {
@@ -485,6 +498,13 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
+    /**
+     * represents a shorthand assignment (e.g. '+=', '*=')
+     * @param from where [name] is got from; null if looked up in the top level
+     * @param name the name to which is assigned
+     * @param operator the operator used in the assignment
+     * @param toAdd the right side of the assignment
+     */
     class VarAssignShorthand(
         var from: AstNode?,
         var name: Token,
@@ -493,7 +513,16 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         relevantTokens: List<Token>
     ) : AstNode(relevantTokens) {
 
+        /**
+         * the index into the locals array at which the variable can be found; -1 if [name] does not refer to a local
+         */
         var index: Int = -1
+
+        var jvmIndex: Int = -1
+
+        /**
+         * if [name] refers to a field, this is set to the definition of the field
+         */
         var fieldDef: Field? = null
 
         override fun swap(orig: AstNode, to: AstNode) {
@@ -519,10 +548,15 @@ abstract class AstNode(val relevantTokens: List<Token>) {
     class VarIncrement(var name: Get, val toAdd: Byte, relevantTokens: List<Token>) : AstNode(relevantTokens) {
 
         /**
-         * the local variable index; the index into the locals array of the jvm at which the variabl can be found;
+         * the local variable index; the index into the locals array at which the variabl can be found;
          * -1 if the increment target is not a local variable
          */
         var index: Int = 0
+
+        /**
+         * the local variable index on the jvm; in this array longs/doubles take twice the space
+         */
+        var jvmIndex: Int = 0
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (name !== orig || to !is Get) throw CantSwapException()
@@ -577,9 +611,14 @@ abstract class AstNode(val relevantTokens: List<Token>) {
     class Variable(val name: Token, relevantTokens: List<Token>) : AstNode(relevantTokens) {
 
         /**
-         * the local variable index; the index into the locals array of the jvm at which the variabl can be found
+         * the local variable index; the index into the locals array at which the variabl can be found
          */
         var index: Int = -1
+
+        /**
+         * the local variable index on the jvm; in this array longs/doubles take twice the space
+         */
+        var jvmIndex: Int = -1
 
         override fun swap(orig: AstNode, to: AstNode){
             throw CantSwapException()
@@ -846,6 +885,20 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         override val isTopLevel: Boolean,
         relevantTokens: List<Token>
     ) : Field(relevantTokens) {
+
+        /**
+         * the maximum amount of locals in the field (yes, fields can have locals)
+         *
+         * for example:
+         * ```
+         * field myField: int = {
+         *      let a = 3
+         *      let b = 4
+         *      => a + b
+         * }
+         * ```
+         */
+        var amountLocals: Int = 0
 
         override val name: String = nameToken.lexeme
 

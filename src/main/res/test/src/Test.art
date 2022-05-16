@@ -1,14 +1,12 @@
 
+fn main(args: str[]) {
 
-fn main() {
-//    const test = Test()
-    Test.test += 210
-    print Test.test
+    print false && false || true
+
+//    let i = -1
+//    while ((i := i + 1) < args.size) print args[i]
 }
 
-class Test {
-    public static field test: int = 123
-}
 
 //class BlackCat : Cat {
 //
