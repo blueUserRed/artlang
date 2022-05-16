@@ -1,19 +1,10 @@
 
-field hi: int = {
-    let a = 32
-    let b = 64
-    => a + b
-}
+fn main(args: str[]) {
 
-field hihi: str = {
-    let c = "hello "
-    let a = "world"
-    => c + a
-}
+    print false && false || true
 
-fn main() {
-    print hi
-    print hihi
+//    let i = -1
+//    while ((i := i + 1) < args.size) print args[i]
 }
 
 

@@ -215,11 +215,16 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                     ))
                 }
                 if (func.functionDescriptor.args.isNotEmpty()) {
-                    artError(Errors.InvalidMainFunctionDeclarationError(
-                        "the main function must not take any arguments",
-                        srcCode,
-                        listOf(func.nameToken)
-                    ))
+                    if (
+                        func.functionDescriptor.args.size != 1 &&
+                        func.functionDescriptor.args[0].second != Datatype.ArrayType(Datatype.Str())
+                    ) {
+                        artError(Errors.InvalidMainFunctionDeclarationError(
+                            "the main function must not take any arguments",
+                            srcCode,
+                            listOf(func.nameToken)
+                        ))
+                    }
                 }
                 if (func.functionDescriptor.returnType != Datatype.Void()) {
                     artError(Errors.InvalidMainFunctionDeclarationError(

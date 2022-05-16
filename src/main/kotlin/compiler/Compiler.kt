@@ -158,7 +158,7 @@ class Compiler : AstNodeVisitor<Unit> {
                         TokenType.NOT_EQ -> doIntCompare(if_icmpne)
                         else -> throw RuntimeException("unreachable")
                     }
-                    doConvertPrimitive(binary.left.type, binary.type)
+                    if (binary.type != Datatype.Bool()) doConvertPrimitive(binary.left.type, binary.type)
                 }
 
                 Datakind.FLOAT -> doNonIntCompare(binary.operator.tokenType, fcmpg)

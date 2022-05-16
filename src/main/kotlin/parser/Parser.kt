@@ -130,6 +130,7 @@ class Parser {
 
         while (match(TokenType.IDENTIFIER)) {
             val name = last()
+            if (name.lexeme == "this") syntaxError("'this' cannot be used as a parameter-name", name)
             consumeOrError(TokenType.COLON, "Expected type-declaration after argument")
             val type = parseType()
             args.add(Pair(name, type))
@@ -478,6 +479,7 @@ class Parser {
         val decToken = last()
         consumeOrError(TokenType.IDENTIFIER, "expected identifier after let/const")
         val name = last()
+        if (name.lexeme == "this") syntaxError("'this' cannot be used a variable name", name)
         var type: AstNode.DatatypeNode? = null
         if (match(TokenType.COLON)) type = parseType()
         consumeOrError(TokenType.EQ, "initializer expected")
@@ -491,7 +493,7 @@ class Parser {
      * parses an assignment
      */
     private fun parseAssignment(): AstNode {
-        val left = parseBooleanComparison()
+        val left = parseOr()
         if (match(TokenType.EQ)) {
             val compToken = last()
             if (left is AstNode.Get) return AstNode.Assignment(left.from, left.name, parseStatement(), false, listOf(compToken))
@@ -519,12 +521,24 @@ class Parser {
     }
 
     /**
-     * parses `&&` and `||`
-     * TODO: finally fix priority, it isnt that hard
+     * parses `||`
      */
-    private fun parseBooleanComparison(): AstNode {
+    private fun parseOr(): AstNode {
+        var left = parseAnd()
+        while (match(TokenType.D_OR)) {
+            val operator = last()
+            val right = parseComparison()
+            left = AstNode.Binary(left, operator, right, listOf(operator))
+        }
+        return left
+    }
+
+    /**
+     * parses `&&`
+     */
+    private fun parseAnd(): AstNode {
         var left = parseComparison()
-        while (match(TokenType.D_AND, TokenType.D_OR)) { //TODO: fix priority
+        while (match(TokenType.D_AND)) {
             val operator = last()
             val right = parseComparison()
             left = AstNode.Binary(left, operator, right, listOf(operator))
@@ -932,6 +946,14 @@ class Parser {
         }
     }
 
+    private fun syntaxError(message: String, token: Token) {
+        artError(Errors.SyntaxError(
+            token,
+            message,
+            srcCode
+        ))
+    }
+
     /**
      * returns the last token
      */
@@ -945,17 +967,6 @@ class Parser {
     private fun peek(): Token {
         return tokens[cur]
     }
-
-//    private fun peekNext(): Token? {
-//        val start = cur
-//        consumeSoftBreaks()
-//        cur++
-//        consumeSoftBreaks()
-//        val ret = tokens[cur]
-//        cur = start
-//        return ret
-////        return if (cur + 1 < tokens.size) tokens[cur + 1] else null
-//    }
 
     /**
      * thrown when a syntax error is encountered, causes the parser to resync
