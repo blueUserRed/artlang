@@ -96,7 +96,7 @@ fn main() {
 ```
 <br>
 
-####Loops
+#### Loops
 Artlang currently supports two loops, the `while`-loop and the
 `loop`-loop. `while` loops until a condition is false, `loop`
 loops forever. Like if-statements, curly braces are optional if the
