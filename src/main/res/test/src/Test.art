@@ -1,32 +1,19 @@
-field global: double = 34#D
 
-fn main() {
-
-    let test1 = (if (true) 34#D else 35#D) + 14.4#D
-    let local: double = 10#D
-
-    global += 123#D
-    local *= 10.double
-
-    const test = Test()
-    test.t1 = 20#D
-    Test.t2 -= -40#D
-
-    print test.t1
-    print Test.t2
-    print local * 2032#I.double
-
-    const myArr = [ 10#D, 203#D, 2938.int.long.double, 21#D ]
-    const arr2 = double[30]
-
-    print arr2[3]
-    arr2[4] = 123#D
-    print arr2[23] := 45.double
+field hi: int = {
+    let a = 32
+    let b = 64
+    => a + b
 }
 
-class Test {
-    public field t1: double = 1#D
-    public static field t2: double = 1#D
+field hihi: str = {
+    let c = "hello "
+    let a = "world"
+    => c + a
+}
+
+fn main() {
+    print hi
+    print hihi
 }
 
 

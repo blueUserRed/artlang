@@ -178,6 +178,12 @@ class VariableResolver : AstNodeVisitor<Unit> {
 
     override fun visit(field: AstNode.Field) {
         field as AstNode.FieldDeclaration
+        curVars.clear()
+        varDeclarations.clear()
+        if (!field.isTopLevel && !field.isStatic) {
+            curVars.add("this")
+            varDeclarations.add(null)
+        }
         resolve(field.initializer, field)
     }
 

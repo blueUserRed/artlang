@@ -15,6 +15,7 @@ import tokenizer.TokenType
 import java.io.File
 import java.util.*
 import java.util.stream.Stream
+import kotlin.math.max
 
 /**
  * compiles the AST into a binary class file
@@ -575,7 +576,7 @@ class Compiler : AstNodeVisitor<Unit> {
         doStaticFields(program.fields)
 
         isTopLevel = true
-        for (func in program.funcs) compile(func, true)
+        for (func in program.funcs) func.accept(this)
         isTopLevel = false
 
         //only add methods if they have code
@@ -642,11 +643,20 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     /**
-     * compiles the non-static fields of the current class. Sets [init]
+     * compiles the non-static fields of the current class. Sets [emitterTarget]
      */
     private fun doNonStaticFields(fields: List<AstNode.Field>) {
         if (fields.isEmpty()) return
         emitterTarget = init
+
+        var maxLocals = 1
+        for (field in fields) {
+            field as AstNode.FieldDeclaration
+            if (field.amountLocals > maxLocals) maxLocals = field.amountLocals
+        }
+        emitterTarget.maxLocals = maxLocals
+        emitterTarget.locals = MutableList(maxLocals) { null }
+
         for (field in fields) compile(field, true)
     }
 
@@ -656,6 +666,15 @@ class Compiler : AstNodeVisitor<Unit> {
     private fun doStaticFields(fields: List<AstNode.Field>) {
         if (fields.isEmpty()) return
         emitterTarget = clinit
+
+        var maxLocals = 1
+        for (field in fields) {
+            field as AstNode.FieldDeclaration
+            if (field.amountLocals > maxLocals) maxLocals = field.amountLocals
+        }
+        emitterTarget.maxLocals = maxLocals
+        emitterTarget.locals = MutableList(maxLocals) { null }
+
         for (field in fields) compile(field, true)
     }
 
@@ -1872,10 +1891,11 @@ class Compiler : AstNodeVisitor<Unit> {
      * stack, and if so pop it
      */
     private fun compile(node: AstNode, forceNoValueOnStack: Boolean) {
+        val stackSizeBefore = emitterTarget.stack.size
         node.accept(this)
-        if (forceNoValueOnStack && emitterTarget.stack.size != 0) {
-            println(emitterTarget.stack.size)
-            doPop()
+        if (forceNoValueOnStack && emitterTarget.stack.size > stackSizeBefore) {
+            println(emitterTarget.stack.size) //TODO: remove
+            while (emitterTarget.stack.size > stackSizeBefore) doPop()
         }
     }
 

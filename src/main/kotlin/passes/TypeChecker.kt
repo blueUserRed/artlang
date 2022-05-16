@@ -810,6 +810,10 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
     override fun visit(field: AstNode.Field): Datatype {
         field as AstNode.FieldDeclaration
+
+        vars.clear()
+        if (!field.isStatic && !field.isTopLevel) vars[0] = Datatype.Object(curClass!!)
+
         check(field.initializer, field)
         if (!field.fieldType.compatibleWith(field.initializer.type)) {
             artError(Errors.IncompatibleTypesError(

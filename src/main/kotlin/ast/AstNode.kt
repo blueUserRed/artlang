@@ -173,6 +173,9 @@ abstract class AstNode(val relevantTokens: List<Token>) {
             statements = to
         }
 
+        /**
+         * checks if the function has a specific modifier
+         */
         fun hasModifier(modifier: String): Boolean {
             for (mod in modifiers) if (mod.tokenType == TokenType.IDENTIFIER && mod.lexeme == modifier) return true
             return false
@@ -882,6 +885,20 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         override val isTopLevel: Boolean,
         relevantTokens: List<Token>
     ) : Field(relevantTokens) {
+
+        /**
+         * the maximum amount of locals in the field (yes, fields can have locals)
+         *
+         * for example:
+         * ```
+         * field myField: int = {
+         *      let a = 3
+         *      let b = 4
+         *      => a + b
+         * }
+         * ```
+         */
+        var amountLocals: Int = 0
 
         override val name: String = nameToken.lexeme
 

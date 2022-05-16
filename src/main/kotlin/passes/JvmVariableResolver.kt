@@ -9,6 +9,7 @@ class JvmVariableResolver : AstNodeVisitor<Unit> {
 
     private var jvmVars: MutableList<String?> = mutableListOf()
     private var maxLocals: Int = 0
+    private var curClass: AstNode.ArtClass? = null
 
     override fun visit(binary: AstNode.Binary) {
         resolve(binary.left)
@@ -105,10 +106,12 @@ class JvmVariableResolver : AstNodeVisitor<Unit> {
     }
 
     override fun visit(clazz: AstNode.ArtClass) {
+        curClass = clazz
         for (field in clazz.fields) resolve(field)
         for (field in clazz.staticFields) resolve(field)
         for (func in clazz.staticFuncs) resolve(func)
         for (func in clazz.funcs) resolve(func)
+        curClass = null
     }
 
     override fun visit(get: AstNode.Get) {
@@ -127,7 +130,13 @@ class JvmVariableResolver : AstNodeVisitor<Unit> {
 
     override fun visit(field: AstNode.Field) {
         field as AstNode.FieldDeclaration
+        maxLocals = 0
+        jvmVars.clear()
+
+        if (!field.isStatic && !field.isTopLevel) addVar("this", Datatype.Object(curClass!!))
+
         resolve(field.initializer)
+        field.amountLocals = maxLocals
     }
 
     override fun visit(arr: AstNode.ArrayCreate) {
