@@ -314,24 +314,11 @@ object Tokenizer {
         val rawString = code.substring(start until cur)
         val string = builder.toString()
         emit(TokenType.STRING, rawString, string, start - lastLineBreakPos)
-
-//        while (current() != endChar) {
-//            if (last() == '\n') {
-//                cur--
-//                artError(Errors.UnterminatedStringError(start - lastLineBreakPos, curLine, code))
-//                return
-//            }
-//            consume()
-//            if (end()) {
-//                artError(Errors.UnterminatedStringError(start - lastLineBreakPos, curLine, code))
-//                return
-//            }
-//        }
-//        consume() //consume ending " or '
-//        val string = code.substring((start + 1)..(cur - 2))
-//        emit(TokenType.STRING, endChar + string + endChar, string, start - lastLineBreakPos)
     }
 
+    /**
+     * tokenizes a unicode string escape
+     */
     private fun doUnicodeStringEscape(start: Int): String? {
         var c = 0
         repeat(4) {

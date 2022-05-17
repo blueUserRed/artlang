@@ -2101,7 +2101,7 @@ class Compiler : AstNodeVisitor<Unit> {
         const val lsub: Byte = 0x65.toByte()
         const val lmul: Byte = 0x69.toByte()
         const val ldiv: Byte = 0x6D.toByte()
-        const val lneg: Byte = 0x6D.toByte()
+        const val lneg: Byte = 0x75.toByte()
         const val lrem: Byte = 0x71.toByte()
 
         const val dadd: Byte = 0x63.toByte()

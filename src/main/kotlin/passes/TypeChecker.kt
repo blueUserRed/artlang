@@ -601,16 +601,6 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
     override fun visit(varInc: AstNode.VarAssignShorthand): Datatype {
         check(varInc.toAdd, varInc)
-//        if (
-//            (varInc.toAdd.type != Datatype.Str() || varInc.operator.tokenType != TokenType.PLUS_EQ)
-//            && varInc.toAdd.type != Datatype.Integer()
-//        ) {
-//            artError(Errors.OperationNotImplementedError(
-//                varInc,
-//                "Shorthand operators are only implemented for int and string types",
-//                srcCode
-//            ))
-//        }
 
         if (varInc.index != -1) {
 

@@ -7,7 +7,6 @@ import ast.SyntheticNode
 import errors.Errors
 import errors.artError
 import passes.ControlFlowChecker.ControlFlowState
-import kotlin.RuntimeException
 
 /**
  * ensures that break/continue is only used in loops, return is only used in function, that functions

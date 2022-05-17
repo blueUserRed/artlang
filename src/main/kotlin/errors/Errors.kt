@@ -4,7 +4,6 @@ import ast.AstNode
 import passes.MinMaxPosFinder
 import Datatype
 import tokenizer.Token
-import kotlin.math.exp
 
 /**
  * contains the different errors
@@ -104,6 +103,8 @@ class Errors {
         }
 
     }
+
+    // I'm not writing doc for each error, they should be obvious
 
     class UnknownCharacterError(
         val character: Char,

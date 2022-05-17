@@ -7,11 +7,26 @@ import errors.Errors
 import errors.artError
 import kotlin.RuntimeException
 
+/**
+ * maps all variables to an index and set that index on references to that local
+ */
 class VariableResolver : AstNodeVisitor<Unit> {
 
+    /**
+     * variables in the current scope
+     *
+     * does *not* correspond to the locals array on the jvm, because two word values only take up one index
+     */
     private var curVars: MutableList<String> = mutableListOf()
+
+    /**
+     * the declarations of the variable in [curVars], null if the variable has no declaration (this, function-arg)
+     */
     private var varDeclarations: MutableList<AstNode.VariableDeclaration?> = mutableListOf()
 
+    /**
+     * if swap is set to value != null, the current node will be swapped with swap
+     */
     private var swap: AstNode? = null
 
     private lateinit var program: AstNode.Program
@@ -70,7 +85,9 @@ class VariableResolver : AstNodeVisitor<Unit> {
     }
 
     override fun visit(varDec: AstNode.VariableDeclaration) {
-        if (varDec.name.lexeme in curVars) throw RuntimeException("Redeclaration of variable ${varDec.name.lexeme}")
+        if (varDec.name.lexeme in curVars) {
+            artError(Errors.DuplicateDefinitionError(varDec.name, "variable", srcCode))
+        }
         resolve(varDec.initializer, varDec)
         curVars.add(varDec.name.lexeme)
         varDeclarations.add(varDec)
@@ -91,7 +108,7 @@ class VariableResolver : AstNodeVisitor<Unit> {
         }
         // if varDeclarations[index] == null the variable is a function arg or 'this', which is const
         if (varDeclarations[index]?.isConst ?: true) {
-            throw RuntimeException("Tried to assign to const ${varAssign.name.lexeme}")
+            artError(Errors.AssignToConstError(varAssign, varAssign.name.lexeme, srcCode))
         }
         varAssign.index = index
     }
@@ -226,6 +243,11 @@ class VariableResolver : AstNodeVisitor<Unit> {
         resolve(convert.toConvert, convert)
     }
 
+    /**
+     * resolves all variables in a node, also handles swapping
+     * @param parent the parent of [node], necessary for swapping. If a swap is attempted and [parent] is null a
+     * [AstNode.CantSwapException] is thrown
+     */
     private fun resolve(node: AstNode, parent: AstNode?) {
         val res = node.accept(this)
         if (swap == null) return res

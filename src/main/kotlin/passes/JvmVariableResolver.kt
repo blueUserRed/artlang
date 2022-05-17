@@ -7,7 +7,14 @@ import ast.SyntheticNode
 
 class JvmVariableResolver : AstNodeVisitor<Unit> {
 
+    /**
+     * represents the local array on the jvm
+     */
     private var jvmVars: MutableList<String?> = mutableListOf()
+
+    /**
+     * the largest size of the locals array reached during execution
+     */
     private var maxLocals: Int = 0
     private var curClass: AstNode.ArtClass? = null
 
@@ -181,6 +188,10 @@ class JvmVariableResolver : AstNodeVisitor<Unit> {
         node.accept(this)
     }
 
+    /**
+     * adds a variable to [jvmVars]
+     * @return the index, if two word value the index of the first word
+     */
     private fun addVar(name: String, type: Datatype): Int {
         if (!type.matches(Datakind.LONG, Datakind.DOUBLE)) {
             jvmVars.add(name)
