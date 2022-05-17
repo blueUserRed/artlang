@@ -4,6 +4,7 @@ import ast.AstNode
 import passes.MinMaxPosFinder
 import Datatype
 import tokenizer.Token
+import kotlin.math.exp
 
 /**
  * contains the different errors
@@ -422,6 +423,17 @@ class Errors {
         override val message: String = "$thingThatCanBeUsed can only be used in $whereThingCanBeUsed"
         override val ranges: MutableMap<Int, Pair<Int, Int>>
             get() = stmt.accept(MinMaxPosFinder())
+    }
+
+    class IllegalStringEscapeError(
+        val escapeChar: Char,
+        val pos: Int,
+        val line: Int,
+        srcCode: String
+    ) : ArtError(33, srcCode) {
+        override val message: String = "Illegal character in string escape '$escapeChar'"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = mutableMapOf(line to (pos to pos))
     }
 
 }

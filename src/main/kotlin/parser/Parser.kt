@@ -81,7 +81,7 @@ class Parser {
      * attempts to resync the parser in the context of the top-level
      */
     private fun resyncTopLevel() {
-        while (cur < tokens.size - 1 && peek().tokenType !in arrayOf(TokenType.K_FN, TokenType.K_CLASS, TokenType.K_CONST, TokenType.EOF) &&
+        while (peek().tokenType !in arrayOf(TokenType.K_FN, TokenType.K_CLASS, TokenType.K_CONST, TokenType.EOF) &&
             !(peek().tokenType == TokenType.IDENTIFIER && peek().lexeme == "field")) cur++
     }
 
@@ -241,7 +241,6 @@ class Parser {
      */
     private fun resyncClass() {
         while (
-            cur < tokens.size &&
             peek().tokenType !in arrayOf(TokenType.K_FN, TokenType.K_CONST, TokenType.EOF) &&
             !(peek().tokenType == TokenType.IDENTIFIER && peek().lexeme == "field") &&
             peek().tokenType != TokenType.R_BRACE
@@ -706,7 +705,7 @@ class Parser {
                 TokenType.STRING,
                 TokenType.BOOLEAN
         )) {
-            artError(Errors.SyntaxError(consume(), "Expected a statement, got ${last().lexeme}", srcCode))
+            artError(Errors.SyntaxError(consume(), "Expected a statement, got '${peek().lexeme}'", srcCode))
             throw ParserResyncException()
         }
 
@@ -763,6 +762,10 @@ class Parser {
         val lBrace = last()
         val statements = mutableListOf<AstNode>()
         while (!match(TokenType.R_BRACE)) {
+            if (match(TokenType.EOF)) {
+                syntaxError("Expected closing brace, reached end of file instead", peek())
+                break
+            }
             try {
                 val statement = parseStatement()
                 statements.add(statement)
@@ -783,7 +786,7 @@ class Parser {
      * attempts to resync the parser in the context of a block
      */
     private fun resync() {
-        while (!matchNSFB(TokenType.SOFT_BREAK, TokenType.SEMICOLON)) consume()
+        while (!matchNSFB(TokenType.SOFT_BREAK, TokenType.SEMICOLON, TokenType.EOF)) consume()
     }
 
     /**
@@ -855,9 +858,9 @@ class Parser {
      */
     private fun match(vararg types: TokenType): Boolean {
         val start = cur
-        while (tokens[cur].tokenType == TokenType.SOFT_BREAK) if (cur >= tokens.size -1) return false else cur++
+        while (tokens[cur].tokenType == TokenType.SOFT_BREAK) cur++
         for (type in types) if (tokens[cur].tokenType == type) {
-            cur++
+            if (type != TokenType.EOF) cur++
             return true
         }
         cur = start
@@ -887,7 +890,7 @@ class Parser {
      */
     private fun matchNSFB(vararg types: TokenType): Boolean {
         for (type in types) if (tokens[cur].tokenType == type) {
-            cur++
+            if (type != TokenType.EOF) cur++
             return true
         }
         return false
@@ -905,6 +908,7 @@ class Parser {
      */
     private fun consume(): Token {
         consumeSoftBreaks()
+        if (peek().tokenType == TokenType.EOF) return peek()
         cur++
         return last()
     }
