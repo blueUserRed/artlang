@@ -243,6 +243,9 @@ class VariableResolver : AstNodeVisitor<Unit> {
         resolve(convert.toConvert, convert)
     }
 
+    override fun visit(supCall: AstNode.SuperCall) {
+    }
+
     /**
      * resolves all variables in a node, also handles swapping
      * @param parent the parent of [node], necessary for swapping. If a swap is attempted and [parent] is null a

@@ -135,4 +135,6 @@ class InheritanceChecker : AstNodeVisitor<Unit> {
     override fun visit(nul: AstNode.Null) = throw RuntimeException("unreachable")
 
     override fun visit(convert: AstNode.TypeConvert) = throw RuntimeException("unreachable")
+
+    override fun visit(supCall: AstNode.SuperCall) = throw RuntimeException("unreachable")
 }

@@ -3,14 +3,11 @@ package compiler
 import Utils
 import ast.AstNode
 import ast.AstNodeVisitor
-import classFile.ClassFileBuilder
-import classFile.Field
-import classFile.MethodBuilder
-import classFile.StackMapTableAttribute
 import classFile.StackMapTableAttribute.VerificationTypeInfo
 import Datatype
 import Datakind
 import ast.SyntheticNode
+import classFile.*
 import tokenizer.TokenType
 import java.io.File
 import java.util.*
@@ -504,7 +501,6 @@ class Compiler : AstNodeVisitor<Unit> {
         emitterTarget.maxLocals = function.amountLocals
 
         methodBuilder.descriptor = function.functionDescriptor.getDescriptorString()
-        methodBuilder.descriptor = function.functionDescriptor.getDescriptorString()
         methodBuilder.name = function.name
 
         compile(function.statements, true)
@@ -549,6 +545,10 @@ class Compiler : AstNodeVisitor<Unit> {
         file.thisClass = topLevelName
         file.superClass = "java/lang/Object"
         file.isPublic = true
+        file.addAttribute(SourceFileAttribute(
+            file.utf8Info("SourceFile"),
+            file.utf8Info(originFileName)
+        ))
 
         file.isSuper = true //always set super flag
         //from https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.4.1:
@@ -607,6 +607,11 @@ class Compiler : AstNodeVisitor<Unit> {
         file.isPublic = true
         curFile = file.thisClass
         curClass = clazz
+
+        file.addAttribute(SourceFileAttribute(
+            file.utf8Info("SourceFile"),
+            file.utf8Info(originFileName)
+        ))
 
         val clinitBuilder = MethodBuilder()
         clinit = MethodEmitter(clinitBuilder)
@@ -1541,6 +1546,24 @@ class Compiler : AstNodeVisitor<Unit> {
     override fun visit(convert: AstNode.TypeConvert) {
         compile(convert.toConvert, false)
         doConvertPrimitive(convert.toConvert.type, convert.type)
+    }
+
+    override fun visit(supCall: AstNode.SuperCall) {
+        emit(aload_0)
+        incStack(emitterTarget.locals[0]!!)
+        for (arg in supCall.arguments) compile(arg, false)
+
+        val methodIndex = file.methodRefInfo(
+            file.classInfo(file.utf8Info(supCall.definition.clazz!!.jvmName)),
+            file.nameAndTypeInfo(
+                file.utf8Info(supCall.definition.name),
+                file.utf8Info(supCall.definition.functionDescriptor.getDescriptorString())
+            )
+        )
+
+        emit(invokespecial, *Utils.getLastTwoBytes(methodIndex))
+        decStack()
+        repeat(supCall.arguments.size) { decStack() }
     }
 
     /**

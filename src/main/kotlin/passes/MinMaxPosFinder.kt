@@ -165,6 +165,10 @@ class MinMaxPosFinder : AstNodeVisitor<MutableMap<Int, Pair<Int, Int>>> {
         return combine(find(convert.toConvert), getMinMaxFor(convert.to))
     }
 
+    override fun visit(supCall: AstNode.SuperCall): MutableMap<Int, Pair<Int, Int>> {
+        return getMinMaxFor(supCall.relevantTokens)
+    }
+
     /**
      * finds the lines and positions of statement
      */

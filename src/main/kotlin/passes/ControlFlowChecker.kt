@@ -280,6 +280,10 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
         return check(convert.toConvert)
     }
 
+    override fun visit(supCall: AstNode.SuperCall): ControlFlowState {
+        return ControlFlowState()
+    }
+
     /**
      * checks the [ControlFlowState] of [node]
      */

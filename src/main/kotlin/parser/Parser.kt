@@ -95,6 +95,7 @@ class Parser {
         val fieldToken = last()
         consumeOrError(TokenType.IDENTIFIER, "expected name")
         val name = last()
+        if (name.lexeme == "this") syntaxError("'this' cannot be used as a parameter-name", name)
         consumeOrError(TokenType.COLON, "Field-definitions always require a explicit type")
         val type = parseType()
         consumeOrError(TokenType.EQ, "")
@@ -216,8 +217,8 @@ class Parser {
                 if (field.isStatic) staticFields.add(field) else fields.add(field)
                 continue
             }
-            artError(Errors.SyntaxError(peek(), "Expected a function or field declaration in class", srcCode))
-//            resyncClass()
+            artError(Errors.SyntaxError(consume(), "Expected a function or field declaration in class", srcCode))
+            resyncClass()
         } catch (e: ParserResyncException) {
             resyncClass()
             continue
@@ -660,6 +661,7 @@ class Parser {
         if (match(TokenType.K_NULL)) return AstNode.Null(listOf(last()))
         if (match(TokenType.L_PAREN)) return groupExpression()
         if (match(TokenType.L_BRACKET)) return parseArrayLiteral()
+        if (match(TokenType.K_SUPER)) return parseSuperCall()
         if (match(TokenType.YIELD_ARROW)) {
             val yieldArrow = last()
             return AstNode.YieldArrow(parseStatement(), listOf(yieldArrow))
@@ -710,6 +712,24 @@ class Parser {
         }
 
         return AstNode.Literal(last(), listOf(last()))
+    }
+
+
+    private fun parseSuperCall(): AstNode.SuperCall {
+        val superToken = last()
+        consumeOrError(TokenType.DOT, "expected function call after super")
+        consumeOrError(TokenType.IDENTIFIER, "expected function call after super")
+        val name = last()
+        consumeOrError(TokenType.L_PAREN, "expected function call after super")
+        val args = mutableListOf<AstNode>()
+        while (!match(TokenType.R_PAREN)) {
+            args.add(parseStatement())
+            if (!match(TokenType.COMMA)) {
+                consumeOrError(TokenType.R_PAREN, "expected closing paren")
+                break
+            }
+        }
+        return AstNode.SuperCall(name, args, listOf(superToken, last()))
     }
 
     /**

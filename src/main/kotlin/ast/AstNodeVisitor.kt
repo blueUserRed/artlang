@@ -39,5 +39,6 @@ interface AstNodeVisitor<T> {
     fun visit(yieldArrow: AstNode.YieldArrow): T
     fun visit(nul: AstNode.Null): T
     fun visit(convert: AstNode.TypeConvert): T
+    fun visit(supCall: AstNode.SuperCall): T
 
 }

@@ -894,6 +894,33 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
     }
 
+    override fun visit(supCall: AstNode.SuperCall): Datatype {
+        val thisSig = mutableListOf<Datatype>()
+        for (arg in supCall.arguments) {
+            check(arg, supCall)
+            thisSig.add(arg.type)
+        }
+
+        if (curClass == null) {
+            artError(Errors.CanOnlyBeUsedInError(
+                "super",
+                "class",
+                supCall,
+                srcCode
+            ))
+            return Datatype.ErrorType()
+        }
+
+        val func = Datatype.Object(curClass!!.extends!!).lookupFunc(supCall.name.lexeme, thisSig)
+        if (func != null) {
+            supCall.definition = func
+            return func.functionDescriptor.returnType
+        }
+
+        artError(Errors.UnknownIdentifierError(supCall.name, srcCode))
+        return Datatype.ErrorType()
+    }
+
     /**
      * looks up a function in the top level with the name [name] and that can be called using the arguments in [sig]
      */

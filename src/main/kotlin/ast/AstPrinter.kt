@@ -206,4 +206,18 @@ class AstPrinter : AstNodeVisitor<String> {
     override fun visit(convert: AstNode.TypeConvert): String {
         return "(${convert.toConvert.accept(this)}.${convert.to.lexeme})"
     }
+
+    override fun visit(supCall: AstNode.SuperCall): String {
+        val builder = StringBuilder()
+        builder
+            .append("(super.")
+            .append(supCall.name.lexeme)
+        for (arg in supCall.arguments) {
+            builder
+                .append(" ")
+                .append(arg.accept(this))
+        }
+        builder.append(")")
+        return builder.toString()
+    }
 }

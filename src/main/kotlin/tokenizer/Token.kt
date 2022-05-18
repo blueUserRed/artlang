@@ -36,7 +36,7 @@ enum class TokenType {
     BYTE, SHORT, INT, LONG, DOUBLE, FLOAT, STRING, IDENTIFIER, BOOLEAN,
 
     //keywords
-    K_FN, K_PRINT, K_CLASS, K_LET, K_CONST, K_NULL,
+    K_FN, K_PRINT, K_CLASS, K_LET, K_CONST, K_NULL, K_SUPER,
     K_FOR, K_ELSE, K_LOOP, K_WHILE, K_IF, K_RETURN, K_BREAK, K_CONTINUE,
 
     //parentheses

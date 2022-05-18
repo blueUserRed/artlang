@@ -1023,6 +1023,25 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
+    class SuperCall(
+        val name: Token,
+        val arguments: MutableList<AstNode>,
+        relevantTokens: List<Token>
+    ) : AstNode(relevantTokens) {
+
+        lateinit var definition: Function
+
+        override fun swap(orig: AstNode, to: AstNode) {
+            for (i in arguments.indices) if (arguments[i] === orig) {
+                arguments[i] = to
+                return
+            }
+            throw CantSwapException()
+        }
+
+        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
+    }
+
     /**
      * the parser-representation of a datatype. Converted to a proper type by the TypeChecker
      * @param kind the kind of data

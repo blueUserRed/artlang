@@ -1,3 +1,28 @@
 fn main() {
-   let x = 3
+    const printer = HelloWorldPrinter()
+    printer.doPrint()
+    printer.printOnlyHi()
 }
+
+class HelloPrinter {
+
+    public fn doPrint() {
+        print "Hello"
+    }
+
+}
+
+
+class HelloWorldPrinter : HelloPrinter {
+
+    public override fn doPrint() {
+        super.doPrint()
+        print "World!"
+    }
+
+    public fn printOnlyHi() {
+        super.doPrint()
+    }
+
+}
+

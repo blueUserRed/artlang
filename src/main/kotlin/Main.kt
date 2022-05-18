@@ -16,8 +16,8 @@ object Main {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        if (Settings.verbose) println("\n")
         val instructions = Settings.parseArgs(args)
+        if (Settings.verbose) println("\n")
 
         if (instructions.isEmpty()) {
             println("Please specify a subcommand\n")
