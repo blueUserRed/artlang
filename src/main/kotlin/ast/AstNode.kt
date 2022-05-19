@@ -1035,12 +1035,20 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
+    /**
+     * represents a function call using super (e.g. `super.doSomething()`)
+     * @param name the name of the function
+     * @param arguments the arguments with which the function is called
+     */
     class SuperCall(
         val name: Token,
         val arguments: MutableList<AstNode>,
         relevantTokens: List<Token>
     ) : AstNode(relevantTokens) {
 
+        /**
+         * the definition of the function
+         */
         lateinit var definition: Function
 
         override fun swap(orig: AstNode, to: AstNode) {
@@ -1049,6 +1057,16 @@ abstract class AstNode(val relevantTokens: List<Token>) {
                 return
             }
             throw CantSwapException()
+        }
+
+        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
+    }
+
+    class Cast(var toCast: AstNode, val to: DatatypeNode, relevantTokens: List<Token>) : AstNode(relevantTokens) {
+
+        override fun swap(orig: AstNode, to: AstNode) {
+            if (toCast === orig) toCast = to
+            else throw CantSwapException()
         }
 
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)

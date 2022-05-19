@@ -921,6 +921,14 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         return Datatype.ErrorType()
     }
 
+    override fun visit(cast: AstNode.Cast): Datatype {
+        val castType = typeNodeToDataType(cast.to)
+        if (!castType.matches(Datakind.OBJECT)) artError(Errors.CannotCastPrimitiveError(cast, srcCode))
+        val leftType = check(cast.toCast, cast)
+        if (!leftType.matches(Datakind.OBJECT)) artError(Errors.CannotCastPrimitiveError(cast, srcCode))
+        return castType
+    }
+
     /**
      * looks up a function in the top level with the name [name] and that can be called using the arguments in [sig]
      */

@@ -614,7 +614,20 @@ class Parser {
             val exp = parseUnaryExpression()
             cur = AstNode.Unary(exp, operator, listOf(operator))
         }
-        return cur ?: parseGetExpression()
+        return cur ?: parseCast()
+    }
+
+    /**
+     * parses a cast
+     */
+    private fun parseCast(): AstNode {
+        var left = parseGetExpression()
+        while (match(TokenType.K_AS)) {
+            val asToken = last()
+            val type = parseType()
+            left = AstNode.Cast(left, type, listOf(asToken, last()))
+        }
+        return left
     }
 
     /**

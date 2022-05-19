@@ -1,29 +1,15 @@
+
 fn main() {
-    const printer: Printer = HelloWorldPrinter()
-    printer.doPrint()
+    const test = B.getB() as A as B
 }
 
-abstract class Printer {
-
-    public abstract fn doPrint()
-
+class A {
 }
 
+class B : A {
 
-abstract class HelloPrinter : Printer {
-
-    override public fn doPrint() {
-        print this.getHello()
-    }
-
-    public abstract fn getHello(): str
-
-}
-
-class HelloWorldPrinter : HelloPrinter {
-
-    public override fn getHello(): str {
-        return "Hello World"
+    public static fn getB(): B {
+        return B()
     }
 
 }

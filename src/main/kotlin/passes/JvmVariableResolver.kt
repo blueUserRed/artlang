@@ -187,6 +187,10 @@ class JvmVariableResolver : AstNodeVisitor<Unit> {
     override fun visit(supCall: AstNode.SuperCall) {
     }
 
+    override fun visit(cast: AstNode.Cast) {
+        resolve(cast.toCast)
+    }
+
     private fun resolve(node: AstNode) {
         node.accept(this)
     }

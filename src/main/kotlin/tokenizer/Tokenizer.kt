@@ -249,6 +249,7 @@ object Tokenizer {
             "continue" -> emit(TokenType.K_CONTINUE, "continue", null, start - lastLineBreakPos)
             "null" -> emit(TokenType.K_NULL, "null", null, start - lastLineBreakPos)
             "super" -> emit(TokenType.K_SUPER, "super", null, start - lastLineBreakPos)
+            "as" -> emit(TokenType.K_AS, "as", null, start - lastLineBreakPos)
             else -> emit(TokenType.IDENTIFIER, identifier, identifier, start - lastLineBreakPos)
         }
     }

@@ -285,6 +285,10 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
         return ControlFlowState()
     }
 
+    override fun visit(cast: AstNode.Cast): ControlFlowState {
+        return check(cast.toCast)
+    }
+
     /**
      * checks the [ControlFlowState] of [node]
      */

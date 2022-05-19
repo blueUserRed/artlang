@@ -223,4 +223,11 @@ class AstPrinter : AstNodeVisitor<String> {
         builder.append(")")
         return builder.toString()
     }
+
+
+    override fun visit(cast: AstNode.Cast): String {
+        return "(${cast.toCast.accept(this)} as ${
+            if (cast.type == Datatype.Void()) "?" else cast.type.toString()
+        })"
+    }
 }

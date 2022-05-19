@@ -488,4 +488,13 @@ class Errors {
             get() = mutableMapOf(funcName.line to (funcName.pos to funcName.pos + funcName.lexeme.length))
     }
 
+    class CannotCastPrimitiveError(
+        val cast: AstNode,
+        srcCode: String
+    ) : ArtError(39, srcCode) {
+        override val message: String = "Only Objects are allowed in cast"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = cast.accept(MinMaxPosFinder())
+    }
+
 }

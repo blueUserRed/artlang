@@ -1568,6 +1568,14 @@ class Compiler : AstNodeVisitor<Unit> {
         repeat(supCall.arguments.size) { decStack() }
     }
 
+    override fun visit(cast: AstNode.Cast) {
+        compile(cast.toCast, false)
+        val classIndex = file.classInfo(file.utf8Info((cast.type as Datatype.Object).clazz.jvmName))
+        emit(checkcast, *Utils.getLastTwoBytes(classIndex))
+        decStack()
+        incStack(cast.type)
+    }
+
     /**
      * the [newarray] instruction uses an operand to tell it the type of array. This functions returns
      * the byte for a specific type
@@ -2316,6 +2324,9 @@ class Compiler : AstNodeVisitor<Unit> {
         const val l2d: Byte = 0x8a.toByte()
         const val l2f: Byte = 0x89.toByte()
         const val l2i: Byte = 0x88.toByte()
+
+        const val checkcast: Byte = 0xC0.toByte()
+        const val instanceof: Byte = 0xC1.toByte()
 
     }
 }
