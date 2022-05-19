@@ -1,30 +1,37 @@
 import java.io.File
-import java.nio.file.Files
 import java.nio.file.Paths
+import kotlin.io.path.readLines
+import kotlin.io.path.readText
 
 fun main() {
-    val test = Test("HelloWorld.art")
+    val test = Test("FizzBuzz.art")
     test.test()
 }
 
 class Test(private val testfileName: String, private val printOutput: Boolean = true) {
 
-    private var sampleOutput = Files.readAllLines(Paths.get("$sampleOutDir/$testfileName")).toString().substring(1)
+    private var sampleOutput = try {
+        println(Paths.get("$sampleOutDir/$testfileName").readLines())
+        Paths.get("$sampleOutDir/$testfileName").readText()
+    } catch (e: java.nio.file.NoSuchFileException) {
+        println("The sample output for this test does not exits. It can therefore not be compared with the programs output.")
+        null
+    }
 
     fun test() {
-        sampleOutput = sampleOutput.substring(0, sampleOutput.length - 1) //TODO beautify
         val args = arrayOf("compile", "$srcDir$testfileName", "-v")
         Main.main(args)
         val output = runProgram()
         if (printOutput) println(output)
         if (sampleOutput == output) {
-            println("kotlin.Test s")
-            println(Ansi.green + "kotlin.Test succeeded [\u2713]")
+            println(Ansi.green + "$testfileName => Test succeeded [\u2713]")
         } else {
-            println(Ansi.red + "kotlin.Test failed [\u2718]")
+            println(Ansi.red + "$testfileName => Test failed [\u2718]")
             // TODO compare is to should - Output
             println("Program Output: «$output»")
-            println("Sample Output: «$sampleOutput»")
+            if (sampleOutput != null) println("Sample Output: «$sampleOutput»") else {
+                println("Sample output does not exist.")
+            }
         }
         println(Ansi.reset)
     }
