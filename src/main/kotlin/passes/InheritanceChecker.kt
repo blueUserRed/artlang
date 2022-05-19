@@ -6,9 +6,12 @@ import ast.SyntheticNode
 import errors.Errors
 import errors.artError
 
+/**
+ * ensures that all inheritance rules are met. for example checks that all functions that override something
+ */
 class InheritanceChecker : AstNodeVisitor<Unit> {
 
-    lateinit var srcCode: String
+    private lateinit var srcCode: String
 
     override fun visit(binary: AstNode.Binary) = throw RuntimeException("unreachable")
 
@@ -64,13 +67,29 @@ class InheritanceChecker : AstNodeVisitor<Unit> {
     }
 
     override fun visit(program: AstNode.Program) {
+        srcCode = program.srcCode
         program.classes.filter { it !is SyntheticNode }.forEach { it.accept(this) }
         program.funcs.filter { it !is SyntheticNode }.forEach { it.accept(this) }
     }
 
     override fun visit(clazz: AstNode.ArtClass) {
+        clazz as AstNode.ClassDefinition
+
         clazz.funcs.filter { it !is SyntheticNode }.forEach { it.accept(this) }
         clazz.staticFuncs.filter { it !is SyntheticNode }.forEach { it.accept(this) }
+
+        var next: AstNode.ArtClass? = clazz.extends
+        while (next != null) {
+            if (next === clazz) {
+                artError(Errors.InheritanceLoopError(
+                    "Inheritance loop found: class ${clazz.name} extends itself",
+                    clazz.nameToken,
+                    srcCode
+                ))
+                break
+            }
+            next = next.extends
+        }
     }
 
     override fun visit(print: AstNode.Print) = throw RuntimeException("unreachable")
@@ -109,5 +128,11 @@ class InheritanceChecker : AstNodeVisitor<Unit> {
 
     override fun visit(arr: AstNode.ArrSet) = throw RuntimeException("unreachable")
 
+    override fun visit(varInc: AstNode.VarAssignShorthand) = throw RuntimeException("unreachable")
+
     override fun visit(yieldArrow: AstNode.YieldArrow) = throw RuntimeException("unreachable")
+
+    override fun visit(nul: AstNode.Null) = throw RuntimeException("unreachable")
+
+    override fun visit(convert: AstNode.TypeConvert) = throw RuntimeException("unreachable")
 }

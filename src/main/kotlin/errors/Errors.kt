@@ -55,7 +55,7 @@ class Errors {
                     val until = ranges[i]!!.second
                     builder.append(Ansi.red)
                     repeat(padAmount + 3) { builder.append(" ") }
-                    for (cur in 0 until (until + 1)) builder.append(if (cur >= from) "~" else " ")
+                    for (cur in 0 until Math.max(until, from + 1)) builder.append(if (cur >= from) "~" else " ")
                     builder
                         .append(" <--------- here")
                         .append(Ansi.white)
@@ -374,6 +374,54 @@ class Errors {
                 "function ${name.lexeme}"
         override val ranges: MutableMap<Int, Pair<Int, Int>>
             get() = mutableMapOf(name.line to (name.pos to name.pos + name.lexeme.length))
+    }
+
+    class CantInferTypeError(
+        val stmt: AstNode,
+        srcCode: String,
+    ) : ArtError(28, srcCode) {
+        override val message: String = "Cannot infer type, explicit type declaration required."
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = stmt.accept(MinMaxPosFinder())
+    }
+
+    class OperationNotImplementedError(
+        val stmt: AstNode,
+        override val message: String,
+        srcCode: String
+    ) : ArtError(29, srcCode) {
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = stmt.accept(MinMaxPosFinder())
+    }
+
+    class ExpectedPrimitiveInTypeConversionError(
+        val notPrimitive: AstNode,
+        val found: Datatype,
+        srcCode: String
+    ) : ArtError(30, srcCode) {
+        override val message: String = "Expected primitive number in type conversion, found $found"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = notPrimitive.accept(MinMaxPosFinder())
+    }
+
+    class FunctionDoesNotAlwaysReturnError(
+        val rBracket: Token,
+        srcCode: String
+    ) : ArtError(31, srcCode) {
+        override val message: String = "Non-void function must always return"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = mutableMapOf(rBracket.line to (rBracket.pos to rBracket.pos + rBracket.lexeme.length))
+    }
+
+    class CanOnlyBeUsedInError(
+        val thingThatCanBeUsed: String,
+        val whereThingCanBeUsed: String,
+        val stmt: AstNode,
+        srcCode: String
+    ) : ArtError(32, srcCode) {
+        override val message: String = "$thingThatCanBeUsed can only be used in $whereThingCanBeUsed"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = stmt.accept(MinMaxPosFinder())
     }
 
 }

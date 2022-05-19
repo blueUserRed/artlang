@@ -167,7 +167,17 @@ class AstPrinter : AstNodeVisitor<String> {
     }
 
     override fun visit(arr: AstNode.ArrayCreate): String {
-        return "new ${arr.of}[${arr.amount.accept(this)}]"
+        val builder = StringBuilder()
+        builder
+            .append("new ")
+            .append(arr.of)
+        for (amount in arr.amounts) {
+            builder
+                .append("[")
+                .append(amount.accept(this))
+                .append("]")
+        }
+        return builder.toString()
     }
 
     override fun visit(arr: AstNode.ArrayLiteral): String {
@@ -180,5 +190,20 @@ class AstPrinter : AstNodeVisitor<String> {
 
     override fun visit(yieldArrow: AstNode.YieldArrow): String {
         return "(=> ${yieldArrow.expr.accept(this)})"
+    }
+
+    override fun visit(varInc: AstNode.VarAssignShorthand): String {
+        return "(${
+            if (varInc.from == null) varInc.name.lexeme
+            else "${varInc.from!!.accept(this)}.${varInc.name.lexeme}"
+        } ${varInc.operator.lexeme} ${varInc.toAdd.accept(this)})"
+    }
+
+    override fun visit(nul: AstNode.Null): String {
+        return "null"
+    }
+
+    override fun visit(convert: AstNode.TypeConvert): String {
+        return "(${convert.toConvert.accept(this)}.${convert.to.lexeme})"
     }
 }

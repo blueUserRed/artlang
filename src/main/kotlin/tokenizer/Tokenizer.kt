@@ -248,6 +248,7 @@ object Tokenizer {
             "return" -> emit(TokenType.K_RETURN, "return", null, start - lastLineBreakPos)
             "break" -> emit(TokenType.K_BREAK, "break", null, start - lastLineBreakPos)
             "continue" -> emit(TokenType.K_CONTINUE, "continue", null, start - lastLineBreakPos)
+            "null" -> emit(TokenType.K_NULL, "null", null, start - lastLineBreakPos)
             else -> emit(TokenType.IDENTIFIER, identifier, identifier, start - lastLineBreakPos)
         }
     }
@@ -273,7 +274,7 @@ object Tokenizer {
         }
         consume() //consume ending " or '
         val string = code.substring((start + 1)..(cur - 2))
-        emit(TokenType.STRING, string, string, start - lastLineBreakPos)
+        emit(TokenType.STRING, endChar + string + endChar, string, start - lastLineBreakPos)
     }
 
     /**
@@ -353,13 +354,17 @@ object Tokenizer {
             return
         }
 
+        val dotIndex = cur - 1
+
         var afterComma = 0.0
         var numIts = 1
         var isFirstIt = true
+        var wasntFloat = false
         while(!end()) {
             if (consume() == '_') continue
             if (!last().isDigit()) {
                 if (isFirstIt) cur--
+                if (isFirstIt) wasntFloat = true
                 break
             }
             isFirstIt = false
@@ -367,6 +372,12 @@ object Tokenizer {
             numIts++
         }
         cur--
+
+        if (wasntFloat) {
+            emit(TokenType.INT, code.substring(start until cur), num.toInt(), start - lastLineBreakPos)
+            cur = dotIndex
+            return
+        }
 
         val commaNum = num + afterComma
         if (!tryConsume('#')) {

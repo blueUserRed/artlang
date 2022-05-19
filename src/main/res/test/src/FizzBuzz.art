@@ -5,16 +5,8 @@ fn main() {
 fn fizzBuzz() {
     let i = 0
     while ((i := i + 1) <= 100) {
-        let output = ""
-        let isEmpty = true
-        if (i % 3 == 0) {
-            output = "Fizz"
-            isEmpty = false
-        }
-        if (i % 5 == 0) {
-            output += "Buzz"
-            isEmpty = false
-        }
-        if (isEmpty) print i else print output
+        let output = if (i % 3 == 0) "Fizz" else ""
+        if (i % 5 == 0) output += "Buzz"
+        if (output.equals("")) print i else print output
     }
 }

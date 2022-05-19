@@ -17,7 +17,7 @@ object SyntheticAst {
     /**
      * represent java.lang.Object
      */
-    val objetClass: SyntClass = SyntClass(
+    val objectClass: SyntClass = SyntClass(
         "Object",
         staticFuncs = mutableListOf(),
         funcs = mutableListOf(),
@@ -27,17 +27,39 @@ object SyntheticAst {
         "java/lang/Object"
     )
 
+    val stringClass: SyntClass = SyntClass(
+        "\$String",
+        staticFuncs = mutableListOf(),
+        funcs = mutableListOf(),
+        staticFields = mutableListOf(),
+        fields = mutableListOf(),
+        objectClass,
+        "java/lang/String"
+    )
+
     init {
-        objetClass.funcs.add(
+        objectClass.funcs.addAll(arrayOf(
+
             SyntFunction(
                 "toString",
                 FunctionDescriptor(mutableListOf(), Datatype.Str()),
                 isStatic = false,
                 isTopLevel = false,
                 isPrivate = false,
-                objetClass
+                objectClass
+            ),
+
+            SyntFunction(
+                "equals",
+                FunctionDescriptor(mutableListOf(Pair("other", Datatype.Object(objectClass))), Datatype.Bool()),
+                isStatic = false,
+                isTopLevel = false,
+                isPrivate = false,
+                objectClass
             )
-        )
+
+        ))
+
     }
 
     /**
@@ -58,7 +80,7 @@ object SyntheticAst {
         fields: MutableList<Field>,
         override val extends: ArtClass?,
         override val jvmName: String
-    ) : AstNode.ArtClass(staticFuncs, funcs, staticFields, fields), SyntheticNode {
+    ) : AstNode.ArtClass(staticFuncs, funcs, staticFields, fields, listOf()), SyntheticNode {
 
         override fun swap(orig: AstNode, to: AstNode) = throw CantSwapException()
 
@@ -81,7 +103,7 @@ object SyntheticAst {
         override val isTopLevel: Boolean,
         override val isPrivate: Boolean,
         override var clazz: ArtClass?
-    ) : AstNode.Function(), SyntheticNode {
+    ) : AstNode.Function(listOf()), SyntheticNode {
 
         override fun swap(orig: AstNode, to: AstNode) = throw CantSwapException()
 
@@ -106,7 +128,7 @@ object SyntheticAst {
         override val fieldType: Datatype,
         override val isConst: Boolean,
         override var clazz: ArtClass?
-    ) : AstNode.Field(), SyntheticNode {
+    ) : AstNode.Field(listOf()), SyntheticNode {
 
         override fun swap(orig: AstNode, to: AstNode) = throw CantSwapException()
 
@@ -116,10 +138,11 @@ object SyntheticAst {
 
     /**
      * adds the synthetic tree to the real tree
-     * @param the real tree
+     * @param root the real tree
      */
     fun addSyntheticTreeParts(root: AstNode.Program) {
-        root.classes.add(objetClass)
+        root.classes.add(objectClass)
+        root.classes.add(stringClass)
     }
 
 }

@@ -1,27 +1,24 @@
 import ast.AstNode
-import ast.AstPrinter
-import ast.SyntheticAst
-import compiler.Compiler
-import errors.ErrorPool
-import parser.Parser
-import passes.ControlFlowChecker
-import passes.InheritanceChecker
-import passes.TypeChecker
-import passes.VariableResolver
-import tokenizer.Token
-import tokenizer.Tokenizer
 import java.io.File
-import java.io.IOException
-import java.lang.RuntimeException
-import java.nio.file.Files
+import parser.Parser
+import ast.AstPrinter
+import tokenizer.Token
+import ast.SyntheticAst
+import errors.ErrorPool
+import compiler.Compiler
+import passes.*
 import java.nio.file.Path
+import tokenizer.Tokenizer
+import java.io.IOException
 import java.nio.file.Paths
+import java.nio.file.Files
+import java.lang.RuntimeException
 
 object Main {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        println("\n")
+        if (Settings.verbose) println("\n")
         val instructions = Settings.parseArgs(args)
 
         if (instructions.isEmpty()) {
@@ -124,7 +121,7 @@ object Main {
         if (Settings.verbose) println("done in ${variableResolverTime}ms\n")
 
         if (Settings.verbose) println("running type checker")
-        val typeCheckingTime = Stopwatch.time { program.accept(TypeChecker().apply { srcCode = code }) }
+        val typeCheckingTime = Stopwatch.time { program.accept(TypeChecker()) }
         if (ErrorPool.errors.size != lastErrors) {
             if (Settings.verbose) {
                 println("${Ansi.yellow}Accumulated ${ErrorPool.errors.size - lastErrors} error(s)${Ansi.reset}")
@@ -143,13 +140,17 @@ object Main {
         if (Settings.verbose) println("done in ${controlFlowCheckingTime}ms\n")
 
         if (Settings.verbose) println("running inheritance checker")
-        val inheritanceCheckingTime = Stopwatch.time { program.accept(InheritanceChecker().apply { srcCode = code }) }
+        val inheritanceCheckingTime = Stopwatch.time { program.accept(InheritanceChecker()) }
         if (ErrorPool.errors.size != lastErrors) {
             if (Settings.verbose) {
                 println("${Ansi.yellow}Accumulated ${ErrorPool.errors.size - lastErrors} error(s)${Ansi.reset}")
             }
         }
         if (Settings.verbose) println("done in ${inheritanceCheckingTime}ms\n")
+
+        if (Settings.verbose) println("running jvm variable resolver")
+        val jvmVariableResolvingTime = Stopwatch.time { program.accept(JvmVariableResolver()) }
+        if (Settings.verbose) println("done in ${jvmVariableResolvingTime}ms\n")
 
         if (Settings.printAst) {
             println("------------revised AST-------------")
