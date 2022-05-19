@@ -5,8 +5,8 @@ import kotlin.io.path.readLines
 import kotlin.io.path.readText
 
 fun main() {
-    //val test = Test("FizzBuzz.art", false)
-    val test = Test("HelloWorld.art")
+    val test = Test("FizzBuzz.art", false)
+//    val test = Test("HelloWorld.art")
     test.test()
 }
 
@@ -18,6 +18,7 @@ class Test(private val testfileName: String, private val printOutput: Boolean = 
         println("The sample output for this test does not exits. It can therefore not be compared with the programs output.")
         null
     }
+    private var succeeded: Boolean = false;
 
     fun test() {
         val args = arrayOf("compile", "$srcDir$testfileName")
@@ -27,6 +28,7 @@ class Test(private val testfileName: String, private val printOutput: Boolean = 
         if (printOutput) println(output)
         if (sampleOutput == output && !ErrorPool.hasErrors()) {
             println(Ansi.green + "$testfileName => Test succeeded [\u2713]")
+            succeeded = true;
         } else {
             println(Ansi.red + "$testfileName => Test failed [\u2718]")
             // TODO compare is to should - Output
