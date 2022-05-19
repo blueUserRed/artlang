@@ -1,5 +1,6 @@
 import ast.AstNode
 import ast.FunctionDescriptor
+import ast.SyntheticAst
 
 abstract class Datatype(val kind: Datakind) {
 
@@ -63,13 +64,13 @@ abstract class Datatype(val kind: Datakind) {
         }
     }
 
-    class Str: Datatype(Datakind.STRING) {
-        override val descriptorType: String = "Ljava/lang/String;"
-        override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Str::class
-        override fun toString(): String = "str"
-        override fun compatibleWith(other: Datatype): Boolean {
-            return other.kind in arrayOf(Datakind.STRING, Datakind.ERROR)
-        }
+    class Str: Datatype.Object(SyntheticAst.stringClass) {
+//        override val descriptorType: String = "Ljava/lang/String;"
+//        override fun equals(other: Any?): Boolean = if (other == null) false else other::class == Str::class
+//        override fun toString(): String = "str"
+//        override fun compatibleWith(other: Datatype): Boolean {
+//            return other.kind in arrayOf(Datakind.STRING, Datakind.ERROR)
+//        }
     }
 
     class Void : Datatype(Datakind.VOID) {
@@ -79,12 +80,12 @@ abstract class Datatype(val kind: Datakind) {
         override fun compatibleWith(other: Datatype): Boolean = false
     }
 
-    class Object(val clazz: AstNode.ArtClass) : Datatype(Datakind.OBJECT) {
+    open class Object(val clazz: AstNode.ArtClass) : Datatype(Datakind.OBJECT) {
 
         override val descriptorType: String = "L${clazz.jvmName};"
 
         override fun equals(other: Any?): Boolean {
-            return if (other == null) false else other::class == Object::class && clazz.jvmName == (other as Object).clazz.jvmName
+            return if (other == null) false else other is Object && clazz.jvmName == other.clazz.jvmName
         }
 
         override fun toString(): String = clazz.name
@@ -96,9 +97,10 @@ abstract class Datatype(val kind: Datakind) {
             return StatClass(other.clazz).isSuperClassOf(clazz)
         }
 
-        fun lookupFunc(name: String, sig: List<Datatype>): AstNode.Function? {
+        fun lookupFunc(name: String, sig: List<Datatype>, origClass: AstNode.ArtClass? = null): AstNode.Function? {
             for (func in clazz.funcs) if (func.name == name && func.functionDescriptor.isCompatibleWith(sig)) return func
-            if (clazz.extends != null) return Object(clazz.extends!!).lookupFunc(name, sig)
+            if (clazz.extends === origClass) return null //protect against inheritance loops
+            if (clazz.extends != null) return Object(clazz.extends!!).lookupFunc(name, sig, origClass ?: clazz)
             return null
         }
 
@@ -151,6 +153,7 @@ abstract class Datatype(val kind: Datakind) {
     }
 
     class ArrayType(val type: Datatype) : Datatype(Datakind.ARRAY) {
+
         override val descriptorType: String = "[${type.descriptorType}"
 
         override fun equals(other: Any?): Boolean {
@@ -160,11 +163,23 @@ abstract class Datatype(val kind: Datakind) {
         override fun toString(): String {
             return "Array<$type>"
         }
+
         override fun compatibleWith(other: Datatype): Boolean {
             if (other.matches(Datakind.ERROR)) return true
             if (other.matches(Datakind.ARRAY)) return type == (other as ArrayType).type
             return false
         }
+
+        fun countDimensions(): Int {
+            if (type !is ArrayType) return 1
+            return 1 + type.countDimensions()
+        }
+
+        fun getRootType(): Datatype {
+            if (type !is ArrayType) return type
+            return type.getRootType()
+        }
+
     }
 
     class ErrorType : Datatype(Datakind.ERROR) {
@@ -176,11 +191,23 @@ abstract class Datatype(val kind: Datakind) {
         }
     }
 
+    class NullType : Datatype(Datakind.NULL) {
+        override val descriptorType: String = "Ljava/lang/Object;"
+
+        override fun compatibleWith(other: Datatype): Boolean {
+            return other.kind in arrayOf(Datakind.ERROR, Datakind.OBJECT, Datakind.NULL)
+        }
+
+        override fun equals(other: Any?): Boolean = other != null && other::class == NullType::class
+
+        override fun toString(): String = "NullType"
+    }
+
 }
 
 enum class Datakind {
-    INT, LONG, BYTE, SHORT, FLOAT, DOUBLE, STRING, VOID, BOOLEAN, OBJECT,
+    INT, LONG, BYTE, SHORT, FLOAT, DOUBLE, VOID, BOOLEAN, OBJECT,
     ARRAY,
-    ERROR,
+    ERROR, NULL,
     STAT_CLASS
 }
