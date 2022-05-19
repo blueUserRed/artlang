@@ -1,17 +1,18 @@
+import errors.ErrorPool
 import java.io.File
 import java.nio.file.Paths
 import kotlin.io.path.readLines
 import kotlin.io.path.readText
 
 fun main() {
-    val test = Test("FizzBuzz.art")
+    //val test = Test("FizzBuzz.art", false)
+    val test = Test("HelloWorld.art")
     test.test()
 }
 
 class Test(private val testfileName: String, private val printOutput: Boolean = true) {
 
     private var sampleOutput = try {
-        println(Paths.get("$sampleOutDir/$testfileName").readLines())
         Paths.get("$sampleOutDir/$testfileName").readText()
     } catch (e: java.nio.file.NoSuchFileException) {
         println("The sample output for this test does not exits. It can therefore not be compared with the programs output.")
@@ -19,11 +20,12 @@ class Test(private val testfileName: String, private val printOutput: Boolean = 
     }
 
     fun test() {
-        val args = arrayOf("compile", "$srcDir$testfileName", "-v")
+        val args = arrayOf("compile", "$srcDir$testfileName")
         Main.main(args)
         val output = runProgram()
+        println()
         if (printOutput) println(output)
-        if (sampleOutput == output) {
+        if (sampleOutput == output && !ErrorPool.hasErrors()) {
             println(Ansi.green + "$testfileName => Test succeeded [\u2713]")
         } else {
             println(Ansi.red + "$testfileName => Test failed [\u2718]")
