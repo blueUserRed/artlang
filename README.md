@@ -8,7 +8,8 @@
 
 ### _Introduction_
 Artlang is a programming language that compiles to 
-java bytecode. It is object-oriented has a static typesystem.
+java bytecode. It is object-oriented has a static weak typesystem. It is easy to understand 
+and doesn't get in your way while coding.
 
 <br><br>
 
