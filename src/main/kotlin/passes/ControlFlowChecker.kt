@@ -64,11 +64,12 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
     override fun visit(function: AstNode.Function): ControlFlowState {
         function as AstNode.FunctionDeclaration
         curFunction = function
-        val controlFlowState = check(function.statements)
+        if (function.statements == null) return ControlFlowState()
+        val controlFlowState = check(function.statements!!)
         curFunction = null
         if (function.functionDescriptor.returnType == Datatype.Void()) return ControlFlowState()
         if (!controlFlowState.alwaysReturns) {
-           artError(Errors.FunctionDoesNotAlwaysReturnError(function.statements.relevantTokens[1], srcCode))
+           artError(Errors.FunctionDoesNotAlwaysReturnError(function.statements!!.relevantTokens[1], srcCode))
         }
         return ControlFlowState()
     }

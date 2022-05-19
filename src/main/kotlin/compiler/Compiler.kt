@@ -492,8 +492,10 @@ class Compiler : AstNodeVisitor<Unit> {
         emitterTarget.stack = Stack()
         emitterTarget.locals = MutableList(function.amountLocals) { null }
 
-        for (i in function.functionDescriptor.args.indices) {
-            putTypeInLocals(i, function.functionDescriptor.args[i].second, false)
+        if (!function.isAbstract) {
+            for (i in function.functionDescriptor.args.indices) {
+                putTypeInLocals(i, function.functionDescriptor.args[i].second, false)
+            }
         }
 
         emitterTarget.maxStack = 0
@@ -503,7 +505,7 @@ class Compiler : AstNodeVisitor<Unit> {
         methodBuilder.descriptor = function.functionDescriptor.getDescriptorString()
         methodBuilder.name = function.name
 
-        compile(function.statements, true)
+        function.statements?.let { compile(it, true) }
 
         //special cases for main method
         if (methodBuilder.name == "main") {
@@ -534,7 +536,7 @@ class Compiler : AstNodeVisitor<Unit> {
         //TODO: can probably be done better
         if (emitterTarget.lastStackMapFrameOffset >= emitterTarget.curCodeOffset) emitterTarget.popStackMapFrame()
 
-        if (methodBuilder.curCodeOffset != 0) file.addMethod(methodBuilder) //only add method if it contains code
+        file.addMethod(methodBuilder)
     }
 
     override fun visit(program: AstNode.Program) {

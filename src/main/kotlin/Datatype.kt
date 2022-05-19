@@ -142,9 +142,7 @@ abstract class Datatype(val kind: Datakind) {
          * @param origClass not intended to be set; internal param for recursion
          */
         fun lookupFunc(name: String, sig: List<Datatype>, origClass: AstNode.ArtClass? = null): AstNode.Function? {
-            for (func in clazz.funcs)
-                if (func.name == name && func.functionDescriptor.isCompatibleWith(sig))
-                    return func
+            for (func in clazz.funcs) if (func.name == name && func.functionDescriptor.isCompatibleWith(sig)) return func
             if (clazz.extends === origClass) return null //protect against inheritance loops
             if (clazz.extends != null) return Object(clazz.extends!!).lookupFunc(name, sig, origClass ?: clazz)
             return null
@@ -152,11 +150,21 @@ abstract class Datatype(val kind: Datakind) {
 
         /**
          * looks up a function with the *exact* signature [sig]
+         * @param ignoreAbstract if true abstract functions will be ignored, default is false
          */
-        fun lookupFuncExact(name: String, sig: FunctionDescriptor, origClass: AstNode.ArtClass? = null): AstNode.Function? {
-            for (func in clazz.funcs) if (func.name == name && func.functionDescriptor.matches(sig)) return func
+        fun lookupFuncExact(
+            name: String,
+            sig: FunctionDescriptor,
+            ignoreAbstract: Boolean = false,
+            origClass: AstNode.ArtClass? = null
+        ): AstNode.Function? {
+            for (func in clazz.funcs) if (func.name == name && func.functionDescriptor.matches(sig)) {
+                if (!(ignoreAbstract && func.isAbstract)) return func
+            }
             if (clazz.extends === origClass) return null //protect against inheritance loops
-            if (clazz.extends != null) return Object(clazz.extends!!).lookupFuncExact(name, sig, origClass ?: clazz)
+            if (clazz.extends != null) {
+                return Object(clazz.extends!!).lookupFuncExact(name, sig, ignoreAbstract, origClass ?: clazz)
+            }
             return null
         }
 
@@ -167,6 +175,17 @@ abstract class Datatype(val kind: Datakind) {
             for (field in clazz.fields) if (field.name == name) return field
             if (clazz.extends != null) return Object(clazz.extends!!).lookupField(name)
             return null
+        }
+
+        /**
+         * gets all abstract functions from this class and super-classes
+         * @param funcList leave at default
+         */
+        fun getAllAbstractFuncs(funcList: MutableList<AstNode.Function> = mutableListOf()): List<AstNode.Function> {
+            if (!clazz.isAbstract) return funcList
+            for (func in clazz.funcs) if (func.isAbstract) funcList.add(func)
+            if (clazz.extends?.isAbstract ?: false) return Object(clazz.extends!!).getAllAbstractFuncs(funcList)
+            return funcList
         }
 
     }

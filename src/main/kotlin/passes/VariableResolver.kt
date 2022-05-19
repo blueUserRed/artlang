@@ -60,7 +60,7 @@ class VariableResolver : AstNodeVisitor<Unit> {
         for (arg in function.args) varDecs.add(null)
         curVars = vars
         varDeclarations = varDecs
-        resolve(function.statements, function)
+        function.statements?.let { resolve(it, function) }
     }
 
     override fun visit(program: AstNode.Program) {

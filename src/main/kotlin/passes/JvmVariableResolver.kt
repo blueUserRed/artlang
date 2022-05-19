@@ -39,7 +39,7 @@ class JvmVariableResolver : AstNodeVisitor<Unit> {
         maxLocals = 0
         jvmVars.clear()
         for (arg in function.functionDescriptor.args) addVar(arg.first, arg.second)
-        resolve(function.statements)
+        function.statements?.let { resolve(it) }
         function.amountLocals = maxLocals
     }
 

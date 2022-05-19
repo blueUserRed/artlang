@@ -45,23 +45,25 @@ class Parser {
         while (!match(TokenType.EOF)) try {
 
             val modifiers = parseModifiers()
-            if (modifiers.isNotEmpty()) artError(Errors.ModifiersInTopLevelError(modifiers, srcCode))
 
             if (match(TokenType.K_FN)) {
+                if (modifiers.isNotEmpty()) artError(Errors.ModifiersInTopLevelError(modifiers, srcCode))
                 functions.add(parseFunc(listOf(), true))
                 continue
             }
             if (match(TokenType.K_CLASS)) {
-                classes.add(parseClass(listOf()))
+                validateModifiersForClass(modifiers)
+                classes.add(parseClass(modifiers))
                 continue
             }
             if (matchIdent("field")) {
-
+                if (modifiers.isNotEmpty()) artError(Errors.ModifiersInTopLevelError(modifiers, srcCode))
                 fields.add(parseFieldDeclaration(listOf(), false, true))
                 continue
             }
             if (match(TokenType.K_CONST)) {
                 consumeIdentOrError("field", "Expected field declaration after const")
+                if (modifiers.isNotEmpty()) artError(Errors.ModifiersInTopLevelError(modifiers, srcCode))
                 fields.add(parseFieldDeclaration(listOf(),true, true))
                 continue
             }
@@ -144,10 +146,10 @@ class Parser {
         var returnType: AstNode.DatatypeNode? = null
         if (match(TokenType.COLON)) returnType = parseType()
 
-        consumeOrError(TokenType.L_BRACE, "Expected code block after function declaration")
+        val statements = if (match(TokenType.L_BRACE)) parseBlock() else null
 
         val function = AstNode.FunctionDeclaration(
-            parseBlock(),
+            statements,
             funcName,
             if (funcName.lexeme == "main") listOf() else modifiers,
             isTopLevel,
@@ -156,6 +158,14 @@ class Parser {
 
         function.args = args
         function.returnType = returnType
+
+        if (function.statements == null && !function.isAbstract) {
+            syntaxError("Expected code block after non-abstract function", peek())
+        }
+
+        if (function.statements != null && function.isAbstract) {
+            syntaxError("Abstract function can't have any code", function.statements!!.relevantTokens[0])
+        }
 
         return function
     }
@@ -168,6 +178,8 @@ class Parser {
         val classToken = last()
         consumeOrError(TokenType.IDENTIFIER, "Expected class name")
         val name = last()
+
+        validateModifiersForClass(classModifiers)
 
         var extends: Token? = null
         if (match(TokenType.COLON)) {
@@ -233,6 +245,7 @@ class Parser {
             staticFields,
             fields,
             extends,
+            classModifiers,
             classModifiers + listOf(classToken, rBraceToken)
         )
     }
@@ -270,7 +283,7 @@ class Parser {
                 continue
             }
             when (modifier.lexeme) {
-                "abstract" -> TODO("abstract functions are not yet implemented")
+                "abstract" -> had.add("abstract")
                 "public" -> had.add("public")
                 "static" -> had.add("static")
                 "override" -> had.add("override")
@@ -296,6 +309,9 @@ class Parser {
                 }
                 "public" -> had.add("public")
                 "static" -> had.add("static")
+                "override" -> {
+                    artError(Errors.InvalidModifierError("Fields can't override anything", modifier, srcCode))
+                }
                 else -> throw RuntimeException("unknown modifier ${modifier.lexeme}")
             }
         }
@@ -312,9 +328,12 @@ class Parser {
                 continue
             }
             when (modifier.lexeme) {
-                "abstract" -> TODO("abstract classes are not implemented")
-                "public" -> throw RuntimeException("class cant be public")
-                "static" -> throw RuntimeException("class cant be static")
+                "abstract" -> had.add("abstract")
+                "public" -> artError(Errors.InvalidModifierError("Classes cannot be public", modifier, srcCode))
+                "static" -> artError(Errors.InvalidModifierError("Classes cannot be static", modifier, srcCode))
+                "override" -> {
+                    artError(Errors.InvalidModifierError("Classes can't override anything", modifier, srcCode))
+                }
                 else -> throw RuntimeException("unknown modifier ${modifier.lexeme}")
             }
         }
@@ -762,7 +781,8 @@ class Parser {
             }
         }
         if (func !is AstNode.Get) throw RuntimeException("cant call ${func.accept(AstPrinter())} like a function")
-        return AstNode.FunctionCall(func.from, func.name, args, listOf(last()))
+        return AstNode.FunctionCall(func.from, func.name, args,
+            listOf(func.name, last()) + (func.from?.relevantTokens ?: listOf()))
     }
 
     /**

@@ -556,7 +556,7 @@ class MethodBuilder {
         stackMapTable.frames = stackMapFrames
         codeAttributes.add(stackMapTable)
 
-        attributes.add(
+        if (!isAbstract) attributes.add(
             CodeAttribute(
                 fileBuilder.utf8Info("Code"),
                 maxStack, maxLocals,

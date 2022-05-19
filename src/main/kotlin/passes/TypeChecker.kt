@@ -145,7 +145,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         for (i in function.functionDescriptor.args.indices) newVars[i] = function.functionDescriptor.args[i].second
         vars = newVars
         function.clazz = curClass
-        check(function.statements, function)
+        function.statements?.let { check(it, function) }
         curFunction = null
         return Datatype.Void()
     }

@@ -1,28 +1,29 @@
 fn main() {
-    const printer = HelloWorldPrinter()
+    const printer: Printer = HelloWorldPrinter()
     printer.doPrint()
-    printer.printOnlyHi()
 }
 
-class HelloPrinter {
+abstract class Printer {
 
-    public fn doPrint() {
-        print "Hello"
+    public abstract fn doPrint()
+
+}
+
+
+abstract class HelloPrinter : Printer {
+
+    override public fn doPrint() {
+        print this.getHello()
     }
 
-}
+    public abstract fn getHello(): str
 
+}
 
 class HelloWorldPrinter : HelloPrinter {
 
-    public override fn doPrint() {
-        super.doPrint()
-        print "World!"
-    }
-
-    public fn printOnlyHi() {
-        super.doPrint()
+    public override fn getHello(): str {
+        return "Hello World"
     }
 
 }
-

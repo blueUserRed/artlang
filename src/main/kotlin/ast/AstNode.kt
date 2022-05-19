@@ -70,6 +70,11 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         abstract val isStatic: Boolean
 
         /**
+         * true if the function is abstract
+         */
+        abstract val isAbstract: Boolean
+
+        /**
          * true if the function is defined in the topLevel
          */
         abstract val isTopLevel: Boolean
@@ -92,7 +97,7 @@ abstract class AstNode(val relevantTokens: List<Token>) {
      * @param isTopLevel true if the function is defined in the toplevel
      */
     class FunctionDeclaration(
-        var statements: Block,
+        var statements: Block?,
         val nameToken: Token,
         val modifiers: List<Token>,
         override val isTopLevel: Boolean,
@@ -154,13 +159,12 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         /**
          * true if the function is private
          */
-        override val isPrivate: Boolean
-            get() {
-                for (modifier in modifiers) {
-                    if (modifier.tokenType == TokenType.IDENTIFIER && modifier.lexeme == "public") return false
-                }
-                return true
-            }
+        override val isPrivate: Boolean = "public" !in modifiers.map { it.lexeme }
+
+        /**
+         * true if the function is abstract
+         */
+        override val isAbstract: Boolean = "abstract" in modifiers.map { it.lexeme }
 
         /**
          * true if the function has a this-argument
@@ -245,6 +249,11 @@ abstract class AstNode(val relevantTokens: List<Token>) {
          * the name that is used to refer to the class on the jvm
          */
         abstract val jvmName: String
+
+        /**
+         * true if the class is abstract
+         */
+        abstract val isAbstract: Boolean
     }
 
     /**
@@ -263,6 +272,7 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         staticFields: MutableList<Field>,
         fields: MutableList<Field>,
         val extendsToken: Token?,
+        val modifiers: List<Token>,
         relevantTokens: List<Token>,
         override val jvmName: String = nameToken.lexeme
     ) : ArtClass(staticFuncs, funcs, staticFields, fields, relevantTokens) {
@@ -273,6 +283,8 @@ abstract class AstNode(val relevantTokens: List<Token>) {
 
         override val extends: ArtClass
             get() = _extends
+
+        override val isAbstract: Boolean = "abstract" in modifiers.map { it.lexeme }
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (to is Function) for (i in staticFuncs.indices) if (staticFuncs[i] === orig) {

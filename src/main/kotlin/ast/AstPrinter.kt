@@ -24,9 +24,12 @@ class AstPrinter : AstNodeVisitor<String> {
         function as AstNode.FunctionDeclaration
         val builder = StringBuilder("\n")
         for (modifier in function.modifiers) builder.append(modifier.lexeme).append(" ")
-        builder.append("fn ").append(function.name).append("() {\n")
-        for (s in function.statements.statements) builder.append(s.accept(this)).append("\n")
-        builder.append("}\n")
+        builder.append("fn ").append(function.name).append("()")
+        if (function.statements != null) {
+            builder.append(" {\n")
+            for (s in function.statements!!.statements) builder.append(s.accept(this)).append("\n")
+            builder.append("}\n")
+        } else builder.append("\n")
         return builder.toString()
     }
 
