@@ -1,15 +1,13 @@
 
 fn main() {
-    const test = B.getB() as A as B
+    const myA: A = B()
+    print myA is B
+    print myA is A
+    print A() is B
 }
 
 class A {
 }
 
 class B : A {
-
-    public static fn getB(): B {
-        return B()
-    }
-
 }

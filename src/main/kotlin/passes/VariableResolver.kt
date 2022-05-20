@@ -250,6 +250,10 @@ class VariableResolver : AstNodeVisitor<Unit> {
         resolve(cast.toCast, cast)
     }
 
+    override fun visit(instanceOf: AstNode.InstanceOf) {
+        resolve(instanceOf.toCheck, instanceOf)
+    }
+
     /**
      * resolves all variables in a node, also handles swapping
      * @param parent the parent of [node], necessary for swapping. If a swap is attempted and [parent] is null a

@@ -1327,6 +1327,14 @@ class Compiler : AstNodeVisitor<Unit> {
         decStack()
     }
 
+    override fun visit(instanceOf: AstNode.InstanceOf) {
+        compile(instanceOf.toCheck, false)
+        val classIndex = file.classInfo(file.utf8Info((instanceOf.checkType as Datatype.Object).clazz.jvmName))
+        emit(instanceof, *Utils.getLastTwoBytes(classIndex))
+        decStack()
+        incStack(Datatype.Bool())
+    }
+
     /**
      * emits the array store instruction for the type
      */

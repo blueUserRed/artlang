@@ -929,6 +929,18 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         return castType
     }
 
+    override fun visit(instanceOf: AstNode.InstanceOf): Datatype {
+        instanceOf.checkType = typeNodeToDataType(instanceOf.checkTypeNode)
+        val toCheckType = check(instanceOf.toCheck, instanceOf)
+        if (!instanceOf.checkType.matches(Datakind.OBJECT)) artError(Errors.CannotUsePrimitiveInInstanceOfError(
+            instanceOf, srcCode
+        ))
+        if (!toCheckType.matches(Datakind.OBJECT))  artError(Errors.CannotUsePrimitiveInInstanceOfError(
+            instanceOf, srcCode
+        ))
+        return Datatype.Bool()
+    }
+
     /**
      * looks up a function in the top level with the name [name] and that can be called using the arguments in [sig]
      */

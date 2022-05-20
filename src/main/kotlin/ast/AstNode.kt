@@ -1072,6 +1072,22 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
+    class InstanceOf(
+        var toCheck: AstNode,
+        var checkTypeNode: DatatypeNode,
+        relevantTokens: List<Token>
+    ) : AstNode(relevantTokens) {
+
+        lateinit var checkType: Datatype
+
+        override fun swap(orig: AstNode, to: AstNode) {
+            if (toCheck === orig) toCheck = to
+            else throw CantSwapException()
+        }
+
+        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
+    }
+
     /**
      * the parser-representation of a datatype. Converted to a proper type by the TypeChecker
      * @param kind the kind of data

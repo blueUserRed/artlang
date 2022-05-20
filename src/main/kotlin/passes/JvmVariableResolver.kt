@@ -191,6 +191,10 @@ class JvmVariableResolver : AstNodeVisitor<Unit> {
         resolve(cast.toCast)
     }
 
+    override fun visit(instanceOf: AstNode.InstanceOf) {
+        resolve(instanceOf.toCheck)
+    }
+
     private fun resolve(node: AstNode) {
         node.accept(this)
     }

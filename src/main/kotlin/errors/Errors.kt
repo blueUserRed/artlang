@@ -497,4 +497,13 @@ class Errors {
             get() = cast.accept(MinMaxPosFinder())
     }
 
+    class CannotUsePrimitiveInInstanceOfError(
+        val instanceOf: AstNode.InstanceOf,
+        srcCode: String
+    ) : ArtError(40, srcCode) {
+        override val message: String = "Only Objects are allowed in is-checks"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = instanceOf.accept(MinMaxPosFinder())
+    }
+
 }

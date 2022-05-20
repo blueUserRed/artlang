@@ -253,5 +253,9 @@ class InheritanceChecker : AstNodeVisitor<Unit> {
         check(cast.toCast)
     }
 
+    override fun visit(instanceOf: AstNode.InstanceOf) {
+        check(instanceOf.toCheck)
+    }
+
     fun check(node: AstNode) = node.accept(this)
 }

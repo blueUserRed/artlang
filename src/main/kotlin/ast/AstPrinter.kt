@@ -226,8 +226,10 @@ class AstPrinter : AstNodeVisitor<String> {
 
 
     override fun visit(cast: AstNode.Cast): String {
-        return "(${cast.toCast.accept(this)} as ${
-            if (cast.type == Datatype.Void()) "?" else cast.type.toString()
-        })"
+        return "(${cast.toCast.accept(this)} as ${cast.to})"
+    }
+
+    override fun visit(instanceOf: AstNode.InstanceOf): String {
+        return "(${instanceOf.toCheck.accept(this)} as ${instanceOf.checkTypeNode})"
     }
 }
