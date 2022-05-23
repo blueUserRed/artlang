@@ -1001,7 +1001,7 @@ class Compiler : AstNodeVisitor<Unit> {
         //non-static function
         compile(funcCall.from!!, false)
         for (arg in funcCall.arguments) compile(arg, false)
-        emit(invokevirtual)
+        if (funcCall.definition.isPrivate) emit(invokespecial) else emit(invokevirtual)
         val funcRef = file.methodRefInfo(
             file.classInfo(file.utf8Info(funcCall.definition.clazz!!.jvmName)),
             file.nameAndTypeInfo(

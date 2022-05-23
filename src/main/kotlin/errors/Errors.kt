@@ -506,4 +506,14 @@ class Errors {
             get() = instanceOf.accept(MinMaxPosFinder())
     }
 
+    class NumTooBigError(
+        val numType: String,
+        val numToken: Token,
+        srcCode: String
+    ) : ArtError(41, srcCode) {
+        override val message: String = "Number too big for range $numType"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = mutableMapOf(numToken.line to (numToken.pos to numToken.pos + numToken.lexeme.length))
+    }
+
 }

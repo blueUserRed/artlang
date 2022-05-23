@@ -1,13 +1,15 @@
-
 fn main() {
-    const myA: A = B()
-    print myA is B
-    print myA is A
-    print A() is B
+    Test().pub()
 }
 
-class A {
-}
+class Test {
 
-class B : A {
+    public fn pub() {
+        this.priv()
+    }
+
+    fn priv() {
+        print "hi"
+    }
+
 }

@@ -383,14 +383,20 @@ object Tokenizer {
             else cur--
         }
 
+        var overflowedRange: String? = null
+
         var num = 0L
+        var numBefore = 0L
 
         while (!end()) {
+            numBefore = num
             if (consume() == '_') continue
             if (!last().isLetterOrDigit()) break
+            if (overflowedRange != null) continue
             num *= radix
             try {
                 num += last().digitToInt(radix)
+                if (numBefore > num) overflowedRange = "long"
             } catch (e: NumberFormatException) {
                 break
             }
@@ -400,14 +406,26 @@ object Tokenizer {
 
         if (end() || radix != 10 || !tryConsume('.')) {
             if (!tryConsume('#')) {
+                if (num !in Int.MIN_VALUE..Int.MAX_VALUE) overflowedRange = "int"
                 emit(TokenType.INT, code.substring(start until cur), num.toInt(), start - lastLineBreakPos)
+
+                if (overflowedRange != null) {
+                    artError(Errors.NumTooBigError(
+                        overflowedRange,
+                        tokens[tokens.size - 1],
+                        code
+                    ))
+                }
                 return
             }
             if (tryConsume('i', 'I')) {
+                if (num !in Int.MIN_VALUE..Int.MAX_VALUE) overflowedRange = "int"
                 emit(TokenType.INT, code.substring(start until cur), num.toInt(), start - lastLineBreakPos)
             } else if (tryConsume('b', 'B')) {
+                if (num !in Byte.MIN_VALUE..Byte.MAX_VALUE) overflowedRange = "byte"
                 emit(TokenType.BYTE, code.substring(start until cur), num.toByte(), start - lastLineBreakPos)
             } else if (tryConsume('s', 'S')) {
+                if (num !in Short.MIN_VALUE..Short.MAX_VALUE) overflowedRange = "short"
                 emit(TokenType.SHORT, code.substring(start until cur), num.toShort(), start - lastLineBreakPos)
             } else if (tryConsume('l', 'L')) {
                 emit(TokenType.LONG, code.substring(start until cur), num, start - lastLineBreakPos)
@@ -417,6 +435,13 @@ object Tokenizer {
                 emit(TokenType.DOUBLE, code.substring(start until cur), num.toDouble(), start - lastLineBreakPos)
             } else {
                 artError(Errors.InvalidNumLiteralTypeIdentifier(cur - lastLineBreakPos, curLine, consume(), code))
+            }
+            if (overflowedRange != null) {
+                artError(Errors.NumTooBigError(
+                    overflowedRange,
+                    tokens[tokens.size - 1],
+                    code
+                ))
             }
             return
         }
@@ -452,10 +477,13 @@ object Tokenizer {
             return
         }
         if (tryConsume('i', 'I')) {
+            if (commaNum.toLong() !in Int.MIN_VALUE..Int.MAX_VALUE) overflowedRange = "int"
             emit(TokenType.INT, code.substring(start until cur), commaNum.toInt(), start - lastLineBreakPos)
         } else if (tryConsume('b', 'B')) {
+            if (commaNum.toLong() !in Byte.MIN_VALUE..Byte.MAX_VALUE) overflowedRange = "byte"
             emit(TokenType.BYTE, code.substring(start until cur), commaNum.toInt().toByte(), start - lastLineBreakPos)
         } else if (tryConsume('s', 'S')) {
+            if (commaNum.toLong() !in Short.MIN_VALUE..Short.MAX_VALUE) overflowedRange = "shrot"
             emit(TokenType.SHORT, code.substring(start until cur), commaNum.toInt().toShort(), start - lastLineBreakPos)
         } else if (tryConsume('l', 'L')) {
             emit(TokenType.LONG, code.substring(start until cur), commaNum.toLong(), start - lastLineBreakPos)
@@ -465,6 +493,13 @@ object Tokenizer {
             emit(TokenType.DOUBLE, code.substring(start until cur), commaNum, start - lastLineBreakPos)
         } else {
             artError(Errors.InvalidNumLiteralTypeIdentifier(cur - lastLineBreakPos, curLine, consume(), code))
+        }
+        if (overflowedRange != null) {
+            artError(Errors.NumTooBigError(
+                overflowedRange,
+                tokens[tokens.size - 1],
+                code
+            ))
         }
     }
 
