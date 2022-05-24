@@ -199,6 +199,10 @@ class JvmVariableResolver : AstNodeVisitor<Unit> {
         node.accept(this)
     }
 
+    override fun visit(constructor: AstNode.Constructor) {
+        TODO("Not yet implemented")
+    }
+
     /**
      * adds a variable to [jvmVars]
      * @return the index, if two word value the index of the first word

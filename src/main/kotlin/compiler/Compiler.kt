@@ -1597,6 +1597,10 @@ class Compiler : AstNodeVisitor<Unit> {
         incStack(cast.type)
     }
 
+    override fun visit(constructor: AstNode.Constructor) {
+        TODO("Not yet implemented")
+    }
+
     /**
      * the [newarray] instruction uses an operand to tell it the type of array. This functions returns
      * the byte for a specific type

@@ -232,6 +232,7 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         val funcs: MutableList<Function>,
         val staticFields: MutableList<Field>,
         val fields: MutableList<Field>,
+        val constructors: MutableList<Constructor>,
         relevantTokens: List<Token>
     ) : AstNode(relevantTokens) {
 
@@ -262,6 +263,7 @@ abstract class AstNode(val relevantTokens: List<Token>) {
      * @param staticFuncs the static functions that are contained in this class
      * @param funcs the non-static functions that are contained in this class
      * @param staticFields the static fields that are contained in this class
+     * @param constructors the constructors of this class
      * @param fields the non-static fields that are contained in this class
      * @param extendsToken the with the name of the extending class; null if none
      */
@@ -271,11 +273,12 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         funcs: MutableList<Function>,
         staticFields: MutableList<Field>,
         fields: MutableList<Field>,
+        constructors: MutableList<Constructor>,
         val extendsToken: Token?,
         val modifiers: List<Token>,
         relevantTokens: List<Token>,
         override val jvmName: String = nameToken.lexeme
-    ) : ArtClass(staticFuncs, funcs, staticFields, fields, relevantTokens) {
+    ) : ArtClass(staticFuncs, funcs, staticFields, fields, constructors, relevantTokens) {
 
         override val name: String = nameToken.lexeme
 
@@ -301,6 +304,10 @@ abstract class AstNode(val relevantTokens: List<Token>) {
             }
             if (to is Field) for (i in staticFields.indices) if (staticFields[i] === orig) {
                 staticFields[i] = to
+                return
+            }
+            if (to is Constructor) for (i in constructors.indices) if (constructors[i] === orig) {
+                constructors[i] = to
                 return
             }
             throw CantSwapException()
@@ -1062,6 +1069,11 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
+    /**
+     * represents a cast (`a as B`)
+     * @param toCast the node to cast
+     * @param to the type to which [toCast] is cast
+     */
     class Cast(var toCast: AstNode, val to: DatatypeNode, relevantTokens: List<Token>) : AstNode(relevantTokens) {
 
         override fun swap(orig: AstNode, to: AstNode) {
@@ -1072,17 +1084,77 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
+    /**
+     * represents an instanceOf-check (`a is B`)
+     * @param toCheck the node to check
+     * @param checkTypeNode the type-node corresponding to [checkType]
+     */
     class InstanceOf(
         var toCheck: AstNode,
         var checkTypeNode: DatatypeNode,
         relevantTokens: List<Token>
     ) : AstNode(relevantTokens) {
 
+        /**
+         * the type for which [toCheck] is checked
+         */
         lateinit var checkType: Datatype
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (toCheck === orig) toCheck = to
             else throw CantSwapException()
+        }
+
+        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
+    }
+
+    /**
+     * represents a constructor
+     */
+    abstract class Constructor(relevantTokens: List<Token>) : AstNode(relevantTokens) {
+
+        /**
+         * true if the constructor is private
+         */
+        abstract val isPrivate: Boolean
+
+        /**
+         * the descriptor of the constructor
+         */
+        abstract val descriptor: FunctionDescriptor
+
+        /**
+         * the class of this constructor
+         */
+        abstract var clazz: ArtClass
+
+    }
+
+    /**
+     * represents a declaration of a constructor
+     * @param modifiers the modifiers for this constructor
+     * @param body the body of this constructor; null if none is present
+     * @param arguments the arguments of the constructor as TypeNodes
+     */
+    class ConstructorDeclaration(
+        val modifiers: List<Token>,
+        var body: Block?,
+        val arguments: MutableList<Pair<Token, DatatypeNode>>,
+        relevantTokens: List<Token>
+    ) : Constructor(relevantTokens) {
+
+        override val isPrivate: Boolean = "public" !in modifiers.map { it.lexeme }
+
+        lateinit var _descriptor: FunctionDescriptor
+
+        override val descriptor: FunctionDescriptor
+            get() = _descriptor
+
+        override lateinit var clazz: ArtClass
+
+        override fun swap(orig: AstNode, to: AstNode) {
+            if (orig !== body || to !is Block) throw CantSwapException()
+            body = to
         }
 
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)

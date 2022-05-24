@@ -52,7 +52,6 @@ class Parser {
                 continue
             }
             if (match(TokenType.K_CLASS)) {
-                validateModifiersForClass(modifiers)
                 classes.add(parseClass(modifiers))
                 continue
             }
@@ -95,6 +94,7 @@ class Parser {
      */
     private fun parseFieldDeclaration(modifiers: List<Token>, isConst: Boolean, isTopLevel: Boolean) : AstNode.Field {
         val fieldToken = last()
+        validateModifiersForField(modifiers)
         consumeOrError(TokenType.IDENTIFIER, "expected name")
         val name = last()
         if (name.lexeme == "this") syntaxError("'this' cannot be used as a parameter-name", name)
@@ -122,6 +122,9 @@ class Parser {
      */
     private fun parseFunc(modifiers: List<Token>, isTopLevel: Boolean): AstNode.Function {
         val fnToken = last()
+
+        validateModifiersForFunc(modifiers)
+
         consumeOrError(TokenType.IDENTIFIER, "Expected function name")
         val funcName = last()
         consumeOrError(TokenType.L_PAREN, "Expected () after function name")
@@ -203,6 +206,7 @@ class Parser {
         val staticFuncs = mutableListOf<AstNode.Function>()
         val fields = mutableListOf<AstNode.Field>()
         val staticFields = mutableListOf<AstNode.Field>()
+        val constructors = mutableListOf<AstNode.Constructor>()
 
         while (!match(TokenType.R_BRACE)) try {
 
@@ -214,13 +218,11 @@ class Parser {
             val modifiers = parseModifiers()
 
             if (match(TokenType.K_FN)) {
-                validateModifiersForFunc(modifiers)
                 val func = parseFunc(modifiers, false)
                 if (func.isStatic) staticFuncs.add(func) else funcs.add(func)
                 continue
             }
             if (matchIdent("field")) {
-                validateModifiersForField(modifiers)
                 val field = parseFieldDeclaration(modifiers, false, false)
                 if (field.isStatic) staticFields.add(field) else fields.add(field)
                 continue
@@ -229,6 +231,10 @@ class Parser {
                 consumeIdentOrError("field", "Expected field declaration after const")
                 val field = parseFieldDeclaration(modifiers, true, false)
                 if (field.isStatic) staticFields.add(field) else fields.add(field)
+                continue
+            }
+            if (matchIdent("constructor")) {
+                constructors.add(parseConstructor(modifiers))
                 continue
             }
             artError(Errors.SyntaxError(consume(), "Expected a function or field declaration in class", srcCode))
@@ -246,9 +252,38 @@ class Parser {
             funcs,
             staticFields,
             fields,
+            constructors,
             extends,
             classModifiers,
             classModifiers + listOf(classToken, rBraceToken)
+        )
+    }
+
+    /**
+     * parses a constructor
+     */
+    private fun parseConstructor(modifiers: List<Token>): AstNode.ConstructorDeclaration {
+        val constructorToken = last()
+        validateModifiersForConstructor(modifiers)
+        consumeOrError(TokenType.L_PAREN, "Expected () after constructor definition")
+        val args = mutableListOf<Pair<Token, AstNode.DatatypeNode>>()
+        while (match(TokenType.IDENTIFIER)) {
+            val name = last()
+            if (name.lexeme == "this") syntaxError("'this' cannot be used as a parameter-name", name)
+            consumeOrError(TokenType.COLON, "Expected type-declaration after argument")
+            val type = parseType()
+            args.add(Pair(name, type))
+            if (!match(TokenType.COMMA)) break
+        }
+        consumeOrError(TokenType.R_PAREN, "Expected () after constructor definition")
+        val clBracket = last()
+        var body: AstNode.Block? = null
+        if (match(TokenType.L_BRACE)) body = parseBlock()
+        return AstNode.ConstructorDeclaration(
+            modifiers,
+            body,
+            args,
+            listOf(constructorToken, clBracket) + (body?.relevantTokens ?: listOf())
         )
     }
 
@@ -259,6 +294,7 @@ class Parser {
         while (
             peek().tokenType !in arrayOf(TokenType.K_FN, TokenType.K_CONST, TokenType.EOF) &&
             !(peek().tokenType == TokenType.IDENTIFIER && peek().lexeme == "field") &&
+            !(peek().tokenType == TokenType.IDENTIFIER && peek().lexeme == "constructor") &&
             peek().tokenType != TokenType.R_BRACE
         ) {
             cur++
@@ -289,6 +325,36 @@ class Parser {
                 "public" -> had.add("public")
                 "static" -> had.add("static")
                 "override" -> had.add("override")
+                else -> throw RuntimeException("unknown modifier ${modifier.lexeme}")
+            }
+        }
+    }
+
+    /**
+     * validates that the [modifiers] can be used in front of a constructor and that each modifier is only present once
+     */
+    private fun validateModifiersForConstructor(modifiers: List<Token>) {
+        val had = mutableListOf<String>()
+        for (modifier in modifiers) {
+            if (modifier.lexeme in had) {
+                artError(Errors.InvalidModifierError("duplicate modifier ${modifier.lexeme}", modifier, srcCode))
+                continue
+            }
+            when (modifier.lexeme) {
+                "abstract" -> {
+                    artError(Errors.InvalidModifierError("Constructors cannot be abstract", modifier, srcCode))
+                }
+                "public" -> had.add("public")
+                "static" -> {
+                    artError(Errors.InvalidModifierError("Constructors cannot be static", modifier, srcCode))
+                }
+                "override" -> {
+                    artError(Errors.InvalidModifierError(
+                        "Constructors can't override anything",
+                        modifier,
+                        srcCode
+                    ))
+                }
                 else -> throw RuntimeException("unknown modifier ${modifier.lexeme}")
             }
         }

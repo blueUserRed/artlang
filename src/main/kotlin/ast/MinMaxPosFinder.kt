@@ -1,7 +1,5 @@
-package passes
+package ast
 
-import ast.AstNode
-import ast.AstNodeVisitor
 import tokenizer.Token
 
 /**
@@ -175,6 +173,10 @@ class MinMaxPosFinder : AstNodeVisitor<MutableMap<Int, Pair<Int, Int>>> {
 
     override fun visit(instanceOf: AstNode.InstanceOf): MutableMap<Int, Pair<Int, Int>> {
         return combine(find(instanceOf.toCheck), getMinMaxFor(instanceOf.relevantTokens))
+    }
+
+    override fun visit(constructor: AstNode.Constructor): MutableMap<Int, Pair<Int, Int>> {
+        return getMinMaxFor(constructor.relevantTokens)
     }
 
     /**

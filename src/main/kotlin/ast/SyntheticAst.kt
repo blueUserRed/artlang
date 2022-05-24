@@ -85,7 +85,7 @@ object SyntheticAst {
         override val isAbstract: Boolean,
         override val extends: ArtClass?,
         override val jvmName: String
-    ) : AstNode.ArtClass(staticFuncs, funcs, staticFields, fields, listOf()), SyntheticNode {
+    ) : AstNode.ArtClass(staticFuncs, funcs, staticFields, fields, mutableListOf(), listOf()), SyntheticNode {
 
         override fun swap(orig: AstNode, to: AstNode) = throw CantSwapException()
 

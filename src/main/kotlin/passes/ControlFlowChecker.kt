@@ -293,6 +293,13 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
         return check(instanceOf.toCheck)
     }
 
+    override fun visit(constructor: AstNode.Constructor): ControlFlowState {
+        constructor as AstNode.ConstructorDeclaration
+
+        constructor.body?.let { check(it) }
+        return ControlFlowState()
+    }
+
     /**
      * checks the [ControlFlowState] of [node]
      */

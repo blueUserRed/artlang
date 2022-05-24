@@ -220,7 +220,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                         func.functionDescriptor.args[0].second != Datatype.ArrayType(Datatype.Str())
                     ) {
                         artError(Errors.InvalidMainFunctionDeclarationError(
-                            "the main function must not take any arguments",
+                            "The main function must have either no arguments or one argument of type str[]",
                             srcCode,
                             listOf(func.nameToken)
                         ))
@@ -228,7 +228,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                 }
                 if (func.functionDescriptor.returnType != Datatype.Void()) {
                     artError(Errors.InvalidMainFunctionDeclarationError(
-                        "the main function must return void",
+                        "The main function must return void",
                         srcCode,
                         listOf(func.nameToken)
                     ))
@@ -939,6 +939,10 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             instanceOf, srcCode
         ))
         return Datatype.Bool()
+    }
+
+    override fun visit(constructor: AstNode.Constructor): Datatype {
+        TODO("Not yet implemented")
     }
 
     /**

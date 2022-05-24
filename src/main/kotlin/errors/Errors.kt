@@ -1,7 +1,7 @@
 package errors
 
 import ast.AstNode
-import passes.MinMaxPosFinder
+import ast.MinMaxPosFinder
 import Datatype
 import tokenizer.Token
 
