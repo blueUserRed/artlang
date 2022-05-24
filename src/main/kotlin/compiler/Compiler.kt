@@ -155,12 +155,12 @@ class Compiler : AstNodeVisitor<Unit> {
                         TokenType.NOT_EQ -> doIntCompare(if_icmpne)
                         else -> throw RuntimeException("unreachable")
                     }
-                    if (binary.type != Datatype.Bool()) doConvertPrimitive(binary.left.type, binary.type)
                 }
 
                 Datakind.FLOAT -> doNonIntCompare(binary.operator.tokenType, fcmpg)
                 Datakind.LONG -> doNonIntCompare(binary.operator.tokenType, lcmp)
                 Datakind.DOUBLE -> doNonIntCompare(binary.operator.tokenType, dcmpg)
+                Datakind.OBJECT -> doObjectCompare(binary)
 
                 else -> throw RuntimeException("unreachable")
 
@@ -214,6 +214,19 @@ class Compiler : AstNodeVisitor<Unit> {
             }
             else -> TODO("not yet implemented")
         }
+    }
+
+    private fun doObjectCompare(binary: AstNode.Binary) {
+        emitStackMapFrame()
+        if (binary.operator.tokenType == TokenType.D_EQ) emit(if_acmpeq) else emit(if_acmpne)
+        emit(*Utils.getShortAsBytes(7.toShort()))
+        decStack()
+        decStack()
+        emit(iconst_0, _goto, *Utils.getShortAsBytes(4.toShort()))
+        emitStackMapFrame()
+        emit(iconst_1)
+        incStack(Datatype.Integer())
+        emitStackMapFrame()
     }
 
     /**
@@ -2280,6 +2293,9 @@ class Compiler : AstNodeVisitor<Unit> {
         const val if_icmple: Byte = 0xA4.toByte()
         const val if_icmplt: Byte = 0xA1.toByte()
         const val if_icmpne: Byte = 0xA0.toByte()
+
+        const val if_acmpeq: Byte = 0xA5.toByte()
+        const val if_acmpne: Byte = 0xA6.toByte()
 
         const val ifeq: Byte = 0x99.toByte()
         const val ifge: Byte = 0x9C.toByte()

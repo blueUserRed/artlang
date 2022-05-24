@@ -102,6 +102,8 @@ class Parser {
         val type = parseType()
         consumeOrError(TokenType.EQ, "")
         val initializer = parseStatement()
+        if (!matchNSFB(TokenType.SOFT_BREAK, TokenType.SEMICOLON)) syntaxError("Expected new line or semicolon" +
+                " after field declaration", peek())
         return AstNode.FieldDeclaration(
             name,
             type,

@@ -1,15 +1,1 @@
-fn main() {
-    Test().pub()
-}
 
-class Test {
-
-    public fn pub() {
-        this.priv()
-    }
-
-    fn priv() {
-        print "hi"
-    }
-
-}
