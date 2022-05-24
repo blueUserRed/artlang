@@ -1,8 +1,6 @@
-import ast.AstNode
 import java.io.File
 import parser.Parser
 import ast.AstPrinter
-import tokenizer.Token
 import ast.SyntheticAst
 import errors.ErrorPool
 import compiler.Compiler
@@ -18,8 +16,8 @@ object Main {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        if (Settings.verbose) println("\n")
         val instructions = Settings.parseArgs(args)
+        if (Settings.verbose) println("\n")
 
         if (instructions.isEmpty()) {
             println("Please specify a subcommand\n")
@@ -72,18 +70,7 @@ object Main {
             println("------------------------------------\n\n")
         }
 
-        var lastErrors = 0
-
-        var tokens: List<Token>
-        val tokenizationTime = Stopwatch.time { tokens = Tokenizer.tokenize(code, file) }
-        if (ErrorPool.errors.size != lastErrors) {
-            if (Settings.verbose) {
-                println("${Ansi.yellow}Accumulated ${ErrorPool.errors.size - lastErrors} error(s)" +
-                        " during tokenization${Ansi.reset}")
-            }
-            lastErrors = ErrorPool.errors.size
-        }
-        if (Settings.verbose) println("tokenization took ${tokenizationTime}ms\n")
+        val tokens = doTask("Tokenizer") { Tokenizer.tokenize(code, file) }
 
         if (Settings.printTokens) {
             println("---------------tokens---------------")
@@ -91,16 +78,7 @@ object Main {
             println("------------------------------------\n\n")
         }
 
-        val program: AstNode.Program
-        val parseTime = Stopwatch.time { program = Parser().parse(tokens, code) }
-        if (ErrorPool.errors.size != lastErrors) {
-            if (Settings.verbose) {
-                println("${Ansi.yellow}Accumulated ${ErrorPool.errors.size - lastErrors} error(s)" +
-                        " during parsing${Ansi.reset}")
-            }
-            lastErrors = ErrorPool.errors.size
-        }
-        if (Settings.verbose) println("parsing took ${parseTime}ms\n")
+        val program = doTask("Parser") { Parser().parse(tokens, code) }
 
         SyntheticAst.addSyntheticTreeParts(program)
 
@@ -110,47 +88,11 @@ object Main {
             println("------------------------------------\n\n")
         }
 
-        if (Settings.verbose) println("running variable resolver")
-        val variableResolverTime = Stopwatch.time { program.accept(VariableResolver()) }
-        if (ErrorPool.errors.size != lastErrors) {
-            if (Settings.verbose) {
-                println("${Ansi.yellow}Accumulated ${ErrorPool.errors.size - lastErrors} error(s)${Ansi.reset}")
-            }
-            lastErrors = ErrorPool.errors.size
-        }
-        if (Settings.verbose) println("done in ${variableResolverTime}ms\n")
-
-        if (Settings.verbose) println("running type checker")
-        val typeCheckingTime = Stopwatch.time { program.accept(TypeChecker()) }
-        if (ErrorPool.errors.size != lastErrors) {
-            if (Settings.verbose) {
-                println("${Ansi.yellow}Accumulated ${ErrorPool.errors.size - lastErrors} error(s)${Ansi.reset}")
-            }
-            lastErrors = ErrorPool.errors.size
-        }
-        if (Settings.verbose) println("done in ${typeCheckingTime}ms\n")
-
-        if (Settings.verbose) println("running controlFlow checker")
-        val controlFlowCheckingTime = Stopwatch.time { program.accept(ControlFlowChecker()) }
-        if (ErrorPool.errors.size != lastErrors) {
-            if (Settings.verbose) {
-                println("${Ansi.yellow}Accumulated ${ErrorPool.errors.size - lastErrors} error(s)${Ansi.reset}")
-            }
-        }
-        if (Settings.verbose) println("done in ${controlFlowCheckingTime}ms\n")
-
-        if (Settings.verbose) println("running inheritance checker")
-        val inheritanceCheckingTime = Stopwatch.time { program.accept(InheritanceChecker()) }
-        if (ErrorPool.errors.size != lastErrors) {
-            if (Settings.verbose) {
-                println("${Ansi.yellow}Accumulated ${ErrorPool.errors.size - lastErrors} error(s)${Ansi.reset}")
-            }
-        }
-        if (Settings.verbose) println("done in ${inheritanceCheckingTime}ms\n")
-
-        if (Settings.verbose) println("running jvm variable resolver")
-        val jvmVariableResolvingTime = Stopwatch.time { program.accept(JvmVariableResolver()) }
-        if (Settings.verbose) println("done in ${jvmVariableResolvingTime}ms\n")
+        doTask("variable resolver") { program.accept(VariableResolver()) }
+        doTask("type checker") { program.accept(TypeChecker()) }
+        doTask("control-flow checker") { program.accept(ControlFlowChecker()) }
+        doTask("inheritance checker") { program.accept(InheritanceChecker()) }
+        doTask("jvm variable resolver") { program.accept(JvmVariableResolver()) }
 
         if (Settings.printAst) {
             println("------------revised AST-------------")
@@ -190,14 +132,33 @@ object Main {
             Files.delete(Paths.get("$outdir/tmp"))
         }
 
+        if (!Settings.verbose) println("Compiled successfully")
+
         stopwatch.stop()
         println("\nTook ${stopwatch.time}ms in total")
     }
 
     /**
+     * executes a part of the compilation process and prints output to the console if [Settings.verbose] is set
+     */
+    private fun <T> doTask(name: String, task: () -> T): T {
+        if (Settings.verbose) println("running $name")
+        val errsBefore = ErrorPool.errors.size
+        val retVal: T
+        val time = Stopwatch.time { retVal = task() }
+        if (ErrorPool.errors.size != errsBefore) {
+            if (Settings.verbose) {
+                println("${Ansi.yellow}Accumulated ${ErrorPool.errors.size - errsBefore} error(s)${Ansi.reset}")
+            }
+        }
+        if (Settings.verbose) println("done in ${time}ms\n")
+        return retVal
+    }
+
+    /**
      * uses the
      * [jar-utility](https://docs.oracle.com/javase/7/docs/technotes/tools/windows/jar.html#:~:text=J%20and%20option\).-,DESCRIPTION,applications%20into%20a%20single%20archive.)
-     * included in the jdk to generate a jar-file from a direcory
+     * included in the jdk to generate a jar-file from a directory
      * @param fromDir the directory containing the .class files which will be bundled to a jar
      * @param name The name of the jar file that is created
      * @param entryPoint the class-file which contains the main method and serves as the entry point to the program

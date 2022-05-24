@@ -4,7 +4,9 @@ import ast.AstNode
 import ast.AstNodeVisitor
 import tokenizer.Token
 
-//TODO: fix error reporting with strings, because the quotes are not included in the lexeme
+/**
+ * finds the lines/positions of a statement in the source file
+ */
 class MinMaxPosFinder : AstNodeVisitor<MutableMap<Int, Pair<Int, Int>>> {
 
     override fun visit(binary: AstNode.Binary): MutableMap<Int, Pair<Int, Int>> {
@@ -163,20 +165,44 @@ class MinMaxPosFinder : AstNodeVisitor<MutableMap<Int, Pair<Int, Int>>> {
         return combine(find(convert.toConvert), getMinMaxFor(convert.to))
     }
 
+    override fun visit(supCall: AstNode.SuperCall): MutableMap<Int, Pair<Int, Int>> {
+        return getMinMaxFor(supCall.relevantTokens)
+    }
+
+    override fun visit(cast: AstNode.Cast): MutableMap<Int, Pair<Int, Int>> {
+        return combine(find(cast.toCast), getMinMaxFor(cast.relevantTokens))
+    }
+
+    override fun visit(instanceOf: AstNode.InstanceOf): MutableMap<Int, Pair<Int, Int>> {
+        return combine(find(instanceOf.toCheck), getMinMaxFor(instanceOf.relevantTokens))
+    }
+
+    /**
+     * finds the lines and positions of statement
+     */
     @Suppress("NOTHING_TO_INLINE")
     private inline fun find(node: AstNode): MutableMap<Int, Pair<Int, Int>> = node.accept(this)
 
+    /**
+     * returns the min/max positions for a token with its line
+     */
     private fun getMinMaxFor(token: Token): MutableMap<Int, Pair<Int, Int>> {
         if (token.line == -1) return mutableMapOf()
         return mutableMapOf(token.line to (token.pos to token.pos + token.lexeme.length))
     }
 
+    /**
+     * like [getMinMaxFor], but also combines the tokens using the [combine] function
+     */
     private fun getMinMaxFor(tokens: List<Token>): MutableMap<Int, Pair<Int, Int>> {
         var acc: MutableMap<Int, Pair<Int, Int>> = mutableMapOf()
         for (t in tokens) if (t.line != -1) acc = combine(acc, getMinMaxFor(t))
         return acc
     }
 
+    /**
+     * combines the min/max positions and lines into one map
+     */
     private fun combine(vararg lists: MutableMap<Int, Pair<Int, Int>>): MutableMap<Int, Pair<Int, Int>> {
         val combined = mutableMapOf<Int, Pair<Int, Int>>()
         for (list in lists) for (entry in list) {

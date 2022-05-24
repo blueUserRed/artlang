@@ -104,6 +104,8 @@ class Errors {
 
     }
 
+    // I'm not writing doc for each error, they should be obvious
+
     class UnknownCharacterError(
         val character: Char,
         val pos: Int,
@@ -131,7 +133,7 @@ class Errors {
     }
 
     class ModifiersInTopLevelError(val modifiers: List<Token>, srcCode: String) : ArtError(2, srcCode) {
-        override val message: String = "Modifiers are not allowed in the top level"
+        override val message: String = "Modifiers are not allowed on top level fields and functions"
 
         override val ranges: MutableMap<Int, Pair<Int, Int>>
             get() = getRangesFromTokens(modifiers)
@@ -422,6 +424,96 @@ class Errors {
         override val message: String = "$thingThatCanBeUsed can only be used in $whereThingCanBeUsed"
         override val ranges: MutableMap<Int, Pair<Int, Int>>
             get() = stmt.accept(MinMaxPosFinder())
+    }
+
+    class IllegalStringEscapeError(
+        val escapeChar: Char,
+        val pos: Int,
+        val line: Int,
+        srcCode: String
+    ) : ArtError(33, srcCode) {
+        override val message: String = "Illegal character in string escape '$escapeChar'"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = mutableMapOf(line to (pos to pos))
+    }
+
+    class AbstractFunctionOutsideAbstractClassError(
+        val abstractModifier: Token,
+        srcCode: String
+    ) : ArtError(34, srcCode) {
+        override val message: String = "Abstract Functions can only be used in abstract classes"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = mutableMapOf(abstractModifier.line to
+                    (abstractModifier.pos to abstractModifier.pos + abstractModifier.lexeme.length))
+    }
+
+    class CannotInstantiateAbstractClassError(
+        val constructorCall: AstNode.ConstructorCall,
+        srcCode: String
+    ) : ArtError(35, srcCode) {
+        override val message: String = "Cannot create instance of abstract class ${constructorCall.clazz.name}"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = constructorCall.accept(MinMaxPosFinder())
+    }
+
+    class ClassDoesNotImplementAbstractFunctionError(
+        val classNameToken: Token,
+        val funcName: String,
+        srcCode: String
+    ) : ArtError(36, srcCode) {
+        override val message: String = "Class ${classNameToken.lexeme} does not implement the abstract function $funcName"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = mutableMapOf(classNameToken.line to (classNameToken.pos to classNameToken.pos + classNameToken.lexeme.length))
+    }
+
+    class CannotCallAbstractFunctionViaSuperError(
+        val call: AstNode,
+        val funcName: String,
+        srcCode: String
+    ) : ArtError(37, srcCode) {
+        override val message: String = "Abstract function $funcName cannot be called using super"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = call.accept(MinMaxPosFinder())
+    }
+
+    class NonMatchingReturnTypesInOverriddenFunctionError(
+        val retType: Datatype,
+        val retTypeOverridden: Datatype,
+        val funcName: Token,
+        srcCode: String
+    ) : ArtError(38, srcCode) {
+        override val message: String = "Return type $retType is not compatible with the return type of the overridden" +
+                "function ${funcName.lexeme}, which is $retTypeOverridden"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = mutableMapOf(funcName.line to (funcName.pos to funcName.pos + funcName.lexeme.length))
+    }
+
+    class CannotCastPrimitiveError(
+        val cast: AstNode,
+        srcCode: String
+    ) : ArtError(39, srcCode) {
+        override val message: String = "Only Objects are allowed in cast"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = cast.accept(MinMaxPosFinder())
+    }
+
+    class CannotUsePrimitiveInInstanceOfError(
+        val instanceOf: AstNode.InstanceOf,
+        srcCode: String
+    ) : ArtError(40, srcCode) {
+        override val message: String = "Only Objects are allowed in is-checks"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = instanceOf.accept(MinMaxPosFinder())
+    }
+
+    class NumTooBigError(
+        val numType: String,
+        val numToken: Token,
+        srcCode: String
+    ) : ArtError(41, srcCode) {
+        override val message: String = "Number too big for range $numType"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = mutableMapOf(numToken.line to (numToken.pos to numToken.pos + numToken.lexeme.length))
     }
 
 }

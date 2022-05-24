@@ -2,7 +2,6 @@ package tokenizer
 
 import errors.Errors
 import errors.artError
-import java.lang.RuntimeException
 import kotlin.math.pow
 
 /**
@@ -249,6 +248,9 @@ object Tokenizer {
             "break" -> emit(TokenType.K_BREAK, "break", null, start - lastLineBreakPos)
             "continue" -> emit(TokenType.K_CONTINUE, "continue", null, start - lastLineBreakPos)
             "null" -> emit(TokenType.K_NULL, "null", null, start - lastLineBreakPos)
+            "super" -> emit(TokenType.K_SUPER, "super", null, start - lastLineBreakPos)
+            "as" -> emit(TokenType.K_AS, "as", null, start - lastLineBreakPos)
+            "is" -> emit(TokenType.K_IS, "is", null, start - lastLineBreakPos)
             else -> emit(TokenType.IDENTIFIER, identifier, identifier, start - lastLineBreakPos)
         }
     }
@@ -260,21 +262,86 @@ object Tokenizer {
     private fun string(endChar: Char) {
         val start = cur
         consume() //consume initial " or '
+
+        val builder = StringBuilder()
+
+        if (end()) {
+            artError(Errors.UnterminatedStringError(start - lastLineBreakPos, curLine, code))
+            return
+        }
+
         while (current() != endChar) {
-            if (last() == '\n') {
-                cur--
-                artError(Errors.UnterminatedStringError(start - lastLineBreakPos, curLine, code))
-                return
+
+            when (val c = consume()) {
+                '\\' -> {
+                    if (end()) {
+                        artError(Errors.UnterminatedStringError(start - lastLineBreakPos, curLine, code))
+                        return
+                    }
+                    when (val c1 = consume()) {
+                        '"' -> builder.append('"')
+                        '\'' -> builder.append('\'')
+                        'f' -> builder.append("\u000C")
+                        't' -> builder.append('\t')
+                        'b' -> builder.append('\b')
+                        'n' -> builder.append('\n')
+                        'r' -> builder.append('\r')
+                        '\\' -> builder.append('\\')
+                        'u' -> doUnicodeStringEscape(start)?.let { builder.append(it) }
+                        else -> {
+                            artError(Errors.IllegalStringEscapeError(
+                                c1,
+                                cur - lastLineBreakPos - 1,
+                                curLine,
+                                code
+                            ))
+                        }
+                    }
+                }
+                '\n' -> {
+                    cur--
+                    artError(Errors.UnterminatedStringError(start - lastLineBreakPos, curLine, code))
+                    return
+                }
+                else -> builder.append(c)
             }
-            consume()
+
             if (end()) {
                 artError(Errors.UnterminatedStringError(start - lastLineBreakPos, curLine, code))
                 return
             }
         }
-        consume() //consume ending " or '
-        val string = code.substring((start + 1)..(cur - 2))
-        emit(TokenType.STRING, endChar + string + endChar, string, start - lastLineBreakPos)
+
+        consume() //consume ending char
+
+        val rawString = code.substring(start until cur)
+        val string = builder.toString()
+        emit(TokenType.STRING, rawString, string, start - lastLineBreakPos)
+    }
+
+    /**
+     * tokenizes a unicode string escape
+     */
+    private fun doUnicodeStringEscape(start: Int): String? {
+        var c = 0
+        repeat(4) {
+            if (end() || consume() == '\n') {
+                artError(Errors.UnterminatedStringError(start - lastLineBreakPos, curLine, code))
+                return null
+            }
+            val curChar = last()
+            try {
+                c *= 16
+                c += Integer.parseInt(curChar.toString(), 16)
+            } catch (e: NumberFormatException) {
+                artError(Errors.IllegalStringEscapeError(
+                    curChar,
+                    cur - 1 - lastLineBreakPos, curLine, code
+                ))
+                return null
+            }
+        }
+        return String(Character.toChars(c))
     }
 
     /**
@@ -316,14 +383,20 @@ object Tokenizer {
             else cur--
         }
 
+        var overflowedRange: String? = null
+
         var num = 0L
+        var numBefore = 0L
 
         while (!end()) {
+            numBefore = num
             if (consume() == '_') continue
             if (!last().isLetterOrDigit()) break
+            if (overflowedRange != null) continue
             num *= radix
             try {
                 num += last().digitToInt(radix)
+                if (numBefore > num) overflowedRange = "long"
             } catch (e: NumberFormatException) {
                 break
             }
@@ -333,14 +406,26 @@ object Tokenizer {
 
         if (end() || radix != 10 || !tryConsume('.')) {
             if (!tryConsume('#')) {
+                if (num !in Int.MIN_VALUE..Int.MAX_VALUE) overflowedRange = "int"
                 emit(TokenType.INT, code.substring(start until cur), num.toInt(), start - lastLineBreakPos)
+
+                if (overflowedRange != null) {
+                    artError(Errors.NumTooBigError(
+                        overflowedRange,
+                        tokens[tokens.size - 1],
+                        code
+                    ))
+                }
                 return
             }
             if (tryConsume('i', 'I')) {
+                if (num !in Int.MIN_VALUE..Int.MAX_VALUE) overflowedRange = "int"
                 emit(TokenType.INT, code.substring(start until cur), num.toInt(), start - lastLineBreakPos)
             } else if (tryConsume('b', 'B')) {
+                if (num !in Byte.MIN_VALUE..Byte.MAX_VALUE) overflowedRange = "byte"
                 emit(TokenType.BYTE, code.substring(start until cur), num.toByte(), start - lastLineBreakPos)
             } else if (tryConsume('s', 'S')) {
+                if (num !in Short.MIN_VALUE..Short.MAX_VALUE) overflowedRange = "short"
                 emit(TokenType.SHORT, code.substring(start until cur), num.toShort(), start - lastLineBreakPos)
             } else if (tryConsume('l', 'L')) {
                 emit(TokenType.LONG, code.substring(start until cur), num, start - lastLineBreakPos)
@@ -350,6 +435,13 @@ object Tokenizer {
                 emit(TokenType.DOUBLE, code.substring(start until cur), num.toDouble(), start - lastLineBreakPos)
             } else {
                 artError(Errors.InvalidNumLiteralTypeIdentifier(cur - lastLineBreakPos, curLine, consume(), code))
+            }
+            if (overflowedRange != null) {
+                artError(Errors.NumTooBigError(
+                    overflowedRange,
+                    tokens[tokens.size - 1],
+                    code
+                ))
             }
             return
         }
@@ -385,10 +477,13 @@ object Tokenizer {
             return
         }
         if (tryConsume('i', 'I')) {
+            if (commaNum.toLong() !in Int.MIN_VALUE..Int.MAX_VALUE) overflowedRange = "int"
             emit(TokenType.INT, code.substring(start until cur), commaNum.toInt(), start - lastLineBreakPos)
         } else if (tryConsume('b', 'B')) {
+            if (commaNum.toLong() !in Byte.MIN_VALUE..Byte.MAX_VALUE) overflowedRange = "byte"
             emit(TokenType.BYTE, code.substring(start until cur), commaNum.toInt().toByte(), start - lastLineBreakPos)
         } else if (tryConsume('s', 'S')) {
+            if (commaNum.toLong() !in Short.MIN_VALUE..Short.MAX_VALUE) overflowedRange = "shrot"
             emit(TokenType.SHORT, code.substring(start until cur), commaNum.toInt().toShort(), start - lastLineBreakPos)
         } else if (tryConsume('l', 'L')) {
             emit(TokenType.LONG, code.substring(start until cur), commaNum.toLong(), start - lastLineBreakPos)
@@ -398,6 +493,13 @@ object Tokenizer {
             emit(TokenType.DOUBLE, code.substring(start until cur), commaNum, start - lastLineBreakPos)
         } else {
             artError(Errors.InvalidNumLiteralTypeIdentifier(cur - lastLineBreakPos, curLine, consume(), code))
+        }
+        if (overflowedRange != null) {
+            artError(Errors.NumTooBigError(
+                overflowedRange,
+                tokens[tokens.size - 1],
+                code
+            ))
         }
     }
 

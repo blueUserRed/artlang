@@ -24,9 +24,12 @@ class AstPrinter : AstNodeVisitor<String> {
         function as AstNode.FunctionDeclaration
         val builder = StringBuilder("\n")
         for (modifier in function.modifiers) builder.append(modifier.lexeme).append(" ")
-        builder.append("fn ").append(function.name).append("() {\n")
-        for (s in function.statements.statements) builder.append(s.accept(this)).append("\n")
-        builder.append("}\n")
+        builder.append("fn ").append(function.name).append("()")
+        if (function.statements != null) {
+            builder.append(" {\n")
+            for (s in function.statements!!.statements) builder.append(s.accept(this)).append("\n")
+            builder.append("}\n")
+        } else builder.append("\n")
         return builder.toString()
     }
 
@@ -205,5 +208,28 @@ class AstPrinter : AstNodeVisitor<String> {
 
     override fun visit(convert: AstNode.TypeConvert): String {
         return "(${convert.toConvert.accept(this)}.${convert.to.lexeme})"
+    }
+
+    override fun visit(supCall: AstNode.SuperCall): String {
+        val builder = StringBuilder()
+        builder
+            .append("(super.")
+            .append(supCall.name.lexeme)
+        for (arg in supCall.arguments) {
+            builder
+                .append(" ")
+                .append(arg.accept(this))
+        }
+        builder.append(")")
+        return builder.toString()
+    }
+
+
+    override fun visit(cast: AstNode.Cast): String {
+        return "(${cast.toCast.accept(this)} as ${cast.to})"
+    }
+
+    override fun visit(instanceOf: AstNode.InstanceOf): String {
+        return "(${instanceOf.toCheck.accept(this)} as ${instanceOf.checkTypeNode})"
     }
 }

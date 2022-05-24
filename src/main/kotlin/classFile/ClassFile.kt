@@ -218,7 +218,8 @@ class ClassFileBuilder {
         out.write(Utils.getLastTwoBytes(methods.size))
         out.write(methodBytes)
 
-        out.write(Utils.getLastTwoBytes(0)) //attributes count
+        out.write(Utils.getLastTwoBytes(attributes.size))
+        for (att in attributes) out.write(att.toBytes())
 
         out.close()
     }
@@ -555,7 +556,7 @@ class MethodBuilder {
         stackMapTable.frames = stackMapFrames
         codeAttributes.add(stackMapTable)
 
-        attributes.add(
+        if (!isAbstract) attributes.add(
             CodeAttribute(
                 fileBuilder.utf8Info("Code"),
                 maxStack, maxLocals,
@@ -687,6 +688,16 @@ class CodeAttribute(
             b
         )
     }
+}
+
+class SourceFileAttribute(val nameIndex: Int, val fileNameIndex: Int) : Attribute() {
+
+    override fun toBytes(): ByteArray = Utils.arrayConcat(
+        Utils.getLastTwoBytes(nameIndex),
+        Utils.getIntAsBytes(2),
+        Utils.getLastTwoBytes(fileNameIndex)
+    )
+
 }
 
 /**

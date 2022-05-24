@@ -23,6 +23,7 @@ object SyntheticAst {
         funcs = mutableListOf(),
         staticFields = mutableListOf(),
         fields = mutableListOf(),
+        isAbstract = false,
         null,
         "java/lang/Object"
     )
@@ -33,6 +34,7 @@ object SyntheticAst {
         funcs = mutableListOf(),
         staticFields = mutableListOf(),
         fields = mutableListOf(),
+        isAbstract = false,
         objectClass,
         "java/lang/String"
     )
@@ -46,6 +48,7 @@ object SyntheticAst {
                 isStatic = false,
                 isTopLevel = false,
                 isPrivate = false,
+                isAbstract = false,
                 objectClass
             ),
 
@@ -55,6 +58,7 @@ object SyntheticAst {
                 isStatic = false,
                 isTopLevel = false,
                 isPrivate = false,
+                isAbstract = false,
                 objectClass
             )
 
@@ -78,6 +82,7 @@ object SyntheticAst {
         funcs: MutableList<Function>,
         staticFields: MutableList<Field>,
         fields: MutableList<Field>,
+        override val isAbstract: Boolean,
         override val extends: ArtClass?,
         override val jvmName: String
     ) : AstNode.ArtClass(staticFuncs, funcs, staticFields, fields, listOf()), SyntheticNode {
@@ -102,6 +107,7 @@ object SyntheticAst {
         override val isStatic: Boolean,
         override val isTopLevel: Boolean,
         override val isPrivate: Boolean,
+        override val isAbstract: Boolean,
         override var clazz: ArtClass?
     ) : AstNode.Function(listOf()), SyntheticNode {
 

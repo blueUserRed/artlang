@@ -7,7 +7,6 @@ import ast.SyntheticNode
 import errors.Errors
 import errors.artError
 import passes.ControlFlowChecker.ControlFlowState
-import kotlin.RuntimeException
 
 /**
  * ensures that break/continue is only used in loops, return is only used in function, that functions
@@ -65,11 +64,12 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
     override fun visit(function: AstNode.Function): ControlFlowState {
         function as AstNode.FunctionDeclaration
         curFunction = function
-        val controlFlowState = check(function.statements)
+        if (function.statements == null) return ControlFlowState()
+        val controlFlowState = check(function.statements!!)
         curFunction = null
         if (function.functionDescriptor.returnType == Datatype.Void()) return ControlFlowState()
         if (!controlFlowState.alwaysReturns) {
-           artError(Errors.FunctionDoesNotAlwaysReturnError(function.statements.relevantTokens[1], srcCode))
+           artError(Errors.FunctionDoesNotAlwaysReturnError(function.statements!!.relevantTokens[1], srcCode))
         }
         return ControlFlowState()
     }
@@ -279,6 +279,18 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
 
     override fun visit(convert: AstNode.TypeConvert): ControlFlowState {
         return check(convert.toConvert)
+    }
+
+    override fun visit(supCall: AstNode.SuperCall): ControlFlowState {
+        return ControlFlowState()
+    }
+
+    override fun visit(cast: AstNode.Cast): ControlFlowState {
+        return check(cast.toCast)
+    }
+
+    override fun visit(instanceOf: AstNode.InstanceOf): ControlFlowState {
+        return check(instanceOf.toCheck)
     }
 
     /**

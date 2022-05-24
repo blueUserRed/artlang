@@ -70,6 +70,11 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         abstract val isStatic: Boolean
 
         /**
+         * true if the function is abstract
+         */
+        abstract val isAbstract: Boolean
+
+        /**
          * true if the function is defined in the topLevel
          */
         abstract val isTopLevel: Boolean
@@ -92,7 +97,7 @@ abstract class AstNode(val relevantTokens: List<Token>) {
      * @param isTopLevel true if the function is defined in the toplevel
      */
     class FunctionDeclaration(
-        var statements: Block,
+        var statements: Block?,
         val nameToken: Token,
         val modifiers: List<Token>,
         override val isTopLevel: Boolean,
@@ -154,13 +159,12 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         /**
          * true if the function is private
          */
-        override val isPrivate: Boolean
-            get() {
-                for (modifier in modifiers) {
-                    if (modifier.tokenType == TokenType.IDENTIFIER && modifier.lexeme == "public") return false
-                }
-                return true
-            }
+        override val isPrivate: Boolean = "public" !in modifiers.map { it.lexeme }
+
+        /**
+         * true if the function is abstract
+         */
+        override val isAbstract: Boolean = "abstract" in modifiers.map { it.lexeme }
 
         /**
          * true if the function has a this-argument
@@ -245,6 +249,11 @@ abstract class AstNode(val relevantTokens: List<Token>) {
          * the name that is used to refer to the class on the jvm
          */
         abstract val jvmName: String
+
+        /**
+         * true if the class is abstract
+         */
+        abstract val isAbstract: Boolean
     }
 
     /**
@@ -263,6 +272,7 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         staticFields: MutableList<Field>,
         fields: MutableList<Field>,
         val extendsToken: Token?,
+        val modifiers: List<Token>,
         relevantTokens: List<Token>,
         override val jvmName: String = nameToken.lexeme
     ) : ArtClass(staticFuncs, funcs, staticFields, fields, relevantTokens) {
@@ -273,6 +283,8 @@ abstract class AstNode(val relevantTokens: List<Token>) {
 
         override val extends: ArtClass
             get() = _extends
+
+        override val isAbstract: Boolean = "abstract" in modifiers.map { it.lexeme }
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (to is Function) for (i in staticFuncs.indices) if (staticFuncs[i] === orig) {
@@ -1018,6 +1030,59 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         override fun swap(orig: AstNode, to: AstNode) {
             if (toConvert !== orig) throw CantSwapException()
             toConvert = to
+        }
+
+        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
+    }
+
+    /**
+     * represents a function call using super (e.g. `super.doSomething()`)
+     * @param name the name of the function
+     * @param arguments the arguments with which the function is called
+     */
+    class SuperCall(
+        val name: Token,
+        val arguments: MutableList<AstNode>,
+        relevantTokens: List<Token>
+    ) : AstNode(relevantTokens) {
+
+        /**
+         * the definition of the function
+         */
+        lateinit var definition: Function
+
+        override fun swap(orig: AstNode, to: AstNode) {
+            for (i in arguments.indices) if (arguments[i] === orig) {
+                arguments[i] = to
+                return
+            }
+            throw CantSwapException()
+        }
+
+        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
+    }
+
+    class Cast(var toCast: AstNode, val to: DatatypeNode, relevantTokens: List<Token>) : AstNode(relevantTokens) {
+
+        override fun swap(orig: AstNode, to: AstNode) {
+            if (toCast === orig) toCast = to
+            else throw CantSwapException()
+        }
+
+        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
+    }
+
+    class InstanceOf(
+        var toCheck: AstNode,
+        var checkTypeNode: DatatypeNode,
+        relevantTokens: List<Token>
+    ) : AstNode(relevantTokens) {
+
+        lateinit var checkType: Datatype
+
+        override fun swap(orig: AstNode, to: AstNode) {
+            if (toCheck === orig) toCheck = to
+            else throw CantSwapException()
         }
 
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)

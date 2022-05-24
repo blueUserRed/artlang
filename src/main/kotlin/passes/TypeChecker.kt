@@ -145,7 +145,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         for (i in function.functionDescriptor.args.indices) newVars[i] = function.functionDescriptor.args[i].second
         vars = newVars
         function.clazz = curClass
-        check(function.statements, function)
+        function.statements?.let { check(it, function) }
         curFunction = null
         return Datatype.Void()
     }
@@ -601,16 +601,6 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
     override fun visit(varInc: AstNode.VarAssignShorthand): Datatype {
         check(varInc.toAdd, varInc)
-//        if (
-//            (varInc.toAdd.type != Datatype.Str() || varInc.operator.tokenType != TokenType.PLUS_EQ)
-//            && varInc.toAdd.type != Datatype.Integer()
-//        ) {
-//            artError(Errors.OperationNotImplementedError(
-//                varInc,
-//                "Shorthand operators are only implemented for int and string types",
-//                srcCode
-//            ))
-//        }
 
         if (varInc.index != -1) {
 
@@ -902,6 +892,53 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
         return getDatatypeFromTypeToken(convert.to.tokenType)
 
+    }
+
+    override fun visit(supCall: AstNode.SuperCall): Datatype {
+        val thisSig = mutableListOf<Datatype>()
+        for (arg in supCall.arguments) {
+            check(arg, supCall)
+            thisSig.add(arg.type)
+        }
+
+        if (curClass == null) {
+            artError(Errors.CanOnlyBeUsedInError(
+                "super",
+                "class",
+                supCall,
+                srcCode
+            ))
+            return Datatype.ErrorType()
+        }
+
+        val func = Datatype.Object(curClass!!.extends!!).lookupFunc(supCall.name.lexeme, thisSig)
+        if (func != null) {
+            supCall.definition = func
+            return func.functionDescriptor.returnType
+        }
+
+        artError(Errors.UnknownIdentifierError(supCall.name, srcCode))
+        return Datatype.ErrorType()
+    }
+
+    override fun visit(cast: AstNode.Cast): Datatype {
+        val castType = typeNodeToDataType(cast.to)
+        if (!castType.matches(Datakind.OBJECT)) artError(Errors.CannotCastPrimitiveError(cast, srcCode))
+        val leftType = check(cast.toCast, cast)
+        if (!leftType.matches(Datakind.OBJECT)) artError(Errors.CannotCastPrimitiveError(cast, srcCode))
+        return castType
+    }
+
+    override fun visit(instanceOf: AstNode.InstanceOf): Datatype {
+        instanceOf.checkType = typeNodeToDataType(instanceOf.checkTypeNode)
+        val toCheckType = check(instanceOf.toCheck, instanceOf)
+        if (!instanceOf.checkType.matches(Datakind.OBJECT)) artError(Errors.CannotUsePrimitiveInInstanceOfError(
+            instanceOf, srcCode
+        ))
+        if (!toCheckType.matches(Datakind.OBJECT))  artError(Errors.CannotUsePrimitiveInInstanceOfError(
+            instanceOf, srcCode
+        ))
+        return Datatype.Bool()
     }
 
     /**

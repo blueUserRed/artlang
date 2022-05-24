@@ -7,7 +7,14 @@ import ast.SyntheticNode
 
 class JvmVariableResolver : AstNodeVisitor<Unit> {
 
+    /**
+     * represents the local array on the jvm
+     */
     private var jvmVars: MutableList<String?> = mutableListOf()
+
+    /**
+     * the largest size of the locals array reached during execution
+     */
     private var maxLocals: Int = 0
     private var curClass: AstNode.ArtClass? = null
 
@@ -32,7 +39,7 @@ class JvmVariableResolver : AstNodeVisitor<Unit> {
         maxLocals = 0
         jvmVars.clear()
         for (arg in function.functionDescriptor.args) addVar(arg.first, arg.second)
-        resolve(function.statements)
+        function.statements?.let { resolve(it) }
         function.amountLocals = maxLocals
     }
 
@@ -177,10 +184,25 @@ class JvmVariableResolver : AstNodeVisitor<Unit> {
         resolve(convert.toConvert)
     }
 
+    override fun visit(supCall: AstNode.SuperCall) {
+    }
+
+    override fun visit(cast: AstNode.Cast) {
+        resolve(cast.toCast)
+    }
+
+    override fun visit(instanceOf: AstNode.InstanceOf) {
+        resolve(instanceOf.toCheck)
+    }
+
     private fun resolve(node: AstNode) {
         node.accept(this)
     }
 
+    /**
+     * adds a variable to [jvmVars]
+     * @return the index, if two word value the index of the first word
+     */
     private fun addVar(name: String, type: Datatype): Int {
         if (!type.matches(Datakind.LONG, Datakind.DOUBLE)) {
             jvmVars.add(name)
