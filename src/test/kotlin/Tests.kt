@@ -4,9 +4,9 @@ import java.nio.file.Paths
 import kotlin.io.path.readText
 
 fun main() {
-    val test = Test("FizzBuzz.art", false)
+//    val test = Test("FizzBuzz.art", false)
 //    val test = Test("HelloWorld.art")
-    test.test()
+//    test.test()
 
     val ts: TestSuite = TestSuite.byId(0)
     println(ts.toString())
@@ -62,11 +62,19 @@ class Test(private val testFileName: String, private val printOutput: Boolean = 
         return output.toString()
     }
 
+
+
     companion object {
         // Working directory set to artlang/src/test/res
         const val outDir = "out/"
         const val srcDir = "src/"
         const val sampleOutDir = "sampleOutputs/"
+    }
+
+    override fun toString(): String {
+        return "File to test: " + this.testFileName +
+                "\n Print Output? " + this.printOutput +
+                "\nTest succeeded? " + this.succeeded
     }
 
 }

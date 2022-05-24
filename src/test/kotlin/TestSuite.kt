@@ -20,12 +20,16 @@ class TestSuite private constructor(val tests: List<Test>) {
         private val testSuitesCSV: List<String> = emptyList()
 
         fun byId(id: Int): TestSuite {
-            return TestSuite(listOf())
+            val testSuitesString = readTestSuitesCSV().map { it[1] }.toTypedArray()
+            val testSuites = testSuitesString.map { Test(it/*TODO filename*/, false) }
+            testSuites.forEach({test: Test -> println(test) })
+            return TestSuite(testSuites)
         }
 
         fun byName(name: String): TestSuite {
             val testSuitesString = readTestSuitesCSV().map { it[0] }.toTypedArray()
             val testSuites = testSuitesString.map { Test(it/*TODO filename*/, false) }
+            testSuites.forEach({test: Test -> println(test) })
             return TestSuite(testSuites)
         }
 
@@ -34,10 +38,14 @@ class TestSuite private constructor(val tests: List<Test>) {
         }
 
         private fun readTestSuitesCSV(): Array<Array <String>> {
-            val testSuitesCSV: String = Paths.get("testSuites.csv").readText()
+            val testSuitesCSV: String = Paths.get("src/testSuites.csv").readText()
             println(testSuitesCSV)
-            val lines = testSuitesCSV.split(Regex(Pattern.quote("\n"))).toTypedArray()
-            val values = lines.forEach { s: String -> s.split(";") }
+            val lines: MutableList<String> = testSuitesCSV.split(Regex(Pattern.quote("\n"))).toMutableList().apply { removeAt(0) }
+            val values = lines.map { s: String -> s.split(";").toTypedArray() }.toTypedArray()
+            println(values.toString())
+            return values
         }
     }
 }
+
+//TODO testduite aufruf TestSuite(ts1, ts2), dass summary output ganzunten also suites kombinieren
