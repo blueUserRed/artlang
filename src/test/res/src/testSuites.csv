@@ -1,6 +1,6 @@
 test suite name; test suite id; test suite description; test1; test2; test3; testn
 Default;0;Runs simple programs like FizzBuzz and HelloWorld to test basic functions;HelloWorld.art;FizzBuzz.art
-Classes;1;Tests creation of classes, constructing and running methods from classes on Animal Example;Animal.art
+Classes;1;Tests creation of classes, constructing and running methods from classes on Animal Example TODO;Animal.art
 OverridingFunctions;
 AbstractClasses;
 ControlFlow;
