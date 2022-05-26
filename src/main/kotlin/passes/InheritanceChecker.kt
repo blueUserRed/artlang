@@ -109,8 +109,11 @@ class InheritanceChecker : AstNodeVisitor<Unit> {
     override fun visit(clazz: AstNode.ArtClass) {
         clazz as AstNode.ClassDefinition
 
-        clazz.funcs.filter { it !is SyntheticNode }.forEach { it.accept(this) }
-        clazz.staticFuncs.filter { it !is SyntheticNode }.forEach { it.accept(this) }
+        clazz.funcs         .filter { it !is SyntheticNode }.forEach { check(it) }
+        clazz.staticFuncs   .filter { it !is SyntheticNode }.forEach { check(it) }
+        clazz.staticFields  .filter { it !is SyntheticNode }.forEach { check(it) }
+        clazz.fields        .filter { it !is SyntheticNode }.forEach { check(it) }
+        clazz.constructors  .filter { it !is SyntheticNode }.forEach { check(it) }
 
         var next: AstNode.ArtClass? = clazz.extends
         while (next != null) {

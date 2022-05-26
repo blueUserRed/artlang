@@ -6,12 +6,12 @@ import ast.AstNodeVisitor
 import classFile.StackMapTableAttribute.VerificationTypeInfo
 import Datatype
 import Datakind
+import ast.FunctionDescriptor
 import ast.SyntheticNode
 import classFile.*
 import tokenizer.TokenType
 import java.io.File
 import java.util.*
-import java.util.stream.Stream
 import kotlin.math.max
 
 /**
@@ -77,13 +77,6 @@ class Compiler : AstNodeVisitor<Unit> {
      * of the current classfile
      */
     private lateinit var clinit: MethodEmitter
-
-    /**
-     * the builder for the
-     * [`<init>` special method](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-2.html#jvms-2.9)
-     * of the current classfile
-     */
-    private lateinit var init: MethodEmitter
 
     /**
      * true if the last statement that was compiled was a return
@@ -515,7 +508,7 @@ class Compiler : AstNodeVisitor<Unit> {
         emitterTarget.lastStackMapFrameOffset = -1
         emitterTarget.maxLocals = function.amountLocals
 
-        methodBuilder.descriptor = function.functionDescriptor.getDescriptorString()
+        methodBuilder.descriptor = function.functionDescriptor.descriptorString
         methodBuilder.name = function.name
 
         function.statements?.let { compile(it, true) }
@@ -583,15 +576,11 @@ class Compiler : AstNodeVisitor<Unit> {
         clinitBuilder.descriptor = "()V"
         clinitBuilder.isStatic = true
 
-        val initBuilder = MethodBuilder()
-        init = MethodEmitter(initBuilder)
-        initBuilder.name = "<init>"
-        initBuilder.descriptor = "()V"
-
         doStaticFields(program.fields)
 
         isTopLevel = true
-        for (func in program.funcs) func.accept(this)
+        for (func in program.funcs) func.accept(this) // cant use the compile function here because it attempts
+                                                            // to access emitterTarget, which is not yet initialised
         isTopLevel = false
 
         //only add methods if they have code
@@ -599,17 +588,13 @@ class Compiler : AstNodeVisitor<Unit> {
             clinit.emitByteCode(_return)
             file.addMethod(clinitBuilder)
         }
-        if (init.curCodeOffset != 0) {
-            init.emitByteCode(_return)
-            file.addMethod(initBuilder)
-        }
         file.build("$outdir/$curFile.class")
 
         for (clazz in program.classes) if (clazz !is SyntheticNode) doClass(clazz)
     }
 
     /**
-     * compiles a class. Sets [file], [clinit], [init] and [emitterTarget].
+     * compiles a class. Sets [file], [clinit] and [emitterTarget].
      * Creates the output file and compiles all functions and fields associated with this class
      */
     private fun doClass(clazz: AstNode.ArtClass) {
@@ -634,49 +619,51 @@ class Compiler : AstNodeVisitor<Unit> {
         clinitBuilder.descriptor = "()V"
         clinitBuilder.isStatic = true
 
-        val initBuilder = MethodBuilder()
-        init = MethodEmitter(initBuilder)
-        initBuilder.name = "<init>"
-        initBuilder.descriptor = "()V"
-        initBuilder.maxLocals = 1
-
-        emitterTarget = init
-        doDefaultConstructor()
-
-        doNonStaticFields(clazz.fields)
         doStaticFields(clazz.staticFields)
 
         for (func in clazz.staticFuncs) compile(func, true)
         for (func in clazz.funcs) compile(func, true)
 
-        //only emit methods if they contain code
+        //only emit method if it contains code
         if (clinit.curCodeOffset != 0) {
             clinit.emitByteCode(_return)
             file.addMethod(clinitBuilder)
         }
-        if (init.curCodeOffset != 0) {
-            init.emitByteCode(_return)
-            file.addMethod(initBuilder)
+
+        if (clazz.constructors.isEmpty()) doDefaultConstructor()
+        else {
+
+            var maxFieldLocals = 0
+            for (field in clazz.fields) {
+                field as AstNode.FieldDeclaration
+
+                if (field.amountLocals > maxFieldLocals) maxFieldLocals = field.amountLocals
+            }
+
+            for (con in clazz.constructors) {
+                con as AstNode.ConstructorDeclaration
+
+                val initBuilder = MethodBuilder()
+                initBuilder.name = "<init>"
+                initBuilder.isPrivate = con.isPrivate
+                initBuilder.isPublic = !initBuilder.isPrivate
+                initBuilder.maxLocals = max(maxFieldLocals, con.amountLocals)
+                initBuilder.descriptor = con.jvmDescriptor.descriptorString
+
+                emitterTarget = MethodEmitter(initBuilder)
+                compile(con, true)
+                file.addMethod(initBuilder)
+            }
         }
 
         file.build("$outdir/$curFile.class")
     }
 
     /**
-     * compiles the non-static fields of the current class. Sets [emitterTarget]
+     * compiles the non-static fields of the current class. Assumes [emitterTarget] is set correctly
      */
     private fun doNonStaticFields(fields: List<AstNode.Field>) {
         if (fields.isEmpty()) return
-        emitterTarget = init
-
-        var maxLocals = 1
-        for (field in fields) {
-            field as AstNode.FieldDeclaration
-            if (field.amountLocals > maxLocals) maxLocals = field.amountLocals
-        }
-        emitterTarget.maxLocals = maxLocals
-        emitterTarget.locals = MutableList(maxLocals) { null }
-
         for (field in fields) compile(field, true)
     }
 
@@ -1002,7 +989,7 @@ class Compiler : AstNodeVisitor<Unit> {
                 )),
                 file.nameAndTypeInfo(
                     file.utf8Info(funcCall.name.lexeme),
-                    file.utf8Info(funcCall.definition.functionDescriptor.getDescriptorString())
+                    file.utf8Info(funcCall.definition.functionDescriptor.descriptorString)
                 )
             )
             emit(*Utils.getLastTwoBytes(funcRef))
@@ -1019,7 +1006,7 @@ class Compiler : AstNodeVisitor<Unit> {
             file.classInfo(file.utf8Info(funcCall.definition.clazz!!.jvmName)),
             file.nameAndTypeInfo(
                 file.utf8Info(funcCall.name.lexeme),
-                file.utf8Info(funcCall.definition.functionDescriptor.getDescriptorString())
+                file.utf8Info(funcCall.definition.functionDescriptor.descriptorString)
             )
         )
         emit(*Utils.getLastTwoBytes(funcRef))
@@ -1386,14 +1373,19 @@ class Compiler : AstNodeVisitor<Unit> {
         incStack(constructorCall.type)
         doDup()
 
+        for (arg in constructorCall.arguments) compile(arg, false)
+
         val methodIndex = file.methodRefInfo(
             file.classInfo(file.utf8Info(constructorCall.clazz.name)),
             file.nameAndTypeInfo(
                 file.utf8Info("<init>"),
-                file.utf8Info("()V")
+                file.utf8Info(constructorCall.constuctor.jvmDescriptor.descriptorString)
             )
         )
         emit(invokespecial, *Utils.getLastTwoBytes(methodIndex))
+
+        repeat(constructorCall.arguments.size) { decStack() }
+
         decStack()
     }
 
@@ -1580,7 +1572,7 @@ class Compiler : AstNodeVisitor<Unit> {
             file.classInfo(file.utf8Info(supCall.definition.clazz!!.jvmName)),
             file.nameAndTypeInfo(
                 file.utf8Info(supCall.definition.name),
-                file.utf8Info(supCall.definition.functionDescriptor.getDescriptorString())
+                file.utf8Info(supCall.definition.functionDescriptor.descriptorString)
             )
         )
 
@@ -1598,7 +1590,28 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     override fun visit(constructor: AstNode.Constructor) {
-        TODO("Not yet implemented")
+        constructor as AstNode.ConstructorDeclaration
+
+        val superConstructorIndex = file.methodRefInfo(
+            file.classInfo(file.utf8Info(curClass?.extends?.jvmName ?: "java/lang/Object")),
+            file.nameAndTypeInfo(
+                file.utf8Info("<init>"),
+                file.utf8Info("()V")
+            )
+        )
+        emit(
+            aload_0,
+            invokespecial,
+            *Utils.getLastTwoBytes(superConstructorIndex),
+        )
+        incStack(VerificationTypeInfo.UninitializedThis())
+        decStack()
+
+        doNonStaticFields(curClass!!.fields)
+
+        constructor.body?.let { compile(it, true) }
+
+        emit(_return)
     }
 
     /**
@@ -1619,7 +1632,16 @@ class Compiler : AstNodeVisitor<Unit> {
      * not return
      */
     private fun doDefaultConstructor() {
-        val objConstructorIndex = file.methodRefInfo(
+
+        val init = MethodBuilder()
+        init.name = "<init>"
+        init.descriptor = "()V"
+        init.maxLocals = 1
+        init.isPublic = true
+
+        emitterTarget = MethodEmitter(init)
+
+        val superConstructorIndex = file.methodRefInfo(
             file.classInfo(file.utf8Info(curClass?.extends?.jvmName ?: "java/lang/Object")),
             file.nameAndTypeInfo(
                 file.utf8Info("<init>"),
@@ -1629,10 +1651,12 @@ class Compiler : AstNodeVisitor<Unit> {
         emit(
             aload_0,
             invokespecial,
-            *Utils.getLastTwoBytes(objConstructorIndex),
+            *Utils.getLastTwoBytes(superConstructorIndex),
         )
         incStack(VerificationTypeInfo.UninitializedThis())
         decStack()
+
+        file.addMethod(init)
     }
 
     /**

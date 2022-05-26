@@ -168,6 +168,7 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
         for (field in clazz.staticFields) check(field)
         for (func in clazz.funcs) check(func)
         for (func in clazz.staticFuncs) check(func)
+        for (con in clazz.constructors) check(con)
         return ControlFlowState()
     }
 

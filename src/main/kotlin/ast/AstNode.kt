@@ -828,6 +828,7 @@ abstract class AstNode(val relevantTokens: List<Token>) {
     class ConstructorCall(
         var clazz: ArtClass,
         val arguments: MutableList<AstNode>,
+        val constuctor: Constructor,
         relevantTokens: List<Token>
     ) : AstNode(relevantTokens) {
 
@@ -1124,6 +1125,12 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         abstract val descriptor: FunctionDescriptor
 
         /**
+         * the descriptor that this constructor has on the jvm. Like [descriptor], but the return-type is void
+         */
+        val jvmDescriptor: FunctionDescriptor
+            get() = FunctionDescriptor(descriptor.args, Datatype.Void())
+
+        /**
          * the class of this constructor
          */
         abstract var clazz: ArtClass
@@ -1134,18 +1141,20 @@ abstract class AstNode(val relevantTokens: List<Token>) {
      * represents a declaration of a constructor
      * @param modifiers the modifiers for this constructor
      * @param body the body of this constructor; null if none is present
-     * @param arguments the arguments of the constructor as TypeNodes
+     * @param args the arguments of the constructor as TypeNodes
      */
     class ConstructorDeclaration(
         val modifiers: List<Token>,
         var body: Block?,
-        val arguments: MutableList<Pair<Token, DatatypeNode>>,
+        val args: MutableList<Pair<Token, DatatypeNode>>,
         relevantTokens: List<Token>
     ) : Constructor(relevantTokens) {
 
         override val isPrivate: Boolean = "public" !in modifiers.map { it.lexeme }
 
         lateinit var _descriptor: FunctionDescriptor
+
+        var amountLocals: Int = -1
 
         override val descriptor: FunctionDescriptor
             get() = _descriptor
@@ -1197,17 +1206,19 @@ abstract class AstNode(val relevantTokens: List<Token>) {
 data class FunctionDescriptor(val args: MutableList<Pair<String, Datatype>>, val returnType: Datatype) {
 
     /**
-     * returns the [descriptor](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.3.3)
+     * the [descriptor](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.3.3)
      * of the function
      */
-    fun getDescriptorString(): String {
-        val builder = StringBuilder()
-        builder.append("(")
-        for (arg in args) if (arg.first != "this") builder.append(arg.second.descriptorType)
-        builder.append(")")
-        builder.append(returnType.descriptorType)
-        return builder.toString()
-    }
+    val descriptorString: String
+        get() {
+            val builder = StringBuilder()
+            builder.append("(")
+            for (arg in args) if (arg.first != "this") builder.append(arg.second.descriptorType)
+            builder.append(")")
+            builder.append(returnType.descriptorType)
+            return builder.toString()
+        }
+
 
     /**
      * checks if this descriptor matches another descriptor (excluding return type)
@@ -1233,7 +1244,13 @@ data class FunctionDescriptor(val args: MutableList<Pair<String, Datatype>>, val
         for (i in other.indices) {
             if (other[i].kind != argsNoThis[i].second.kind) return false
             if (other[i].kind == Datakind.OBJECT) {
-                return Datatype.StatClass((argsNoThis[i].second as Datatype.Object).clazz).isSuperClassOf((other[i] as Datatype.Object).clazz)
+                if (
+                    argsNoThis[i].second != other[i] &&
+                    !Datatype.StatClass((argsNoThis[i].second as Datatype.Object).clazz)
+                        .isSuperClassOf((other[i] as Datatype.Object).clazz)
+                ) {
+                    return false
+                }
             }
         }
         return true

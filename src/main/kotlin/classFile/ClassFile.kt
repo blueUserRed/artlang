@@ -1,6 +1,8 @@
 package classFile
 
+import java.io.OutputStreamWriter
 import java.lang.RuntimeException
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Paths
 
@@ -287,9 +289,9 @@ abstract class ConstantInfo(val tag: Byte) {
 }
 
 /**
- * represents a utf8 info
+ * represents an utf8 info
  */
-class ConstantUTF8Info(val string: String) : ConstantInfo(1) {
+class ConstantUTF8Info(val string: String) : ConstantInfo(1) { //TODO: fix modified utf8
 
     /**
      * the string as byte array

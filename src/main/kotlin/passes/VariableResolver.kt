@@ -168,6 +168,7 @@ class VariableResolver : AstNodeVisitor<Unit> {
         for (field in clazz.staticFields) resolve(field, clazz)
         for (func in clazz.staticFuncs) resolve(func, clazz)
         for (func in clazz.funcs) resolve(func, clazz)
+        for (con in clazz.constructors) resolve(con, clazz)
     }
 
     override fun visit(get: AstNode.Get) {
@@ -255,7 +256,19 @@ class VariableResolver : AstNodeVisitor<Unit> {
     }
 
     override fun visit(constructor: AstNode.Constructor) {
-        TODO("Not yet implemented")
+        constructor as AstNode.ConstructorDeclaration
+
+        val vars = mutableListOf<String>()
+        val varDecs = mutableListOf<AstNode.VariableDeclaration?>()
+        vars.add("this")
+        varDecs.add(null)
+        for (arg in constructor.args) {
+            vars.add(arg.first.lexeme)
+            varDecs.add(null)
+        }
+        curVars = vars
+        varDeclarations = varDecs
+        constructor.body?.let { resolve(it, constructor) }
     }
 
     /**

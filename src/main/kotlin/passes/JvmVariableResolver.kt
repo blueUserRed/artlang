@@ -118,6 +118,7 @@ class JvmVariableResolver : AstNodeVisitor<Unit> {
         for (field in clazz.staticFields) resolve(field)
         for (func in clazz.staticFuncs) resolve(func)
         for (func in clazz.funcs) resolve(func)
+        for (con in clazz.constructors) resolve(con)
         curClass = null
     }
 
@@ -200,7 +201,13 @@ class JvmVariableResolver : AstNodeVisitor<Unit> {
     }
 
     override fun visit(constructor: AstNode.Constructor) {
-        TODO("Not yet implemented")
+        constructor as AstNode.ConstructorDeclaration
+        maxLocals = 0
+        jvmVars.clear()
+//        addVar("this", Datatype.Object(constructor.clazz))
+        for (arg in constructor.descriptor.args) addVar(arg.first, arg.second)
+        constructor.body?.let { resolve(it) }
+        constructor.amountLocals = maxLocals
     }
 
     /**

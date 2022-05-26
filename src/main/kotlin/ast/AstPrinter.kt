@@ -136,7 +136,7 @@ class AstPrinter : AstNodeVisitor<String> {
         for (field in clazz.staticFields) builder.append(field.accept(this))
         for (func in clazz.staticFuncs) builder.append(func.accept(this))
         for (func in clazz.funcs) builder.append(func.accept(this))
-        for (c in clazz.constructors) builder.append(c.accept(this))
+        for (c in clazz.constructors) if (c !is SyntheticNode) builder.append(c.accept(this))
         builder.append("}\n")
         return builder.toString()
     }
@@ -238,7 +238,7 @@ class AstPrinter : AstNodeVisitor<String> {
         constructor as AstNode.ConstructorDeclaration
         val builder = StringBuilder()
         builder.append("constructor(")
-        for (arg in constructor.arguments) {
+        for (arg in constructor.args) {
             builder
                 .append(arg.first.lexeme)
                 .append(": ")

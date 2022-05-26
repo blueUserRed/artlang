@@ -301,10 +301,10 @@ class Errors {
     class PrivateMemberAccessError(
         val access: AstNode,
         val type: String,
-        val name: String,
+        val name: String?,
         srcCode: String
     ) : ArtError(20, srcCode) {
-        override val message: String = "Cannot access private $type $name"
+        override val message: String = "Cannot access private $type ${name ?: ""}"
         override val ranges: MutableMap<Int, Pair<Int, Int>>
             get() = access.accept(MinMaxPosFinder())
     }

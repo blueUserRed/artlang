@@ -28,6 +28,10 @@ object SyntheticAst {
         "java/lang/Object"
     )
 
+    /**
+     * represents the java.lang.String class. It is called $String in art to stop people from referring to it directly
+     * and using str direct
+     */
     val stringClass: SyntClass = SyntClass(
         "\$String",
         staticFuncs = mutableListOf(),
@@ -38,6 +42,7 @@ object SyntheticAst {
         objectClass,
         "java/lang/String"
     )
+
 
     init {
         objectClass.funcs.addAll(arrayOf(
@@ -140,6 +145,23 @@ object SyntheticAst {
 
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = throw RuntimeException("cant visit synthetic node")
 
+    }
+
+    /**
+     * represents a synthetic constructor
+     * @param isPrivate true if the constructor is private
+     * @param descriptor the descriptor containing the argument types of the constructor
+     * @param clazz the class which this constructor instantiates
+     */
+    class SyntConstructor(
+        override val isPrivate: Boolean,
+        override val descriptor: FunctionDescriptor,
+        override var clazz: ArtClass
+    ) : AstNode.Constructor(listOf()), SyntheticNode {
+
+        override fun swap(orig: AstNode, to: AstNode) = throw CantSwapException()
+
+        override fun <T> accept(visitor: AstNodeVisitor<T>): T = throw RuntimeException("cant visit synthetic node")
     }
 
     /**

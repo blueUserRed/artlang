@@ -1,12 +1,12 @@
 
+fn main() {
+    Test("Hello World")
+}
 
 class Test {
 
-    constructor(a: int, b: str)
-
-    constructor(sdf: str[], hi: long) {
-        print 2 + 2
-        let x = "hsdldf"
+    constructor(message: str) {
+        print message
     }
 
 }

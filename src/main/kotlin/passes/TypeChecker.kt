@@ -179,6 +179,17 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             names.add(clazz.name)
             preCalcFields(clazz.fields + clazz.staticFields, clazz)
             preCalcFuncs(clazz.funcs + clazz.staticFuncs, clazz)
+            preCalcConstructors(clazz.constructors, clazz)
+
+            if (clazz.constructors.isEmpty()) {
+                // add default constructor if no manually defined constructor is present
+                clazz.constructors.add(SyntheticAst.SyntConstructor(
+                    false,
+                    FunctionDescriptor(mutableListOf(), Datatype.Object(clazz)),
+                    clazz
+                ))
+            }
+
         }
         for (clazz in clazzes) if (clazz !is SyntheticNode) {
             clazz as AstNode.ClassDefinition
@@ -258,6 +269,30 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             val explType = typeNodeToDataType(field.explType)
             field._fieldType = explType
             field.clazz = clazz
+        }
+    }
+
+    /**
+     * pre-calculates constructors. This is necessary to e.g. determine the types of functions/fields before the main
+     * type-checking phase starts
+     */
+    private fun preCalcConstructors(constructors: List<AstNode.Constructor>, clazz: AstNode.ArtClass) {
+        for (constructor in constructors) if (constructor !is SyntheticNode) {
+            constructor as AstNode.ConstructorDeclaration
+
+            constructor.clazz = clazz
+
+            val args = mutableListOf<Pair<String, Datatype>>()
+            args.add("this" to Datatype.Object(constructor.clazz))
+            for (arg in constructor.args) args.add(arg.first.lexeme to typeNodeToDataType(arg.second))
+            constructor._descriptor = FunctionDescriptor(args, Datatype.Object(clazz))
+        }
+        for (con1 in constructors) for (con2 in constructors) if (con1 !== con2 && con1.descriptor.matches(con2.descriptor)) {
+            artError(Errors.DuplicateDefinitionError(
+                con2.relevantTokens[0],
+                "constructor",
+                srcCode
+            ))
         }
     }
 
@@ -467,31 +502,33 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                 return func.functionDescriptor.returnType
             }
             if (curClass != null && funcCall.name.lexeme == curClass!!.name) {
-                if (funcCall.arguments.size != 0) {
-                    artError(Errors.OperationNotImplementedError(
-                        funcCall,
-                        "Constructors with parameters are not implemented",
-                        srcCode
-                    ))
+                val con = Datatype.StatClass(curClass!!).lookupConstructor(thisSig)
+                if (con != null) {
+                    val toSwap = AstNode.ConstructorCall(curClass!!, funcCall.arguments, con, funcCall.relevantTokens)
+                    toSwap.type = Datatype.Object(curClass!!)
+                    swap = toSwap
+                    return toSwap.type
                 }
-                val toSwap = AstNode.ConstructorCall(curClass!!, funcCall.arguments, funcCall.relevantTokens)
-                toSwap.type = Datatype.Object(curClass!!)
-                swap = toSwap
-                return toSwap.type
             }
             val clazz = lookupTopLevelClass(funcCall.name.lexeme)
             if (clazz != null) {
-                if (funcCall.arguments.size != 0) {
-                    artError(Errors.OperationNotImplementedError(
-                        funcCall,
-                        "Constructors with parameters are not implemented",
-                        srcCode
-                    ))
+                val con = Datatype.StatClass(clazz).lookupConstructor(thisSig)
+                if (con != null) {
+
+                    if (con.isPrivate) {
+                        artError(Errors.PrivateMemberAccessError(
+                            funcCall,
+                            "constructor",
+                            null,
+                            srcCode
+                        ))
+                    }
+
+                    val toSwap = AstNode.ConstructorCall(clazz, funcCall.arguments, con, funcCall.relevantTokens)
+                    toSwap.type = Datatype.Object(clazz)
+                    swap = toSwap
+                    return toSwap.type
                 }
-                val toSwap = AstNode.ConstructorCall(clazz, funcCall.arguments, funcCall.relevantTokens)
-                toSwap.type = Datatype.Object(clazz)
-                swap = toSwap
-                return toSwap.type
             }
 
             artError(Errors.UnknownIdentifierError(funcCall.name, srcCode))
@@ -595,6 +632,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         for (field in clazz.staticFields) check(field, clazz)
         for (func in clazz.staticFuncs) check(func, clazz)
         for (func in clazz.funcs) check(func, clazz)
+        for (con in clazz.constructors) check(con, clazz)
         curClass = tmp
         return Datatype.Void()
     }
@@ -942,7 +980,15 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     }
 
     override fun visit(constructor: AstNode.Constructor): Datatype {
-        TODO("Not yet implemented")
+        constructor as AstNode.ConstructorDeclaration
+
+        val newVars = mutableMapOf<Int, Datatype>()
+        newVars[0] = Datatype.Object(constructor.clazz)
+        for (i in constructor.descriptor.args.indices) newVars[i] = constructor.descriptor.args[i].second
+        vars = newVars
+        constructor.body?.let { check(it, constructor) }
+        curFunction = null
+        return Datatype.Void()
     }
 
     /**
