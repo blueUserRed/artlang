@@ -3,6 +3,7 @@ package errors
 import ast.AstNode
 import ast.MinMaxPosFinder
 import Datatype
+import Either
 import tokenizer.Token
 
 /**
@@ -514,6 +515,50 @@ class Errors {
         override val message: String = "Number too big for range $numType"
         override val ranges: MutableMap<Int, Pair<Int, Int>>
             get() = mutableMapOf(numToken.line to (numToken.pos to numToken.pos + numToken.lexeme.length))
+    }
+
+    class NoMatchingSuperConstructorFoundError(
+        val openParen: Token,
+        val closingParen: Token,
+        srcCode: String
+    ) : ArtError(42, srcCode) {
+        override val message: String = "No constructor in super is invokable with these arguments"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = MinMaxPosFinder().getMinMaxFor(listOf(openParen, closingParen))
+    }
+
+    class SuperHasNoDefaultConstructorError(
+        val constructor: AstNode.Constructor,
+        srcCode: String
+    ) : ArtError(43, srcCode) {
+        override val message: String = "Constructor needs to invoke a super constructor because no default-constructor" +
+                " was found in super-class."
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = constructor.accept(MinMaxPosFinder())
+    }
+
+    class FieldIsNotInitialisedError(
+        val toHighlight: Either<Token, AstNode>,
+        val fieldName: String,
+        srcCode: String
+    ) : ArtError(44, srcCode) {
+        override val message: String = "Field $fieldName is not initialized"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = if (toHighlight is Either.Left) {
+                mutableMapOf(toHighlight.value.line to (toHighlight.value.pos to toHighlight.value.pos + toHighlight.value.lexeme.length))
+            } else {
+                (toHighlight as Either.Right).value.accept(MinMaxPosFinder())
+            }
+    }
+
+    class FieldAccessBeforeInitialization(
+        val access: AstNode,
+        val fieldName: String,
+        srcCode: String
+    ) : ArtError(45, srcCode) {
+        override val message: String = "Cannot access field $fieldName before it is initialized"
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = access.accept(MinMaxPosFinder())
     }
 
 }

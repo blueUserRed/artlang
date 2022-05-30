@@ -203,7 +203,7 @@ class InheritanceChecker : AstNodeVisitor<Unit> {
 
     override fun visit(field: AstNode.Field) {
         field as AstNode.FieldDeclaration
-        check(field.initializer)
+        field.initializer?.let { check(it) }
     }
 
     override fun visit(arr: AstNode.ArrayCreate) {
@@ -263,6 +263,7 @@ class InheritanceChecker : AstNodeVisitor<Unit> {
     override fun visit(constructor: AstNode.Constructor) {
         constructor as AstNode.ConstructorDeclaration
 
+        constructor.superCallArgs?.forEach { check(it) }
         constructor.body?.let { check(it) }
     }
 

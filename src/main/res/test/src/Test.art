@@ -1,12 +1,21 @@
 
-fn main() {
-    Test("Hello World")
-}
-
 class Test {
-
-    constructor(message: str) {
-        print message
-    }
-
 }
+
+//class Animal {
+//
+//    public constructor(name: str, age: int) {
+//        print "animal " + name + " was created"
+//    }
+//
+//}
+//
+//class Cat : Animal {
+//
+//    public constructor(name: str, color: str, age: int) : (name, age) {
+//        let colorString = "Color: " + color
+//        print "Cat was created!"
+//        print colorString
+//    }
+//
+//}

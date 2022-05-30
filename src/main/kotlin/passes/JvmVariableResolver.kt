@@ -114,11 +114,11 @@ class JvmVariableResolver : AstNodeVisitor<Unit> {
 
     override fun visit(clazz: AstNode.ArtClass) {
         curClass = clazz
-        for (field in clazz.fields) resolve(field)
-        for (field in clazz.staticFields) resolve(field)
-        for (func in clazz.staticFuncs) resolve(func)
-        for (func in clazz.funcs) resolve(func)
-        for (con in clazz.constructors) resolve(con)
+        for (field in clazz.fields)         if (field !is SyntheticNode) resolve(field)
+        for (field in clazz.staticFields)   if (field !is SyntheticNode) resolve(field)
+        for (func in clazz.staticFuncs)     if (func !is SyntheticNode)  resolve(func)
+        for (func in clazz.funcs)           if (func !is SyntheticNode)  resolve(func)
+        for (con in clazz.constructors)     if (con !is SyntheticNode)   resolve(con)
         curClass = null
     }
 
@@ -143,7 +143,7 @@ class JvmVariableResolver : AstNodeVisitor<Unit> {
 
         if (!field.isStatic && !field.isTopLevel) addVar("this", Datatype.Object(curClass!!))
 
-        resolve(field.initializer)
+        field.initializer?.let { resolve(it) }
         field.amountLocals = maxLocals
     }
 
@@ -206,8 +206,9 @@ class JvmVariableResolver : AstNodeVisitor<Unit> {
         jvmVars.clear()
 //        addVar("this", Datatype.Object(constructor.clazz))
         for (arg in constructor.descriptor.args) addVar(arg.first, arg.second)
+        constructor.superCallArgs?.forEach { resolve(it) }
         constructor.body?.let { resolve(it) }
-        constructor.amountLocals = maxLocals
+        constructor.amountLocals = if (constructor.body == null) jvmVars.size else maxLocals
     }
 
     /**

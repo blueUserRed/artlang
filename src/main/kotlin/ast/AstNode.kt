@@ -899,7 +899,7 @@ abstract class AstNode(val relevantTokens: List<Token>) {
     class FieldDeclaration(
         val nameToken: Token,
         val explType: DatatypeNode,
-        var initializer: AstNode,
+        var initializer: AstNode?,
         override val isConst: Boolean,
         val modifiers: List<Token>,
         override val isTopLevel: Boolean,
@@ -1147,6 +1147,7 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         val modifiers: List<Token>,
         var body: Block?,
         val args: MutableList<Pair<Token, DatatypeNode>>,
+        var superCallArgs: MutableList<AstNode>?,
         relevantTokens: List<Token>
     ) : Constructor(relevantTokens) {
 
@@ -1154,7 +1155,15 @@ abstract class AstNode(val relevantTokens: List<Token>) {
 
         lateinit var _descriptor: FunctionDescriptor
 
+        /**
+         * the maximum amount of locals used by this constructor
+         */
         var amountLocals: Int = -1
+
+        /**
+         * the constructor called with the super-call part of the constructor; null if the constructor has no super-part
+         */
+        var superConstructor: Constructor? = null
 
         override val descriptor: FunctionDescriptor
             get() = _descriptor
@@ -1162,8 +1171,14 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         override lateinit var clazz: ArtClass
 
         override fun swap(orig: AstNode, to: AstNode) {
-            if (orig !== body || to !is Block) throw CantSwapException()
-            body = to
+            if (orig === body && to is Block) body = to
+            else if (superCallArgs != null){
+                for (i in superCallArgs!!.indices) if (superCallArgs!![i] === orig) {
+                    superCallArgs!![i] = to
+                    return
+                }
+                throw CantSwapException()
+            } else throw CantSwapException()
         }
 
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)

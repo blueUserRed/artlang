@@ -69,6 +69,14 @@ object SyntheticAst {
 
         ))
 
+        objectClass.constructors.add(
+            SyntConstructor(
+                false,
+                FunctionDescriptor(mutableListOf(), Datatype.Object(objectClass)),
+                objectClass
+            )
+        )
+
     }
 
     /**
@@ -153,7 +161,7 @@ object SyntheticAst {
      * @param descriptor the descriptor containing the argument types of the constructor
      * @param clazz the class which this constructor instantiates
      */
-    class SyntConstructor(
+    open class SyntConstructor(
         override val isPrivate: Boolean,
         override val descriptor: FunctionDescriptor,
         override var clazz: ArtClass
@@ -163,6 +171,13 @@ object SyntheticAst {
 
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = throw RuntimeException("cant visit synthetic node")
     }
+
+    /**
+     * represents the default constructor that is emitted if a class does not define a constructor
+     */
+    class DefaultConstructor(
+        clazz: ArtClass
+    ) : SyntConstructor(false, FunctionDescriptor(mutableListOf(), Datatype.Object(clazz)), clazz)
 
     /**
      * adds the synthetic tree to the real tree

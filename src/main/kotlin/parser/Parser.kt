@@ -88,11 +88,11 @@ class Parser {
 
     /**
      * parses a field declaration
-     * @param modifiers the modifiers that preceeded the field
+     * @param modifiers the modifiers that preceded the field
      * @param isConst true if the field is const
      * @param isTopLevel true if the field was defined in the top level
      */
-    private fun parseFieldDeclaration(modifiers: List<Token>, isConst: Boolean, isTopLevel: Boolean) : AstNode.Field {
+    private fun parseFieldDeclaration(modifiers: List<Token>, isConst: Boolean, isTopLevel: Boolean): AstNode.Field {
         val fieldToken = last()
         validateModifiersForField(modifiers)
         consumeOrError(TokenType.IDENTIFIER, "expected name")
@@ -100,10 +100,11 @@ class Parser {
         if (name.lexeme == "this") syntaxError("'this' cannot be used as a parameter-name", name)
         consumeOrError(TokenType.COLON, "Field-definitions always require a explicit type")
         val type = parseType()
-        consumeOrError(TokenType.EQ, "")
-        val initializer = parseStatement()
+        val initializer = if (match(TokenType.EQ)) parseStatement() else null
+
         if (!matchNSFB(TokenType.SOFT_BREAK, TokenType.SEMICOLON)) syntaxError("Expected new line or semicolon" +
                 " after field declaration", peek())
+
         return AstNode.FieldDeclaration(
             name,
             type,
@@ -263,7 +264,8 @@ class Parser {
      * parses a constructor
      */
     private fun parseConstructor(modifiers: List<Token>): AstNode.ConstructorDeclaration {
-        val constructorToken = last()
+        val relevantTokens = mutableListOf(last())
+
         validateModifiersForConstructor(modifiers)
         consumeOrError(TokenType.L_PAREN, "Expected () after constructor definition")
         val args = mutableListOf<Pair<Token, AstNode.DatatypeNode>>()
@@ -276,14 +278,32 @@ class Parser {
             if (!match(TokenType.COMMA)) break
         }
         consumeOrError(TokenType.R_PAREN, "Expected () after constructor definition")
-        val clBracket = last()
+        relevantTokens.add(last())
+
+        var superArgs: MutableList<AstNode>? = null
+
+        if (match(TokenType.COLON)) {
+            superArgs = mutableListOf()
+            consumeOrError(TokenType.L_PAREN, "Expected () in super-constructor call")
+            relevantTokens.add(last())
+            while (!match(TokenType.R_PAREN)) {
+                superArgs.add(parseStatement())
+                if (!match(TokenType.COMMA)) {
+                    consumeOrError(TokenType.R_PAREN, "expected closing paren")
+                    break
+                }
+            }
+            relevantTokens.add(last())
+        }
+
         var body: AstNode.Block? = null
         if (match(TokenType.L_BRACE)) body = parseBlock()
         return AstNode.ConstructorDeclaration(
             modifiers,
             body,
             args,
-            listOf(constructorToken, clBracket) + (body?.relevantTokens ?: listOf())
+            superArgs,
+            relevantTokens
         )
     }
 

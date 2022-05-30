@@ -1,13 +1,10 @@
 package compiler
 
 import Utils
-import ast.AstNode
-import ast.AstNodeVisitor
 import classFile.StackMapTableAttribute.VerificationTypeInfo
 import Datatype
 import Datakind
-import ast.FunctionDescriptor
-import ast.SyntheticNode
+import ast.*
 import classFile.*
 import tokenizer.TokenType
 import java.io.File
@@ -630,8 +627,9 @@ class Compiler : AstNodeVisitor<Unit> {
             file.addMethod(clinitBuilder)
         }
 
-        if (clazz.constructors.isEmpty()) doDefaultConstructor()
-        else {
+        if (clazz.constructors.size == 1 && clazz.constructors[0] is SyntheticAst.DefaultConstructor) {
+            doDefaultConstructor()
+        }  else {
 
             var maxFieldLocals = 0
             for (field in clazz.fields) {
@@ -651,6 +649,8 @@ class Compiler : AstNodeVisitor<Unit> {
                 initBuilder.descriptor = con.jvmDescriptor.descriptorString
 
                 emitterTarget = MethodEmitter(initBuilder)
+                emitterTarget.locals = MutableList(initBuilder.maxLocals) { null }
+
                 compile(con, true)
                 file.addMethod(initBuilder)
             }
@@ -1419,7 +1419,7 @@ class Compiler : AstNodeVisitor<Unit> {
             incStack(getObjVerificationType(curClass!!.jvmName))
         }
 
-        compile(field.initializer, false)
+        compile(field.initializer!!, false) //TODO: delete
 
         val fieldRefIndex = file.fieldRefInfo(
             file.classInfo(file.utf8Info(curClass?.jvmName ?: topLevelName)),
@@ -1592,20 +1592,44 @@ class Compiler : AstNodeVisitor<Unit> {
     override fun visit(constructor: AstNode.Constructor) {
         constructor as AstNode.ConstructorDeclaration
 
-        val superConstructorIndex = file.methodRefInfo(
-            file.classInfo(file.utf8Info(curClass?.extends?.jvmName ?: "java/lang/Object")),
-            file.nameAndTypeInfo(
-                file.utf8Info("<init>"),
-                file.utf8Info("()V")
+        val superConstructorIndex: Int
+        if (constructor.superConstructor != null) {
+            superConstructorIndex = file.methodRefInfo(
+                file.classInfo(file.utf8Info(constructor.superConstructor!!.clazz.jvmName)),
+                file.nameAndTypeInfo(
+                    file.utf8Info("<init>"),
+                    file.utf8Info(constructor.superConstructor!!.jvmDescriptor.descriptorString)
+                )
             )
-        )
+        } else {
+            superConstructorIndex = file.methodRefInfo(
+                file.classInfo(file.utf8Info(constructor.clazz.extends!!.jvmName)),
+                file.nameAndTypeInfo(
+                    file.utf8Info("<init>"),
+                    file.utf8Info("()V")
+                )
+            )
+        }
+
+//        val superConstructorIndex = file.methodRefInfo(
+//            file.classInfo(file.utf8Info(curClass?.extends?.jvmName ?: "java/lang/Object")),
+//            file.nameAndTypeInfo(
+//                file.utf8Info("<init>"),
+//                file.utf8Info("()V")
+//            )
+//        )
+
+        emit(aload_0)
+        incStack(VerificationTypeInfo.UninitializedThis())
+
+        if (constructor.superCallArgs != null) for (arg in constructor.superCallArgs!!) compile(arg, false)
+
         emit(
-            aload_0,
             invokespecial,
             *Utils.getLastTwoBytes(superConstructorIndex),
         )
-        incStack(VerificationTypeInfo.UninitializedThis())
         decStack()
+        if (constructor.superConstructor != null) repeat(constructor.superCallArgs!!.size) { decStack() }
 
         doNonStaticFields(curClass!!.fields)
 

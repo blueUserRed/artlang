@@ -202,7 +202,7 @@ class VariableResolver : AstNodeVisitor<Unit> {
             curVars.add("this")
             varDeclarations.add(null)
         }
-        resolve(field.initializer, field)
+        field.initializer?.let { resolve(it, field) }
     }
 
     override fun visit(arr: AstNode.ArrayCreate) {
@@ -268,6 +268,9 @@ class VariableResolver : AstNodeVisitor<Unit> {
         }
         curVars = vars
         varDeclarations = varDecs
+
+        constructor.superCallArgs?.forEach { resolve(it, constructor) }
+
         constructor.body?.let { resolve(it, constructor) }
     }
 

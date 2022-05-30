@@ -165,7 +165,7 @@ class AstPrinter : AstNodeVisitor<String> {
         builder
             .append(field.name)
             .append(" = ")
-            .append(field.initializer.accept(this))
+            .append(field.initializer?.accept(this) ?: "")
             .append("\n")
         return builder.toString()
     }

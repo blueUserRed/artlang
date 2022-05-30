@@ -21,6 +21,11 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     private var vars: MutableMap<Int, Datatype> = mutableMapOf()
 
     /**
+     * true if currently in a constructor
+     */
+    private var inConstructor: Boolean = false
+
+    /**
      * the program currently being compiled
      */
     private lateinit var program: AstNode.Program
@@ -183,11 +188,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
             if (clazz.constructors.isEmpty()) {
                 // add default constructor if no manually defined constructor is present
-                clazz.constructors.add(SyntheticAst.SyntConstructor(
-                    false,
-                    FunctionDescriptor(mutableListOf(), Datatype.Object(clazz)),
-                    clazz
-                ))
+                clazz.constructors.add(SyntheticAst.DefaultConstructor(clazz))
             }
 
         }
@@ -371,6 +372,13 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                 if (!varType.compatibleWith(typeToAssign)) {
                     artError(Errors.IncompatibleTypesError(varAssign, "assignment", varType, typeToAssign, srcCode))
                 }
+                if (!inConstructor && field.isConst) {
+                    artError(Errors.AssignToConstError(
+                        varAssign,
+                        field.name,
+                        srcCode
+                    ))
+                }
                 varAssign.fieldDef = field
                 return if (varAssign.isWalrus) field.fieldType else Datatype.Void()
             }
@@ -390,7 +398,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                     if (!field.fieldType.compatibleWith(typeToAssign)) {
                         artError(Errors.IncompatibleTypesError(varAssign, "assignment", field.fieldType, typeToAssign, srcCode))
                     }
-                    if (field.isConst) artError(Errors.AssignToConstError(varAssign, field.name, srcCode))
+                    if (!inConstructor && field.isConst) artError(Errors.AssignToConstError(varAssign, field.name, srcCode))
                     if (field.isPrivate && curClass !== field.clazz) {
                         artError(Errors.PrivateMemberAccessError(varAssign, "field", varAssign.name.lexeme, srcCode))
                     }
@@ -409,7 +417,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                     if (!field.fieldType.compatibleWith(typeToAssign)) {
                         artError(Errors.IncompatibleTypesError(varAssign, "assignment", field.fieldType, typeToAssign, srcCode))
                     }
-                    if (field.isConst) artError(Errors.AssignToConstError(varAssign, field.name, srcCode))
+                    if (!inConstructor && field.isConst) artError(Errors.AssignToConstError(varAssign, field.name, srcCode))
                     if (field.isPrivate && curClass !== field.clazz) {
                         artError(Errors.PrivateMemberAccessError(varAssign, "field", varAssign.name.lexeme, srcCode))
                     }
@@ -628,11 +636,11 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     override fun visit(clazz: AstNode.ArtClass): Datatype {
         val tmp = curClass
         curClass = clazz
-        for (field in clazz.fields) check(field, clazz)
-        for (field in clazz.staticFields) check(field, clazz)
-        for (func in clazz.staticFuncs) check(func, clazz)
-        for (func in clazz.funcs) check(func, clazz)
-        for (con in clazz.constructors) check(con, clazz)
+        for (field in clazz.fields)         if (field !is SyntheticNode) check(field, clazz)
+        for (field in clazz.staticFields)   if (field !is SyntheticNode) check(field, clazz)
+        for (func in clazz.staticFuncs)     if (func !is SyntheticNode)  check(func, clazz)
+        for (func in clazz.funcs)           if (func !is SyntheticNode)  check(func, clazz)
+        for (con in clazz.constructors)     if (con !is SyntheticNode)   check(con, clazz)
         curClass = tmp
         return Datatype.Void()
     }
@@ -847,13 +855,13 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         vars.clear()
         if (!field.isStatic && !field.isTopLevel) vars[0] = Datatype.Object(curClass!!)
 
-        check(field.initializer, field)
-        if (!field.fieldType.compatibleWith(field.initializer.type)) {
+        field.initializer?.let { check(it, field) }
+        if (field.initializer != null && !field.fieldType.compatibleWith(field.initializer!!.type)) {
             artError(Errors.IncompatibleTypesError(
                 field,
                 "field declaration",
                 field.fieldType,
-                field.initializer.type,
+                field.initializer!!.type,
                 srcCode
             ))
         }
@@ -982,12 +990,52 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     override fun visit(constructor: AstNode.Constructor): Datatype {
         constructor as AstNode.ConstructorDeclaration
 
+        inConstructor = true
+
         val newVars = mutableMapOf<Int, Datatype>()
         newVars[0] = Datatype.Object(constructor.clazz)
         for (i in constructor.descriptor.args.indices) newVars[i] = constructor.descriptor.args[i].second
         vars = newVars
+
+        if (constructor.superCallArgs != null) {
+            val superCallSig = mutableListOf<Datatype>()
+            for (arg in constructor.superCallArgs!!) superCallSig.add(check(arg, constructor))
+            val supCon = Datatype.StatClass(constructor.clazz.extends!!).lookupConstructor(superCallSig)
+            if (supCon == null) {
+                artError(Errors.NoMatchingSuperConstructorFoundError(
+                    constructor.relevantTokens[2], // these direct accesses to relevantTokens are gonna cause an
+                    constructor.relevantTokens[3], // IndexOutOfBoundException sooner or later
+                    srcCode
+                ))
+            } else {
+                if (supCon.isPrivate) artError(Errors.PrivateMemberAccessError(
+                    constructor,
+                    "constructor",
+                    null,
+                    srcCode
+                ))
+                constructor.superConstructor = supCon
+            }
+        } else {
+            val con = Datatype.StatClass(constructor.clazz.extends!!).lookupConstructor(listOf())
+            if (con == null) {
+                artError(Errors.SuperHasNoDefaultConstructorError(
+                    constructor,
+                    srcCode
+                ))
+            } else if (con.isPrivate) {
+                artError(Errors.PrivateMemberAccessError(
+                    constructor,
+                    "constructor",
+                    null,
+                    srcCode
+                ))
+            }
+        }
+
         constructor.body?.let { check(it, constructor) }
         curFunction = null
+        inConstructor = false
         return Datatype.Void()
     }
 
