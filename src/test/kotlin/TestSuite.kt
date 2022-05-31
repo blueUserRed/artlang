@@ -1,3 +1,6 @@
+import onj.OnjArray
+import onj.OnjObject
+import onj.OnjParser
 import java.nio.file.Paths
 import java.util.regex.Pattern
 import kotlin.io.path.readText
@@ -22,14 +25,14 @@ class TestSuite private constructor(val tests: List<Test>) {
         fun byId(id: Int): TestSuite {
             val testSuitesString = readTestSuitesCSV().map { it[1] }.toTypedArray()
             val testSuites = testSuitesString.map { Test(it/*TODO filename*/, false) }
-            testSuites.forEach({test: Test -> println(test) })
+            testSuites.forEach { test: Test -> println(test) }
             return TestSuite(testSuites)
         }
 
         fun byName(name: String): TestSuite {
             val testSuitesString = readTestSuitesCSV().map { it[0] }.toTypedArray()
             val testSuites = testSuitesString.map { Test(it/*TODO filename*/, false) }
-            testSuites.forEach({test: Test -> println(test) })
+            testSuites.forEach { test: Test -> println(test) }
             return TestSuite(testSuites)
         }
 
@@ -38,6 +41,11 @@ class TestSuite private constructor(val tests: List<Test>) {
         }
 
         private fun readTestSuitesCSV(): Array<Array <String>> {
+            val testSuitesONJ = OnjParser.parseFile("src/testSuites.onj") as OnjObject
+            val testSuites = testSuitesONJ.get<OnjArray>("testSuites")
+            val suite = testSuites.get<String>(0)
+//            println(suite)
+
             val testSuitesCSV: String = Paths.get("src/testSuites.csv").readText()
             println(testSuitesCSV)
             val lines: MutableList<String> = testSuitesCSV.split(Regex(Pattern.quote("\n"))).toMutableList().apply { removeAt(0) }

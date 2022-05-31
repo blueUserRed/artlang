@@ -1,11 +1,17 @@
-{
-    id: 0
-    name: "Default"
-    description: """
-                 Runs simple programs like FizzBuzz and HelloWorld to test basic functions
-                 """
-    tests: [ HelloWorld.art FizzBuzz.art ] // Paths to files
-}
+testSuites: [
+    {
+        id: 0
+        name: "Default"
+        description: "Runs simple programs like FizzBuzz and HelloWorld to test basic functions"
+        tests: [ "HelloWorld.art" "FizzBuzz.art" ] // Paths to files
+    }
+    {
+        id: 1
+        name: "Classes"
+        description: "Tests creation of classes, constructing and running methods from classes on Animal Example"
+        tests: [ "Animal.art" "Cat.art" "Dog.art" ] // Paths to files
+    }
+]
 
 /* old csv
 test suite name; test suite id; test suite description; test1; test2; test3; testn
