@@ -561,4 +561,15 @@ class Errors {
             get() = access.accept(MinMaxPosFinder())
     }
 
+    class DuplicateFieldInitialisationError(
+        val toHighlight: AstNode,
+        val fieldName: String,
+        srcCode: String
+    ) : ArtError(46, srcCode) {
+        override val message: String = "Field $fieldName is initialised in the constructor as a field argument and in " +
+                "it's definition."
+        override val ranges: MutableMap<Int, Pair<Int, Int>>
+            get() = toHighlight.accept(MinMaxPosFinder())
+    }
+
 }

@@ -204,8 +204,25 @@ class JvmVariableResolver : AstNodeVisitor<Unit> {
         constructor as AstNode.ConstructorDeclaration
         maxLocals = 0
         jvmVars.clear()
-//        addVar("this", Datatype.Object(constructor.clazz))
-        for (arg in constructor.descriptor.args) addVar(arg.first, arg.second)
+
+        val fieldAssignArgsIndies = constructor.fieldAssignArgsIndices
+
+        val fieldAssignArgJvmIndices = mutableMapOf<String, Int>()
+
+        for (i in constructor.descriptor.args.indices) {
+            val arg = constructor.descriptor.args[i]
+
+            val fieldAssignArgFieldDefs = constructor.fieldAssignArgFieldDefs
+            if (i in fieldAssignArgsIndies) {
+                val type = fieldAssignArgFieldDefs[arg.first]?.fieldType ?: Datatype.ErrorType()
+                fieldAssignArgJvmIndices[arg.first] = addVar("\$FieldAssignArg\$${arg.first}", type)
+            } else {
+                fieldAssignArgJvmIndices[arg.first] = addVar(arg.first, arg.second)
+            }
+        }
+
+        constructor.fieldAssignArgJvmVarLocation = fieldAssignArgJvmIndices
+
         constructor.superCallArgs?.forEach { resolve(it) }
         constructor.body?.let { resolve(it) }
         constructor.amountLocals = if (constructor.body == null) jvmVars.size else maxLocals

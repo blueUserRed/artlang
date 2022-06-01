@@ -1141,12 +1141,13 @@ abstract class AstNode(val relevantTokens: List<Token>) {
      * represents a declaration of a constructor
      * @param modifiers the modifiers for this constructor
      * @param body the body of this constructor; null if none is present
-     * @param args the arguments of the constructor as TypeNodes
+     * @param args the arguments of the constructor as TypeNodes; if DatatypeNode is null the argument is treated as
+     *              a field-argument ( ``constructor(field x, field y)`` )
      */
     class ConstructorDeclaration(
         val modifiers: List<Token>,
         var body: Block?,
-        val args: MutableList<Pair<Token, DatatypeNode>>,
+        val args: MutableList<Pair<Token, DatatypeNode?>>,
         var superCallArgs: MutableList<AstNode>?,
         relevantTokens: List<Token>
     ) : Constructor(relevantTokens) {
@@ -1167,6 +1168,28 @@ abstract class AstNode(val relevantTokens: List<Token>) {
 
         override val descriptor: FunctionDescriptor
             get() = _descriptor
+
+        /**
+         * the indices of the arguments that are field-assign-args. Offset by one to account for the 'this'-argument
+         * in [descriptor]
+         */
+        val fieldAssignArgsIndices: List<Int>
+            get() {
+                val toRet = mutableListOf<Int>()
+                for (i in args.indices) if (args[i].second == null) toRet.add(i + 1 /* offset by one because the descriptor includes 'this' */ )
+                return toRet
+            }
+
+        /**
+         * stores the index into the jvm locals-array at which the variable for assigning the field can be found
+         * TODO: work on the name lol
+         */
+        lateinit var fieldAssignArgJvmVarLocation: MutableMap<String, Int>
+
+        /**
+         * stores the field-definition referenced by field-assign-args
+         */
+        lateinit var fieldAssignArgFieldDefs: MutableMap<String, Field>
 
         override lateinit var clazz: ArtClass
 
@@ -1257,6 +1280,7 @@ data class FunctionDescriptor(val args: MutableList<Pair<String, Datatype>>, val
         }
         if (other.size != argsNoThis.size) return false
         for (i in other.indices) {
+            if (other[i].kind == Datakind.NULL && argsNoThis[i].second.kind == Datakind.OBJECT) continue
             if (other[i].kind != argsNoThis[i].second.kind) return false
             if (other[i].kind == Datakind.OBJECT) {
                 if (

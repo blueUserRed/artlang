@@ -3,12 +3,10 @@ package passes
 import Datakind
 import Datatype
 import ast.*
-import errors.ErrorPool
 import errors.Errors
 import errors.artError
 import tokenizer.Token
 import tokenizer.TokenType
-import javax.xml.crypto.Data
 
 /**
  * checks type-safety, checks that function/fields that are referenced exist
@@ -95,8 +93,15 @@ class TypeChecker : AstNodeVisitor<Datatype> {
                 if (left.matches(Datakind.OBJECT) && right.matches(Datakind.OBJECT)) return Datatype.Bool()
 
                 if (
-                    left.matches(Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.LONG, Datakind.FLOAT, Datakind.DOUBLE) &&
-                    left == right
+                    left.matches(
+                        Datakind.BYTE,
+                        Datakind.SHORT,
+                        Datakind.INT,
+                        Datakind.LONG,
+                        Datakind.FLOAT,
+                        Datakind.DOUBLE,
+                        Datakind.BOOLEAN
+                    ) && left == right
                 ) return Datatype.Bool()
 
                 artError(Errors.IllegalTypesInBinaryOperationError(
@@ -285,7 +290,26 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
             val args = mutableListOf<Pair<String, Datatype>>()
             args.add("this" to Datatype.Object(constructor.clazz))
-            for (arg in constructor.args) args.add(arg.first.lexeme to typeNodeToDataType(arg.second))
+
+            val fieldAssignArgsFieldDefs = mutableMapOf<String, AstNode.Field>()
+
+            for (arg in constructor.args) {
+                if (arg.second == null) {
+                    val field = Datatype.Object(clazz).lookupField(arg.first.lexeme)
+                    if (field == null) artError(Errors.UnknownIdentifierError(
+                        arg.first,
+                        srcCode
+                    ))
+                    val fieldType = field?.fieldType ?: Datatype.ErrorType()
+                    args.add(arg.first.lexeme to fieldType)
+
+                    // Just not include fields that dont exist, I hope this dosent cause a npe later
+                    if (field != null) fieldAssignArgsFieldDefs[arg.first.lexeme] = field
+                } else args.add(arg.first.lexeme to typeNodeToDataType(arg.second!!))
+            }
+
+            constructor.fieldAssignArgFieldDefs = fieldAssignArgsFieldDefs
+
             constructor._descriptor = FunctionDescriptor(args, Datatype.Object(clazz))
         }
         for (con1 in constructors) for (con2 in constructors) if (con1 !== con2 && con1.descriptor.matches(con2.descriptor)) {
@@ -994,7 +1018,12 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
         val newVars = mutableMapOf<Int, Datatype>()
         newVars[0] = Datatype.Object(constructor.clazz)
-        for (i in constructor.descriptor.args.indices) newVars[i] = constructor.descriptor.args[i].second
+
+        val fieldAssignArgsIndices = constructor.fieldAssignArgsIndices
+        for (i in constructor.descriptor.args.indices) if (i !in fieldAssignArgsIndices) {
+            newVars[i] = constructor.descriptor.args[i].second
+        }
+
         vars = newVars
 
         if (constructor.superCallArgs != null) {

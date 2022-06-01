@@ -3,6 +3,7 @@ package passes
 import ast.AstNode
 import ast.AstNodeVisitor
 import Datatype
+import ast.SyntheticAst
 import ast.SyntheticNode
 import errors.Errors
 import errors.artError
@@ -248,6 +249,17 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
         for (func in clazz.staticFuncs)     if (func !is SyntheticNode)  check(func)
         for (con in clazz.constructors)     if (con !is SyntheticNode)   check(con)
 
+
+        if (clazz.constructors.size == 1 && clazz.constructors[0] is SyntheticAst.DefaultConstructor) {
+            for (field in clazz.fields) if (field is AstNode.FieldDeclaration && field.initializer == null) {
+                artError(Errors.FieldIsNotInitialisedError(
+                    Either.Right(field),
+                    field.name,
+                    srcCode
+                ))
+            }
+        }
+
         curClass = null
 
         return ControlFlowState()
@@ -298,7 +310,8 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
     }
 
     override fun visit(constructorCall: AstNode.ConstructorCall): ControlFlowState {
-        return ControlFlowState() //TODO: fix when constructor-parameters are added //TODO: lol
+        for (arg in constructorCall.arguments) check(arg) // TODO: may not work in the future: expressions that return, etc.
+        return ControlFlowState()
     }
 
     override fun visit(field: AstNode.Field): ControlFlowState {
@@ -403,9 +416,22 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
 
         fields.clear()
 
+        val fieldAssignArgs = constructor.fieldAssignArgFieldDefs
         for (field in curClass!!.fields) if (field !is SyntheticNode) {
             field as AstNode.FieldDeclaration
-            fields[field.name] = if (field.initializer == null) FieldInitState.NOT_INITIALISED else FieldInitState.INITIALISED
+
+            var initialisedByArg = false
+            for ((name, _) in fieldAssignArgs) if (name == field.name) initialisedByArg = true
+            val initialisedInDef = field.initializer != null
+
+            if (initialisedByArg && initialisedInDef) artError(Errors.DuplicateFieldInitialisationError(
+                constructor,
+                field.name,
+                srcCode
+            ))
+
+            fields[field.name] =    if (initialisedInDef || initialisedByArg) FieldInitState.INITIALISED
+                                    else FieldInitState.NOT_INITIALISED
         }
 
         inConstructor = true

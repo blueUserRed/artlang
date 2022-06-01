@@ -268,15 +268,29 @@ class Parser {
 
         validateModifiersForConstructor(modifiers)
         consumeOrError(TokenType.L_PAREN, "Expected () after constructor definition")
-        val args = mutableListOf<Pair<Token, AstNode.DatatypeNode>>()
+        val args = mutableListOf<Pair<Token, AstNode.DatatypeNode?>>()
+        val fieldAssignArgs = mutableListOf<Int>()
+
+        var counter = 0
         while (match(TokenType.IDENTIFIER)) {
             val name = last()
+
             if (name.lexeme == "this") syntaxError("'this' cannot be used as a parameter-name", name)
-            consumeOrError(TokenType.COLON, "Expected type-declaration after argument")
-            val type = parseType()
-            args.add(Pair(name, type))
+
+            if (name.lexeme == "field" && peek().tokenType == TokenType.IDENTIFIER) {
+                fieldAssignArgs.add(counter)
+                args.add(Pair(consume(), null))
+            } else {
+                consumeOrError(TokenType.COLON, "Expected type-declaration after argument")
+                val type = parseType()
+                args.add(Pair(name, type))
+            }
+
             if (!match(TokenType.COMMA)) break
+
+            counter++
         }
+
         consumeOrError(TokenType.R_PAREN, "Expected () after constructor definition")
         relevantTokens.add(last())
 

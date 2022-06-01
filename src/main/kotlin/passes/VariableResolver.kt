@@ -262,10 +262,15 @@ class VariableResolver : AstNodeVisitor<Unit> {
         val varDecs = mutableListOf<AstNode.VariableDeclaration?>()
         vars.add("this")
         varDecs.add(null)
-        for (arg in constructor.args) {
+
+        val fieldAssignArgsIndices = constructor.fieldAssignArgsIndices
+
+        for (i in constructor.args.indices) if (i !in fieldAssignArgsIndices) {
+            val arg = constructor.args[i]
             vars.add(arg.first.lexeme)
             varDecs.add(null)
         }
+
         curVars = vars
         varDeclarations = varDecs
 

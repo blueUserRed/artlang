@@ -1,6 +1,41 @@
 
-class Test {
+fn main() {
+    const textPrinter = TextPrinter("Hello", 10)
+    textPrinter.doPrint()
 }
+
+
+class TextPrinter {
+
+    const field text: str
+    field times: int
+
+    public constructor(field text, field times)
+
+    public constructor(field text) {
+        this.times = 1
+    }
+
+    public fn doPrint() {
+        let i = -1
+        while ((i := i + 1) < this.times) print this.text
+    }
+
+}
+
+//class Test {
+//
+//    const field t: str
+//
+//    public constructor(text: str) {
+//       this.t = text
+//    }
+//
+//    public fn printText() {
+//        print this.t
+//    }
+//
+//}
 
 //class Animal {
 //
