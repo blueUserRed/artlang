@@ -232,6 +232,7 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         val funcs: MutableList<Function>,
         val staticFields: MutableList<Field>,
         val fields: MutableList<Field>,
+        val constructors: MutableList<Constructor>,
         relevantTokens: List<Token>
     ) : AstNode(relevantTokens) {
 
@@ -262,6 +263,7 @@ abstract class AstNode(val relevantTokens: List<Token>) {
      * @param staticFuncs the static functions that are contained in this class
      * @param funcs the non-static functions that are contained in this class
      * @param staticFields the static fields that are contained in this class
+     * @param constructors the constructors of this class
      * @param fields the non-static fields that are contained in this class
      * @param extendsToken the with the name of the extending class; null if none
      */
@@ -271,11 +273,12 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         funcs: MutableList<Function>,
         staticFields: MutableList<Field>,
         fields: MutableList<Field>,
+        constructors: MutableList<Constructor>,
         val extendsToken: Token?,
         val modifiers: List<Token>,
         relevantTokens: List<Token>,
         override val jvmName: String = nameToken.lexeme
-    ) : ArtClass(staticFuncs, funcs, staticFields, fields, relevantTokens) {
+    ) : ArtClass(staticFuncs, funcs, staticFields, fields, constructors, relevantTokens) {
 
         override val name: String = nameToken.lexeme
 
@@ -301,6 +304,10 @@ abstract class AstNode(val relevantTokens: List<Token>) {
             }
             if (to is Field) for (i in staticFields.indices) if (staticFields[i] === orig) {
                 staticFields[i] = to
+                return
+            }
+            if (to is Constructor) for (i in constructors.indices) if (constructors[i] === orig) {
+                constructors[i] = to
                 return
             }
             throw CantSwapException()
@@ -821,6 +828,7 @@ abstract class AstNode(val relevantTokens: List<Token>) {
     class ConstructorCall(
         var clazz: ArtClass,
         val arguments: MutableList<AstNode>,
+        val constuctor: Constructor,
         relevantTokens: List<Token>
     ) : AstNode(relevantTokens) {
 
@@ -891,7 +899,7 @@ abstract class AstNode(val relevantTokens: List<Token>) {
     class FieldDeclaration(
         val nameToken: Token,
         val explType: DatatypeNode,
-        var initializer: AstNode,
+        var initializer: AstNode?,
         override val isConst: Boolean,
         val modifiers: List<Token>,
         override val isTopLevel: Boolean,
@@ -1062,6 +1070,11 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
+    /**
+     * represents a cast (`a as B`)
+     * @param toCast the node to cast
+     * @param to the type to which [toCast] is cast
+     */
     class Cast(var toCast: AstNode, val to: DatatypeNode, relevantTokens: List<Token>) : AstNode(relevantTokens) {
 
         override fun swap(orig: AstNode, to: AstNode) {
@@ -1072,17 +1085,123 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
     }
 
+    /**
+     * represents an instanceOf-check (`a is B`)
+     * @param toCheck the node to check
+     * @param checkTypeNode the type-node corresponding to [checkType]
+     */
     class InstanceOf(
         var toCheck: AstNode,
         var checkTypeNode: DatatypeNode,
         relevantTokens: List<Token>
     ) : AstNode(relevantTokens) {
 
+        /**
+         * the type for which [toCheck] is checked
+         */
         lateinit var checkType: Datatype
 
         override fun swap(orig: AstNode, to: AstNode) {
             if (toCheck === orig) toCheck = to
             else throw CantSwapException()
+        }
+
+        override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
+    }
+
+    /**
+     * represents a constructor
+     */
+    abstract class Constructor(relevantTokens: List<Token>) : AstNode(relevantTokens) {
+
+        /**
+         * true if the constructor is private
+         */
+        abstract val isPrivate: Boolean
+
+        /**
+         * the descriptor of the constructor
+         */
+        abstract val descriptor: FunctionDescriptor
+
+        /**
+         * the descriptor that this constructor has on the jvm. Like [descriptor], but the return-type is void
+         */
+        val jvmDescriptor: FunctionDescriptor
+            get() = FunctionDescriptor(descriptor.args, Datatype.Void())
+
+        /**
+         * the class of this constructor
+         */
+        abstract var clazz: ArtClass
+
+    }
+
+    /**
+     * represents a declaration of a constructor
+     * @param modifiers the modifiers for this constructor
+     * @param body the body of this constructor; null if none is present
+     * @param args the arguments of the constructor as TypeNodes; if DatatypeNode is null the argument is treated as
+     *              a field-argument ( ``constructor(field x, field y)`` )
+     */
+    class ConstructorDeclaration(
+        val modifiers: List<Token>,
+        var body: Block?,
+        val args: MutableList<Pair<Token, DatatypeNode?>>,
+        var superCallArgs: MutableList<AstNode>?,
+        relevantTokens: List<Token>
+    ) : Constructor(relevantTokens) {
+
+        override val isPrivate: Boolean = "public" !in modifiers.map { it.lexeme }
+
+        lateinit var _descriptor: FunctionDescriptor
+
+        /**
+         * the maximum amount of locals used by this constructor
+         */
+        var amountLocals: Int = -1
+
+        /**
+         * the constructor called with the super-call part of the constructor; null if the constructor has no super-part
+         */
+        var superConstructor: Constructor? = null
+
+        override val descriptor: FunctionDescriptor
+            get() = _descriptor
+
+        /**
+         * the indices of the arguments that are field-assign-args. Offset by one to account for the 'this'-argument
+         * in [descriptor]
+         */
+        val fieldAssignArgsIndices: List<Int>
+            get() {
+                val toRet = mutableListOf<Int>()
+                for (i in args.indices) if (args[i].second == null) toRet.add(i + 1 /* offset by one because the descriptor includes 'this' */ )
+                return toRet
+            }
+
+        /**
+         * stores the index into the jvm locals-array at which the variable for assigning the field can be found
+         * TODO: work on the name lol
+         */
+        lateinit var fieldAssignArgJvmVarLocation: MutableMap<String, Int>
+
+        /**
+         * stores the field-definition referenced by field-assign-args
+         */
+        lateinit var fieldAssignArgFieldDefs: MutableMap<String, Field>
+
+        override lateinit var clazz: ArtClass
+
+        override fun swap(orig: AstNode, to: AstNode) {
+            if (orig === body && to is Block) body = to
+            else if (superCallArgs != null){
+                for (i in superCallArgs!!.indices) if (superCallArgs!![i] === orig) {
+                    superCallArgs!![i] = to
+                    return
+                }
+                throw CantSwapException()
+            } else throw CantSwapException()
         }
 
         override fun <T> accept(visitor: AstNodeVisitor<T>): T = visitor.visit(this)
@@ -1125,17 +1244,19 @@ abstract class AstNode(val relevantTokens: List<Token>) {
 data class FunctionDescriptor(val args: MutableList<Pair<String, Datatype>>, val returnType: Datatype) {
 
     /**
-     * returns the [descriptor](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.3.3)
+     * the [descriptor](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.3.3)
      * of the function
      */
-    fun getDescriptorString(): String {
-        val builder = StringBuilder()
-        builder.append("(")
-        for (arg in args) if (arg.first != "this") builder.append(arg.second.descriptorType)
-        builder.append(")")
-        builder.append(returnType.descriptorType)
-        return builder.toString()
-    }
+    val descriptorString: String
+        get() {
+            val builder = StringBuilder()
+            builder.append("(")
+            for (arg in args) if (arg.first != "this") builder.append(arg.second.descriptorType)
+            builder.append(")")
+            builder.append(returnType.descriptorType)
+            return builder.toString()
+        }
+
 
     /**
      * checks if this descriptor matches another descriptor (excluding return type)
@@ -1159,9 +1280,16 @@ data class FunctionDescriptor(val args: MutableList<Pair<String, Datatype>>, val
         }
         if (other.size != argsNoThis.size) return false
         for (i in other.indices) {
+            if (other[i].kind == Datakind.NULL && argsNoThis[i].second.kind == Datakind.OBJECT) continue
             if (other[i].kind != argsNoThis[i].second.kind) return false
             if (other[i].kind == Datakind.OBJECT) {
-                return Datatype.StatClass((argsNoThis[i].second as Datatype.Object).clazz).isSuperClassOf((other[i] as Datatype.Object).clazz)
+                if (
+                    argsNoThis[i].second != other[i] &&
+                    !Datatype.StatClass((argsNoThis[i].second as Datatype.Object).clazz)
+                        .isSuperClassOf((other[i] as Datatype.Object).clazz)
+                ) {
+                    return false
+                }
             }
         }
         return true

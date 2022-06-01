@@ -1,7 +1,5 @@
-package passes
+package ast
 
-import ast.AstNode
-import ast.AstNodeVisitor
 import tokenizer.Token
 
 /**
@@ -131,7 +129,7 @@ class MinMaxPosFinder : AstNodeVisitor<MutableMap<Int, Pair<Int, Int>>> {
         field as AstNode.FieldDeclaration
         return combine(
             *Array(field.modifiers.size) { getMinMaxFor(field.modifiers[it]) },
-            find(field.initializer),
+            field.initializer?.let { find(it) } ?: mutableMapOf(),
             getMinMaxFor(field.relevantTokens)
         )
     }
@@ -177,6 +175,10 @@ class MinMaxPosFinder : AstNodeVisitor<MutableMap<Int, Pair<Int, Int>>> {
         return combine(find(instanceOf.toCheck), getMinMaxFor(instanceOf.relevantTokens))
     }
 
+    override fun visit(constructor: AstNode.Constructor): MutableMap<Int, Pair<Int, Int>> {
+        return getMinMaxFor(constructor.relevantTokens)
+    }
+
     /**
      * finds the lines and positions of statement
      */
@@ -194,7 +196,7 @@ class MinMaxPosFinder : AstNodeVisitor<MutableMap<Int, Pair<Int, Int>>> {
     /**
      * like [getMinMaxFor], but also combines the tokens using the [combine] function
      */
-    private fun getMinMaxFor(tokens: List<Token>): MutableMap<Int, Pair<Int, Int>> {
+    fun getMinMaxFor(tokens: List<Token>): MutableMap<Int, Pair<Int, Int>> {
         var acc: MutableMap<Int, Pair<Int, Int>> = mutableMapOf()
         for (t in tokens) if (t.line != -1) acc = combine(acc, getMinMaxFor(t))
         return acc

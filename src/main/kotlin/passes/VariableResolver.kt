@@ -168,6 +168,7 @@ class VariableResolver : AstNodeVisitor<Unit> {
         for (field in clazz.staticFields) resolve(field, clazz)
         for (func in clazz.staticFuncs) resolve(func, clazz)
         for (func in clazz.funcs) resolve(func, clazz)
+        for (con in clazz.constructors) resolve(con, clazz)
     }
 
     override fun visit(get: AstNode.Get) {
@@ -201,7 +202,7 @@ class VariableResolver : AstNodeVisitor<Unit> {
             curVars.add("this")
             varDeclarations.add(null)
         }
-        resolve(field.initializer, field)
+        field.initializer?.let { resolve(it, field) }
     }
 
     override fun visit(arr: AstNode.ArrayCreate) {
@@ -252,6 +253,30 @@ class VariableResolver : AstNodeVisitor<Unit> {
 
     override fun visit(instanceOf: AstNode.InstanceOf) {
         resolve(instanceOf.toCheck, instanceOf)
+    }
+
+    override fun visit(constructor: AstNode.Constructor) {
+        constructor as AstNode.ConstructorDeclaration
+
+        val vars = mutableListOf<String>()
+        val varDecs = mutableListOf<AstNode.VariableDeclaration?>()
+        vars.add("this")
+        varDecs.add(null)
+
+        val fieldAssignArgsIndices = constructor.fieldAssignArgsIndices
+
+        for (i in constructor.args.indices) if (i !in fieldAssignArgsIndices) {
+            val arg = constructor.args[i]
+            vars.add(arg.first.lexeme)
+            varDecs.add(null)
+        }
+
+        curVars = vars
+        varDeclarations = varDecs
+
+        constructor.superCallArgs?.forEach { resolve(it, constructor) }
+
+        constructor.body?.let { resolve(it, constructor) }
     }
 
     /**

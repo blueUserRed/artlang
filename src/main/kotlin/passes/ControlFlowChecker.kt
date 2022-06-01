@@ -3,6 +3,7 @@ package passes
 import ast.AstNode
 import ast.AstNodeVisitor
 import Datatype
+import ast.SyntheticAst
 import ast.SyntheticNode
 import errors.Errors
 import errors.artError
@@ -25,6 +26,15 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
      * the current function; null if not in a function
      */
     private var curFunction: AstNode.Function? = null
+
+    /**
+     * stores the states of all non-static fields in the current class
+     */
+    private var fields: MutableMap<String, FieldInitState> = mutableMapOf()
+
+    private var inConstructor: Boolean = false
+
+    private var curClass: AstNode.ArtClass? = null
 
     override fun visit(binary: AstNode.Binary): ControlFlowState {
         val s1 = check(binary.left)
@@ -54,6 +64,7 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
     }
 
     override fun visit(funcCall: AstNode.FunctionCall): ControlFlowState {
+        for (arg in funcCall.arguments) check(arg)
         return ControlFlowState()
     }
 
@@ -106,16 +117,36 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
     }
 
     override fun visit(varAssign: AstNode.Assignment): ControlFlowState {
+        if (inConstructor && varAssign.fieldDef != null && !varAssign.fieldDef!!.isStatic) {
+            if (varAssign.fieldDef!!.isConst && fields[varAssign.fieldDef!!.name] != FieldInitState.NOT_INITIALISED) {
+                artError(Errors.AssignToConstError(
+                    varAssign,
+                    varAssign.fieldDef!!.name,
+                    srcCode
+                ))
+            }
+            fields[varAssign.fieldDef!!.name] = FieldInitState.INITIALISED
+        }
         return check(varAssign.toAssign)
     }
 
     override fun visit(loop: AstNode.Loop): ControlFlowState {
         val tmp = surroundingLoop
         surroundingLoop = loop
+        val fieldsBefore = fields.toMutableMap()
         val result = check(loop.body)
         var alwaysReturns = result.alwaysReturns
         if (!result.sometimesBreaks && result.sometimesReturns) alwaysReturns = true
         surroundingLoop = tmp
+
+        val newFields = mutableMapOf<String, FieldInitState>()
+        for ((key, value) in fieldsBefore) {
+            if (value == FieldInitState.NOT_INITIALISED && fields[key] == FieldInitState.INITIALISED) {
+                newFields[key] = FieldInitState.MAYBE_INITIALISED
+            } else newFields[key] = value
+        }
+        fields = newFields
+
         return ControlFlowState(
             alwaysReturns = alwaysReturns,
             alwaysBreaks = false,
@@ -125,8 +156,43 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
     }
 
     override fun visit(ifStmt: AstNode.If): ControlFlowState {
+        val fieldsBefore = fields.toMutableMap()
+
         val ifBranch = check(ifStmt.ifStmt)
+        val fieldsAfterIf = fields.toMutableMap()
+
+        fields = fieldsBefore
         val elseBranch = ifStmt.elseStmt?.let { check(it) } ?: ControlFlowState()
+
+        val newFields = mutableMapOf<String, FieldInitState>()
+        if (ifStmt.elseStmt == null) {
+            for ((key, value) in fieldsBefore) {
+                if (
+                    value != FieldInitState.INITIALISED &&
+                    fieldsAfterIf[key] == FieldInitState.INITIALISED
+                ) newFields[key] = FieldInitState.MAYBE_INITIALISED
+                else newFields[key] = value
+            }
+        } else {
+            for ((key, value) in fieldsBefore) {
+                if (value == FieldInitState.INITIALISED) {
+                    newFields[key] = value
+                    continue
+                }
+                if (fieldsAfterIf[key] == FieldInitState.INITIALISED && fields[key] == FieldInitState.INITIALISED) {
+                    newFields[key] = FieldInitState.INITIALISED
+                    continue
+                }
+                if (fieldsAfterIf[key] == FieldInitState.INITIALISED || fields[key] == FieldInitState.INITIALISED) {
+                    newFields[key] = FieldInitState.MAYBE_INITIALISED
+                    continue
+                }
+                newFields[key] = value
+            }
+        }
+
+        fields = newFields
+
         return ControlFlowState(
             ifBranch.alwaysReturns && elseBranch.alwaysReturns,
             ifBranch.alwaysBreaks && elseBranch.alwaysBreaks,
@@ -137,8 +203,18 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
 
     override fun visit(whileStmt: AstNode.While): ControlFlowState {
         val tmp = surroundingLoop
+        val fieldsBefore = fields.toMutableMap()
         val result = check(whileStmt.body)
         surroundingLoop = tmp
+
+        val newFields = mutableMapOf<String, FieldInitState>()
+        for ((key, value) in fieldsBefore) {
+            if (value == FieldInitState.NOT_INITIALISED && fields[key] == FieldInitState.INITIALISED) {
+                newFields[key] = FieldInitState.MAYBE_INITIALISED
+            } else newFields[key] = value
+        }
+        fields = newFields
+
         return ControlFlowState(
             alwaysReturns = false,
             alwaysBreaks = false,
@@ -164,14 +240,43 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
     }
 
     override fun visit(clazz: AstNode.ArtClass): ControlFlowState {
-        for (field in clazz.fields) check(field)
-        for (field in clazz.staticFields) check(field)
-        for (func in clazz.funcs) check(func)
-        for (func in clazz.staticFuncs) check(func)
+
+        curClass = clazz
+
+        for (field in clazz.fields)         if (field !is SyntheticNode) check(field)
+        for (field in clazz.staticFields)   if (field !is SyntheticNode) check(field)
+        for (func in clazz.funcs)           if (func !is SyntheticNode)  check(func)
+        for (func in clazz.staticFuncs)     if (func !is SyntheticNode)  check(func)
+        for (con in clazz.constructors)     if (con !is SyntheticNode)   check(con)
+
+
+        if (clazz.constructors.size == 1 && clazz.constructors[0] is SyntheticAst.DefaultConstructor) {
+            for (field in clazz.fields) if (field is AstNode.FieldDeclaration && field.initializer == null) {
+                artError(Errors.FieldIsNotInitialisedError(
+                    Either.Right(field),
+                    field.name,
+                    srcCode
+                ))
+            }
+        }
+
+        curClass = null
+
         return ControlFlowState()
     }
 
     override fun visit(get: AstNode.Get): ControlFlowState {
+
+        if (inConstructor && get.fieldDef != null && curClass != null && get.fieldDef in curClass!!.fields) {
+            if (fields[get.fieldDef!!.name] != FieldInitState.INITIALISED) {
+                artError(Errors.FieldAccessBeforeInitialization(
+                    get,
+                    get.fieldDef!!.name,
+                    srcCode
+                ))
+            }
+        }
+
         return get.from?.let { check(it) } ?: ControlFlowState()
     }
 
@@ -205,12 +310,25 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
     }
 
     override fun visit(constructorCall: AstNode.ConstructorCall): ControlFlowState {
-        return ControlFlowState() //TODO: fix when constructor-parameters are added
+        for (arg in constructorCall.arguments) check(arg) // TODO: may not work in the future: expressions that return, etc.
+        return ControlFlowState()
     }
 
     override fun visit(field: AstNode.Field): ControlFlowState {
         field as AstNode.FieldDeclaration
-        return check(field.initializer)
+        if (field.initializer != null) {
+            if (!field.isStatic) fields[field.name] = FieldInitState.INITIALISED
+            return check(field.initializer!!)
+        } else {
+            if (field.isStatic) {
+                artError(Errors.FieldIsNotInitialisedError(
+                    Either.Right(field),
+                    field.name,
+                    srcCode
+                ))
+            }
+            return ControlFlowState()
+        }
     }
 
     override fun visit(arr: AstNode.ArrGet): ControlFlowState {
@@ -293,6 +411,46 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
         return check(instanceOf.toCheck)
     }
 
+    override fun visit(constructor: AstNode.Constructor): ControlFlowState {
+        constructor as AstNode.ConstructorDeclaration
+
+        fields.clear()
+
+        val fieldAssignArgs = constructor.fieldAssignArgFieldDefs
+        for (field in curClass!!.fields) if (field !is SyntheticNode) {
+            field as AstNode.FieldDeclaration
+
+            var initialisedByArg = false
+            for ((name, _) in fieldAssignArgs) if (name == field.name) initialisedByArg = true
+            val initialisedInDef = field.initializer != null
+
+            if (initialisedByArg && initialisedInDef) artError(Errors.DuplicateFieldInitialisationError(
+                constructor,
+                field.name,
+                srcCode
+            ))
+
+            fields[field.name] =    if (initialisedInDef || initialisedByArg) FieldInitState.INITIALISED
+                                    else FieldInitState.NOT_INITIALISED
+        }
+
+        inConstructor = true
+
+        constructor.superCallArgs?.forEach { check(it) }
+        constructor.body?.let { check(it) }
+
+        inConstructor = false
+
+        for (fieldEntry in fields) if (fieldEntry.value != FieldInitState.INITIALISED) {
+            artError(Errors.FieldIsNotInitialisedError(
+                Either.Left(constructor.relevantTokens[0]),
+                fieldEntry.key,
+                srcCode
+            ))
+        }
+        return ControlFlowState()
+    }
+
     /**
      * checks the [ControlFlowState] of [node]
      */
@@ -311,5 +469,9 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
         val sometimesReturns: Boolean = false,
         val sometimesBreaks: Boolean = false
     )
+
+    private enum class FieldInitState {
+        NOT_INITIALISED, INITIALISED, MAYBE_INITIALISED
+    }
 
 }

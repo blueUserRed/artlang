@@ -136,6 +136,7 @@ class AstPrinter : AstNodeVisitor<String> {
         for (field in clazz.staticFields) builder.append(field.accept(this))
         for (func in clazz.staticFuncs) builder.append(func.accept(this))
         for (func in clazz.funcs) builder.append(func.accept(this))
+        for (c in clazz.constructors) if (c !is SyntheticNode) builder.append(c.accept(this))
         builder.append("}\n")
         return builder.toString()
     }
@@ -164,7 +165,7 @@ class AstPrinter : AstNodeVisitor<String> {
         builder
             .append(field.name)
             .append(" = ")
-            .append(field.initializer.accept(this))
+            .append(field.initializer?.accept(this) ?: "")
             .append("\n")
         return builder.toString()
     }
@@ -231,5 +232,25 @@ class AstPrinter : AstNodeVisitor<String> {
 
     override fun visit(instanceOf: AstNode.InstanceOf): String {
         return "(${instanceOf.toCheck.accept(this)} as ${instanceOf.checkTypeNode})"
+    }
+
+    override fun visit(constructor: AstNode.Constructor): String {
+        constructor as AstNode.ConstructorDeclaration
+        val builder = StringBuilder()
+        builder.append("constructor(")
+        for (arg in constructor.args) {
+            builder
+                .append(arg.first.lexeme)
+                .append(": ")
+                .append(arg.second.toString())
+                .append(", ")
+        }
+        builder.append(")")
+        if (constructor.body != null) {
+            builder.append(" {\n")
+            for (s in constructor.body!!.statements) builder.append(s.accept(this)).append("\n")
+            builder.append("}\n")
+        } else builder.append("\n")
+        return builder.toString()
     }
 }

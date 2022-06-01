@@ -114,10 +114,11 @@ class JvmVariableResolver : AstNodeVisitor<Unit> {
 
     override fun visit(clazz: AstNode.ArtClass) {
         curClass = clazz
-        for (field in clazz.fields) resolve(field)
-        for (field in clazz.staticFields) resolve(field)
-        for (func in clazz.staticFuncs) resolve(func)
-        for (func in clazz.funcs) resolve(func)
+        for (field in clazz.fields)         if (field !is SyntheticNode) resolve(field)
+        for (field in clazz.staticFields)   if (field !is SyntheticNode) resolve(field)
+        for (func in clazz.staticFuncs)     if (func !is SyntheticNode)  resolve(func)
+        for (func in clazz.funcs)           if (func !is SyntheticNode)  resolve(func)
+        for (con in clazz.constructors)     if (con !is SyntheticNode)   resolve(con)
         curClass = null
     }
 
@@ -142,7 +143,7 @@ class JvmVariableResolver : AstNodeVisitor<Unit> {
 
         if (!field.isStatic && !field.isTopLevel) addVar("this", Datatype.Object(curClass!!))
 
-        resolve(field.initializer)
+        field.initializer?.let { resolve(it) }
         field.amountLocals = maxLocals
     }
 
@@ -197,6 +198,34 @@ class JvmVariableResolver : AstNodeVisitor<Unit> {
 
     private fun resolve(node: AstNode) {
         node.accept(this)
+    }
+
+    override fun visit(constructor: AstNode.Constructor) {
+        constructor as AstNode.ConstructorDeclaration
+        maxLocals = 0
+        jvmVars.clear()
+
+        val fieldAssignArgsIndies = constructor.fieldAssignArgsIndices
+
+        val fieldAssignArgJvmIndices = mutableMapOf<String, Int>()
+
+        for (i in constructor.descriptor.args.indices) {
+            val arg = constructor.descriptor.args[i]
+
+            val fieldAssignArgFieldDefs = constructor.fieldAssignArgFieldDefs
+            if (i in fieldAssignArgsIndies) {
+                val type = fieldAssignArgFieldDefs[arg.first]?.fieldType ?: Datatype.ErrorType()
+                fieldAssignArgJvmIndices[arg.first] = addVar("\$FieldAssignArg\$${arg.first}", type)
+            } else {
+                fieldAssignArgJvmIndices[arg.first] = addVar(arg.first, arg.second)
+            }
+        }
+
+        constructor.fieldAssignArgJvmVarLocation = fieldAssignArgJvmIndices
+
+        constructor.superCallArgs?.forEach { resolve(it) }
+        constructor.body?.let { resolve(it) }
+        constructor.amountLocals = if (constructor.body == null) jvmVars.size else maxLocals
     }
 
     /**

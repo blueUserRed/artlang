@@ -42,5 +42,6 @@ interface AstNodeVisitor<T> {
     fun visit(supCall: AstNode.SuperCall): T
     fun visit(cast: AstNode.Cast): T
     fun visit(instanceOf: AstNode.InstanceOf): T
+    fun visit(constructor: AstNode.Constructor): T
 
 }

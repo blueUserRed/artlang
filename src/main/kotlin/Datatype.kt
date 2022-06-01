@@ -205,6 +205,10 @@ abstract class Datatype(val kind: Datakind) {
          * looks up a function with name [name] that can be called with [sig]
          */
         fun lookupFunc(name: String, sig: List<Datatype>): AstNode.Function? {
+            //TODO: fix functions with sigs where on param is a supertype of the other
+            // fn f(a: Animal)
+            // fn f(c: Cat)
+            // if an instance of cat is provided the first function in the list will be called, while fn f(c: Cat) should be called
             for (func in clazz.staticFuncs) if (func.name == name && func.functionDescriptor.isCompatibleWith(sig)) return func
             return null
         }
@@ -232,6 +236,12 @@ abstract class Datatype(val kind: Datakind) {
             if (other.extends == null) return false
             if (other.extends === clazz) return true
             return isSuperClassOf(other.extends!!)
+        }
+
+        fun lookupConstructor(sig: List<Datatype>): AstNode.Constructor? {
+            for (con in clazz.constructors)
+                if (con.descriptor.isCompatibleWith(sig)) return con
+            return null
         }
 
         override fun toString(): String = "Class<${clazz.name}>"

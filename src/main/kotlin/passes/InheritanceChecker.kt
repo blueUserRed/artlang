@@ -109,8 +109,11 @@ class InheritanceChecker : AstNodeVisitor<Unit> {
     override fun visit(clazz: AstNode.ArtClass) {
         clazz as AstNode.ClassDefinition
 
-        clazz.funcs.filter { it !is SyntheticNode }.forEach { it.accept(this) }
-        clazz.staticFuncs.filter { it !is SyntheticNode }.forEach { it.accept(this) }
+        clazz.funcs         .filter { it !is SyntheticNode }.forEach { check(it) }
+        clazz.staticFuncs   .filter { it !is SyntheticNode }.forEach { check(it) }
+        clazz.staticFields  .filter { it !is SyntheticNode }.forEach { check(it) }
+        clazz.fields        .filter { it !is SyntheticNode }.forEach { check(it) }
+        clazz.constructors  .filter { it !is SyntheticNode }.forEach { check(it) }
 
         var next: AstNode.ArtClass? = clazz.extends
         while (next != null) {
@@ -200,7 +203,7 @@ class InheritanceChecker : AstNodeVisitor<Unit> {
 
     override fun visit(field: AstNode.Field) {
         field as AstNode.FieldDeclaration
-        check(field.initializer)
+        field.initializer?.let { check(it) }
     }
 
     override fun visit(arr: AstNode.ArrayCreate) {
@@ -255,6 +258,13 @@ class InheritanceChecker : AstNodeVisitor<Unit> {
 
     override fun visit(instanceOf: AstNode.InstanceOf) {
         check(instanceOf.toCheck)
+    }
+
+    override fun visit(constructor: AstNode.Constructor) {
+        constructor as AstNode.ConstructorDeclaration
+
+        constructor.superCallArgs?.forEach { check(it) }
+        constructor.body?.let { check(it) }
     }
 
     fun check(node: AstNode) = node.accept(this)
