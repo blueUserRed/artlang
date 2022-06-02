@@ -72,5 +72,3 @@ class TestSuite private constructor(private val tests: List<Test>) {
         }
     }
 }
-
-//TODO testsuite aufruf TestSuite(ts1, ts2), dass summary output ganzunten also suites kombinieren

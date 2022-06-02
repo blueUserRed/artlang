@@ -8,7 +8,7 @@ fun main() {
 //    val test = Test("HelloWorld.art")
 //    test.test()
 
-    val ts: TestSuite = TestSuite.custom(listOf(Test("HelloWorld.art"), Test("BlockExpressions.art")))
+    val ts: TestSuite = TestSuite.custom(listOf(Test("HelloWorld.art"), Test("OperationsBasic.art")))
 //    println(ts.toString())
     ts.run()
 
