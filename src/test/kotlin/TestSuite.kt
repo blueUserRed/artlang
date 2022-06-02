@@ -4,7 +4,7 @@ import onj.*
  * @author Simon Berthold
  *
  * TestSuite is an array of tests which can all be performed at once.
- * There are predefined Suites in testSuites.csv which can be selected with byName or byId. Otherwise it is possible to
+ * There are predefined Suites in testSuites.onj which can be selected with byName or byId. Otherwise it is possible to
  * create custom suites.
  */
 class TestSuite private constructor(private val tests: List<Test>) {
