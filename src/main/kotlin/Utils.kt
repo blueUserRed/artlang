@@ -64,6 +64,34 @@ object Utils {
         ((s.toInt() shr 0) and 0xFF).toByte(),
     ).toByteArray()
 
+
+    /**
+     * converts a string to modified utf8 encoding, which is used by the class-file format for encoding string-constants
+     */
+    fun strToModifiedUTF8(str: String): ByteArray {
+
+        // https://stackoverflow.com/questions/57419723/how-to-convert-the-java-modified-utf-8-to-the-regular-utf-8-and-back
+
+        // how can something as simple as encoding text be such a mess?
+
+        val chars = str.toCharArray()
+        val bytes = mutableListOf<Byte>()
+
+        for (c in chars) {
+            if (c.code in 1..0x7F) {
+                bytes.add(c.code.toByte())
+            }
+            else if (c.code > 0x7FF) {
+                bytes.add((0xE0 or (((c.code shr 12) and 0xF))).toByte())
+                bytes.add((0x80 or (((c.code shr 6) and 0x3F))).toByte())
+                bytes.add((0x80 or (c.code and 0x3F)).toByte())
+            } else {
+                bytes.add((0xc0 or (((c.code shr 6) and 0x1F))).toByte())
+                bytes.add((0x80 or (c.code and 0x3F)).toByte())
+            }
+        }
+        return bytes.toByteArray()
+    }
 }
 
 /**

@@ -296,7 +296,7 @@ class ConstantUTF8Info(val string: String) : ConstantInfo(1) { //TODO: fix modif
     /**
      * the string as byte array
      */
-    val bytes: ByteArray = string.toByteArray(Charsets.UTF_8)
+    val bytes: ByteArray = Utils.strToModifiedUTF8(string) //string.toByteArray(Charsets.UTF_8)
 
     override fun toBytes(): ByteArray = Utils.arrayConcat(
         arrayOf(tag).toByteArray(),

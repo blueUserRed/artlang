@@ -231,8 +231,10 @@ class VariableResolver : AstNodeVisitor<Unit> {
     override fun visit(varInc: AstNode.VarAssignShorthand) {
         if (varInc.from != null) {
             resolve(varInc.from!!, varInc)
+            resolve(varInc.toAdd, varInc)
             return
         }
+        resolve(varInc.toAdd, varInc)
         val index = curVars.indexOf(varInc.name.lexeme)
         varInc.index = index
     }

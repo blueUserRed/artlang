@@ -688,7 +688,24 @@ class Compiler : AstNodeVisitor<Unit> {
         var maxLocals = 1
         for (field in fields) {
             field as AstNode.FieldDeclaration
+
             if (field.amountLocals > maxLocals) maxLocals = field.amountLocals
+
+            val fieldToAdd = Field(
+                file.utf8Info(field.name),
+                file.utf8Info(field.fieldType.descriptorType)
+            )
+
+            for (modifier in field.modifiers) when (modifier.lexeme) {
+                "public" -> fieldToAdd.isPublic = true
+                "static" -> fieldToAdd.isStatic = true // lol
+            }
+            if (field.isTopLevel) fieldToAdd.isStatic = true
+            if (field.isConst) fieldToAdd.isFinal = true
+            fieldToAdd.isPrivate = !fieldToAdd.isPublic
+
+            file.addField(fieldToAdd)
+
         }
         emitterTarget.maxLocals = maxLocals
         emitterTarget.locals = MutableList(maxLocals) { null }
@@ -1036,9 +1053,10 @@ class Compiler : AstNodeVisitor<Unit> {
 
         when (returnStmt.toReturn!!.type.kind) {
             Datakind.OBJECT, Datakind.ARRAY, Datakind.NULL -> emit(areturn)
-            Datakind.INT, Datakind.SHORT, Datakind.BYTE -> emit(ireturn)
+            Datakind.INT, Datakind.SHORT, Datakind.BYTE, Datakind.BOOLEAN -> emit(ireturn)
             Datakind.FLOAT -> emit(freturn)
             Datakind.LONG -> emit(lreturn)
+            Datakind.DOUBLE -> emit(dreturn)
             else -> TODO("return-type is not yet implemented")
         }
 
@@ -1387,7 +1405,7 @@ class Compiler : AstNodeVisitor<Unit> {
         for (arg in constructorCall.arguments) compile(arg, false)
 
         val methodIndex = file.methodRefInfo(
-            file.classInfo(file.utf8Info(constructorCall.clazz.name)),
+            file.classInfo(file.utf8Info(constructorCall.clazz.jvmName)),
             file.nameAndTypeInfo(
                 file.utf8Info("<init>"),
                 file.utf8Info(constructorCall.constuctor.jvmDescriptor.descriptorString)
@@ -2051,7 +2069,7 @@ class Compiler : AstNodeVisitor<Unit> {
         val stackSizeBefore = emitterTarget.stack.size
         node.accept(this)
         if (forceNoValueOnStack && emitterTarget.stack.size > stackSizeBefore) {
-            println(emitterTarget.stack.size) //TODO: remove
+            println(emitterTarget.stack.size - stackSizeBefore) //TODO: remove
             while (emitterTarget.stack.size > stackSizeBefore) doPop()
         }
     }
@@ -2389,6 +2407,7 @@ class Compiler : AstNodeVisitor<Unit> {
         const val ireturn: Byte = 0xAC.toByte()
         const val freturn: Byte = 0xAE.toByte()
         const val lreturn: Byte = 0xAD.toByte()
+        const val dreturn: Byte = 0xAF.toByte()
 
         const val if_icmpeq: Byte = 0x9F.toByte()
         const val if_icmpge: Byte = 0xA2.toByte()

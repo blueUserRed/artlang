@@ -364,6 +364,7 @@ object Tokenizer {
                 curLine++
                 lastLineBreakPos = cur
             }
+            if (!canPeek()) break
             if (tryConsume('*') && tryConsume('/')) break else consume()
         }
     }

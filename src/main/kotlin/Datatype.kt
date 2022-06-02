@@ -158,7 +158,8 @@ abstract class Datatype(val kind: Datakind) {
             ignoreAbstract: Boolean = false,
             origClass: AstNode.ArtClass? = null
         ): AstNode.Function? {
-            for (func in clazz.funcs) if (func.name == name && func.functionDescriptor.matches(sig)) {
+            for (func in clazz.funcs) if (func.name == name &&
+                func.functionDescriptor.matches(sig)) {
                 if (!(ignoreAbstract && func.isAbstract)) return func
             }
             if (clazz.extends === origClass) return null //protect against inheritance loops

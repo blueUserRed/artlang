@@ -1,0 +1,316 @@
+
+// NOTE: this is still very hacky, for example, external classes/functions have to be added manually in the compiler
+//       Also, artlang dosen't support things like interfaces or enums, so workarounds are required
+
+fn main() {
+    const ticTacToe = TicTacToe(JFrame())
+}
+
+class TicTacToe {
+
+    const field frame: JFrame
+    const field grid: TicTacToeField[][]
+    const field turnLabel: JLabel
+
+    field currentPlayer: int = 1
+    field isOver: bool = false
+
+    public constructor(field frame) {
+
+        const vbox = Box.createVerticalBox()
+
+        this.frame.add(vbox)
+        this.turnLabel = JLabel()
+        this.turnLabel.setText("Player1's turn")
+        vbox.add(this.turnLabel)
+        vbox.add(Box.createVerticalStrut(10))
+
+        const gridPanel = JPanel()
+
+        const grid = TicTacToeField[3][3]
+        let i = -1
+        while ((i := i + 1) < 9) grid[i % 3][i / 3] = {
+            const ticTacToeField = TicTacToeField(this)
+            gridPanel.add(ticTacToeField)
+            => ticTacToeField
+        }
+        this.grid = grid
+
+        gridPanel.setLayout(GridLayout(3, 3))
+
+        vbox.add(gridPanel)
+
+        this.frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE)
+        this.frame.setSize(400, 400)
+        this.frame.setResizable(false)
+        this.frame.setVisible(true)
+    }
+
+    fn updateText() {
+        this.turnLabel.setText(
+            if (this.currentPlayer == 1) "Player1's turn" else "Player2's turn"
+        )
+    }
+
+    public fn getCurrentPlayer(): int {
+        return this.currentPlayer
+    }
+
+    public fn completeTurn() {
+        const result = this.checkField()
+        if (result == -1) {
+            this.turnLabel.setText("Draw")
+            this.isOver = true
+        } else if (result != 0) {
+            this.turnLabel.setText("Player" + (if (result == 1) "1" else "2") + " won")
+            this.isOver = true
+        } else {
+            this.currentPlayer = if (this.currentPlayer == 1) 2 else 1
+            this.updateText()
+        }
+    }
+
+    fn checkField(): int {
+        let column = -1
+        while ((column := column + 1) < 3) {
+            const result = this.checkLine(column, 0, 0, 1)
+            if (result != 0) return result
+        }
+
+        let row = -1
+        while ((row := row + 1) < 3) {
+            const result = this.checkLine(0, row, 1, 0)
+            if (result != 0) return result
+        }
+
+        const diag1 = this.checkLine(0, 0, 1, 1)
+        if (diag1 != 0) return diag1
+        const diag2 = this.checkLine(2, 0, -1, 1)
+        if (diag2 != 0) return diag2
+
+        let x = -1
+        while ((x := x + 1) < this.grid.size) {
+            let y = -1
+            while ((y := y + 1) < this.grid[x].size) {
+                if (this.grid[x][y].getState() == TicTacToeField.NOT_SELECTED) return 0
+            }
+        }
+        return -1
+    }
+
+    fn checkLine(startX: int, startY: int, offsetX: int, offsetY: int): int {
+        let curX = startX
+        let curY = startY
+
+        const first = this.grid[curX][curY].getState()
+        if (first == TicTacToeField.NOT_SELECTED) return 0
+        loop {
+            curX += offsetX
+            curY += offsetY
+            if (curX >= 3 || curY >= 3) break
+            if (this.grid[curX][curY].getState() != first) return 0
+        }
+        return if (first == TicTacToeField.PL1_SELECTED) 1 else 2
+    }
+
+    public fn isOver(): bool {
+        return this.isOver
+    }
+
+}
+
+class TicTacToeField : JButton {
+
+    public static const field NOT_SELECTED: int = 0
+    public static const field PL1_SELECTED: int = 1
+    public static const field PL2_SELECTED: int = 2
+
+    field state: int = NOT_SELECTED
+
+    const field game: TicTacToe
+
+    public constructor(field game) : (" ")
+
+    public fn getState(): int {
+        return this.state
+    }
+
+    fn updateText() {
+        this.setText(
+            if (this.state == NOT_SELECTED) " "
+            else if (this.state == PL1_SELECTED) "x"
+            else "o"
+        )
+    }
+
+    public override fn processEvent(e: AWTEvent) {
+        if (!(e is MouseEvent) || this.game.isOver() || this.state != NOT_SELECTED) return
+        const event = e as MouseEvent
+        if (!event.paramString().startsWith("MOUSE_PRESSED")) return
+        this.state = if (this.game.getCurrentPlayer() == 1) PL1_SELECTED else PL2_SELECTED
+        this.updateText()
+        this.game.completeTurn()
+    }
+}
+
+////////////////////////////////////
+// java source code for this game //
+///////////////////////////////////
+
+/*
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.MouseEvent;
+
+// this code is not supposed to be good, it attempts to not use any features artlang dosent support
+
+public class ToDelete {
+
+    public static void main(String[] args) {
+        new TicTacToe(new JFrame());
+    }
+
+    private static class TicTacToe {
+
+        private final JFrame frame;
+        private final TicTacToeField[][] grid;
+        private final JLabel turnLabel;
+
+        private int currentPlayer = 1;
+        private boolean isOver = false;
+
+        public TicTacToe(JFrame frame) {
+           this.frame = frame;
+
+            Box vbox = Box.createVerticalBox();
+
+            frame.add(vbox);
+            turnLabel = new JLabel("Player1's turn");
+            vbox.add(turnLabel);
+            vbox.add(Box.createVerticalStrut(10));
+
+            JPanel gridPanel = new JPanel();
+
+            TicTacToeField[][] grid = new TicTacToeField[3][3];
+            for (int i = 0; i < 9; i++) {
+                TicTacToeField field = new TicTacToeField(this);
+                gridPanel.add(field);
+                grid[i % 3][i / 3] = field;
+            }
+            this.grid = grid;
+
+            gridPanel.setLayout(new GridLayout(3, 3));
+
+            vbox.add(gridPanel);
+
+            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+            frame.setSize(400, 400);
+            frame.setResizable(false);
+            frame.setVisible(true);
+        }
+
+        private void updateText() {
+            if (currentPlayer == 1) turnLabel.setText("Player1's turn");
+            else turnLabel.setText("Player2's turn");
+        }
+
+        public int getCurrentPlayer() {
+            return currentPlayer;
+        }
+
+        public void completeTurn() {
+            int result = checkField();
+            if (result == -1) {
+                turnLabel.setText("Draw");
+                isOver = true;
+            }
+            else if (result != 0) {
+                turnLabel.setText("Player" + (result == 1 ? "1" : "2") + " won");
+                isOver = true;
+            }
+            else {
+                if (currentPlayer == 1) currentPlayer = 2; else currentPlayer = 1;
+                updateText();
+            }
+        }
+
+        private int checkField() {
+            for (int column = 0; column < 3; column++) {
+                int result = checkLine(column, 0, 0, 1);
+                if (result != 0) return result;
+            }
+            for (int row = 0; row < 3; row++) {
+                int result = checkLine(0, row, 1, 0);
+                if (result != 0) return result;
+            }
+
+            int diag1 = checkLine(0, 0, 1, 1);
+            if (diag1 != 0) return diag1;
+            int diag2 = checkLine(2, 0, -1, 1);
+            if (diag2 != 0) return diag2;
+
+            for (int x = 0; x < grid.length; x++) for (int y = 0; y < grid[x].length; y++) {
+                if (grid[x][y].state == TicTacToeField.NOT_SELECTED) return 0;
+            }
+            return -1;
+        }
+
+        private int checkLine(int startX, int startY, int offsetX, int offsetY) {
+            int curX = startX;
+            int curY = startY;
+
+            int first = grid[curX][curY].getState();
+            if (first == TicTacToeField.NOT_SELECTED) return 0;
+            while (true) {
+                curX += offsetX;
+                curY += offsetY;
+                if (curX >= 3 || curY >= 3) break;
+                if (grid[curX][curY].state != first) return 0;
+            }
+            if (first == TicTacToeField.PL1_SELECTED) return 1; else return 2;
+        }
+
+        public boolean isOver() {
+            return isOver;
+        }
+    }
+
+    private static class TicTacToeField extends JButton {
+
+        public static final int NOT_SELECTED = 0;
+        public static final int PL1_SELECTED = 1;
+        public static final int PL2_SELECTED = 2;
+
+        private int state = NOT_SELECTED;
+
+        private final TicTacToe game;
+
+        public TicTacToeField(TicTacToe game) {
+            super(" ");
+            this.game = game;
+        }
+
+        public int getState() {
+            return state;
+        }
+
+        private void updateText() {
+            if (state == NOT_SELECTED) this.setText(" ");
+            else if (state == PL1_SELECTED) this.setText("x");
+            else if (state == PL2_SELECTED) this.setText("o");
+        }
+
+        @Override
+        protected void processEvent(AWTEvent e) {
+            super.processEvent(e);
+            if (e instanceof MouseEvent event && event.paramString().startsWith("MOUSE_PRESSED")) {
+                if (state != NOT_SELECTED || game.isOver()) return;
+                if (game.getCurrentPlayer() == 1) state = PL1_SELECTED; else state = PL2_SELECTED;
+                updateText();
+                game.completeTurn();
+            }
+        }
+
+    }
+
+}

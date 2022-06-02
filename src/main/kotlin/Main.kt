@@ -81,6 +81,7 @@ object Main {
         val program = doTask("Parser") { Parser().parse(tokens, code) }
 
         SyntheticAst.addSyntheticTreeParts(program)
+        SyntheticAst.addSwingTreeParts(program) // this adds a few classes and function from java.swing, only wrote it for the ticTacToe-demo to work
 
         if (Settings.printAst) {
             println("----------------AST-----------------")
