@@ -10,6 +10,7 @@ fun main() {
 
     val ts: TestSuite = TestSuite.byId(0)
     println(ts.toString())
+    ts.run()
 
 
 }
@@ -20,6 +21,8 @@ fun main() {
  * The meanwhile generated .jar file is placed in WORKING_DIR/out
  */
 class Test(private val testFileName: String, private val printOutput: Boolean = true) {
+
+    private var hasbeentested = false
 
     private var sampleOutput = try {
         Paths.get("$sampleOutDir/$testFileName").readText()
@@ -46,6 +49,7 @@ class Test(private val testFileName: String, private val printOutput: Boolean = 
             }
         }
         println(Ansi.reset)
+        hasbeentested = true
     }
 
     private fun runProgram(): String {
@@ -76,7 +80,8 @@ class Test(private val testFileName: String, private val printOutput: Boolean = 
     override fun toString(): String {
         return "File to test: " + this.testFileName +
                 "\n Print Output? " + this.printOutput +
-                "\nTest succeeded? " + this.succeeded
+                "\nTest succeeded? " + this.succeeded +
+                "\nHas been tested? " + this.hasbeentested
     }
 
 }

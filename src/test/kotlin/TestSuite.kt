@@ -1,6 +1,4 @@
 import onj.*
-import java.util.HashMap
-import java.util.stream.Stream
 
 /**
  * @author Simon Berthold
@@ -9,7 +7,16 @@ import java.util.stream.Stream
  * There are predefined Suites in testSuites.csv which can be selected with byName or byId. Otherwise it is possible to
  * create custom suites.
  */
-class TestSuite private constructor(val tests: List<Test>) {
+class TestSuite private constructor(private val tests: List<Test>) {
+
+    /**
+     * runs one test after the other, prints summary at the end
+     * returns whether tests succeeded
+     */
+    fun run(): Boolean {
+        tests.forEach{it.test()}
+        return false //TODO
+    }
 
     @Override
     override fun toString(): String {
@@ -17,19 +24,14 @@ class TestSuite private constructor(val tests: List<Test>) {
     }
 
     companion object {
-        private val testSuitesCSV: List<String> = emptyList()
-
         fun byId(id: Int): TestSuite {
             val testSuiteOnj = readTestSuitesOnj().value
-                    .filter { (it as OnjObject).get<Long>("id").toInt() == id }.get(0)
-            val message = testSuiteOnj.value as LinkedHashMap<*, *>
-            val tests = message["tests"] as OnjArray
-            val testSuites : List<Test> = tests.value.stream().map { Test(it.toString()) }.toList()
-            println(testSuites)
-//            println(message.toString() +"\n"+ tests)
-//            println((testSuiteOnj as OnjObject).get<OnjString>("tests"))
-
-            return TestSuite(TODO())
+                    .filter { (it as OnjObject).get<Long>("id").toInt() == id }[0]
+            val linkedHashMap = testSuiteOnj.value as LinkedHashMap<*, *>
+            val tests = linkedHashMap["tests"] as OnjArray
+            val testSuite: List<Test> = tests.value.stream().map { Test(it.toString().substring(1, it.toString().lastIndexOf('\''))) }.toList()
+            testSuite.forEach(::println)
+            return TestSuite(testSuite)//TODO: better code
         }
 
         fun byName(name: String): TestSuite {
