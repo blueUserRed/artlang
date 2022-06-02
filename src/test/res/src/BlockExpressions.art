@@ -1,0 +1,7 @@
+fn main() {
+    let a = 10
+    let b = 15
+    let ab = {
+        (a + 50*b) % 5 * 0.5
+    }
+}

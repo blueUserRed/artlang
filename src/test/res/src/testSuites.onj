@@ -11,6 +11,12 @@ testSuites: [
         description: "Tests creation of classes, constructing and running methods from classes on Animal Example"
         tests: [ "Animal.art" "Cat.art" "Dog.art" ] // Paths to files
     }
+    {
+        id: 2
+        name: "Block Expressions"
+        description: "Tests Blockexpressions TODO"
+        tests: [ "BlockExpressions.art" ]
+    }
 ]
 
 /* old csv
