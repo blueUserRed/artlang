@@ -4,5 +4,5 @@ fn main() {
     let ab = {
         => ((a + 50*b) % 5).float * 0.5 //0
     }
-    print a + b + ab //TODO
+    print a + b + ab.int //TODO
 }

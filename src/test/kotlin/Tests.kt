@@ -9,7 +9,7 @@ fun main() {
 //    test.test()
 
     val ts: TestSuite = TestSuite.custom(listOf(Test("HelloWorld.art"), Test("BlockExpressions.art")))
-    println(ts.toString())
+//    println(ts.toString())
     ts.run()
 
 
@@ -20,7 +20,7 @@ fun main() {
  * The .art file gets compiled, then it is run and the output is compared to the sample output.
  * The meanwhile generated .jar file is placed in WORKING_DIR/out
  */
-class Test(private val testFileName: String, private val printOutput: Boolean = true) {
+class Test(val testFileName: String, private val printOutput: Boolean = true) {
 
     private var hasbeentested = false
 
@@ -30,7 +30,7 @@ class Test(private val testFileName: String, private val printOutput: Boolean = 
         println("The sample output for this test does not exits. It can therefore not be compared with the programs output.")
         null
     }
-    private var succeeded: Boolean = false
+    var succeeded: Boolean = false
 
     fun test() {
         val args = arrayOf("compile", "$srcDir$testFileName")

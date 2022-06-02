@@ -14,7 +14,26 @@ class TestSuite private constructor(private val tests: List<Test>) {
      * returns whether tests succeeded
      */
     fun run(): Boolean {
-        tests.forEach{it.test()}
+        println("""${Ansi.blue}
+            
+            ····························
+            ·· TestSuite is being run ··
+            ····························
+            
+        ${Ansi.reset}""")
+        tests.forEach { it.test() }
+        println("""${Ansi.blue}
+            
+            ·······················
+            ·· TestSuite Summary ··
+            ·······················
+            
+        ${Ansi.reset}""")
+        tests.forEach {
+            println(Ansi.reset + it.testFileName +
+                    if (it.succeeded) "${Ansi.green} => Test succeeded [✓]"
+                    else "${Ansi.red} => Test failed [✘]")
+        }
         return false //TODO
     }
 
@@ -30,7 +49,6 @@ class TestSuite private constructor(private val tests: List<Test>) {
             val linkedHashMap = testSuiteOnj.value as LinkedHashMap<*, *>
             val tests = linkedHashMap["tests"] as OnjArray
             val testSuite: List<Test> = tests.value.stream().map { Test(it.toString().substring(1, it.toString().lastIndexOf('\''))) }.toList()
-            testSuite.forEach(::println)
             return TestSuite(testSuite)//TODO: better code
         }
 
@@ -40,7 +58,6 @@ class TestSuite private constructor(private val tests: List<Test>) {
             val linkedHashMap = testSuiteOnj.value as LinkedHashMap<*, *>
             val tests = linkedHashMap["tests"] as OnjArray
             val testSuite: List<Test> = tests.value.stream().map { Test(it.toString().substring(1, it.toString().lastIndexOf('\''))) }.toList()
-            testSuite.forEach(::println)
             return TestSuite(testSuite)//TODO: better code
         }
 
