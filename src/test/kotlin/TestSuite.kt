@@ -35,8 +35,13 @@ class TestSuite private constructor(private val tests: List<Test>) {
         }
 
         fun byName(name: String): TestSuite {
-            val testSuitesString = readTestSuitesOnj()
-            return TestSuite(TODO())
+            val testSuiteOnj = readTestSuitesOnj().value
+                    .filter { (it as OnjObject).get<String>("name").toString() == name }[0]
+            val linkedHashMap = testSuiteOnj.value as LinkedHashMap<*, *>
+            val tests = linkedHashMap["tests"] as OnjArray
+            val testSuite: List<Test> = tests.value.stream().map { Test(it.toString().substring(1, it.toString().lastIndexOf('\''))) }.toList()
+            testSuite.forEach(::println)
+            return TestSuite(testSuite)//TODO: better code
         }
 
         fun custom(tests: List<Test>): TestSuite {

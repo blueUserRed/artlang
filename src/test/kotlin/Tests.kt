@@ -8,7 +8,7 @@ fun main() {
 //    val test = Test("HelloWorld.art")
 //    test.test()
 
-    val ts: TestSuite = TestSuite.byId(0)
+    val ts: TestSuite = TestSuite.byName("Default")
     println(ts.toString())
     ts.run()
 
