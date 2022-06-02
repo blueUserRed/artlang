@@ -505,7 +505,7 @@ class Parser {
      */
     private fun parseReturn(): AstNode.Return {
         val returnToken = last()
-        if (matchNSFB(TokenType.SOFT_BREAK)) return AstNode.Return(null, returnToken, listOf(returnToken))
+        if (peek().tokenType == TokenType.SOFT_BREAK) return AstNode.Return(null, returnToken, listOf(returnToken))
         val returnExpr = parseStatement()
         return AstNode.Return(returnExpr, returnToken, listOf(returnToken))
     }

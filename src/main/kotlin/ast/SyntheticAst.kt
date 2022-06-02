@@ -45,29 +45,31 @@ object SyntheticAst {
 
 
     init {
-        objectClass.funcs.addAll(arrayOf(
+        objectClass.funcs.addAll(
+            arrayOf(
 
-            SyntFunction(
-                "toString",
-                FunctionDescriptor(mutableListOf(), Datatype.Str()),
-                isStatic = false,
-                isTopLevel = false,
-                isPrivate = false,
-                isAbstract = false,
-                objectClass
-            ),
+                SyntFunction(
+                    "toString",
+                    FunctionDescriptor(mutableListOf(), Datatype.Str()),
+                    isStatic = false,
+                    isTopLevel = false,
+                    isPrivate = false,
+                    isAbstract = false,
+                    objectClass
+                ),
 
-            SyntFunction(
-                "equals",
-                FunctionDescriptor(mutableListOf(Pair("other", Datatype.Object(objectClass))), Datatype.Bool()),
-                isStatic = false,
-                isTopLevel = false,
-                isPrivate = false,
-                isAbstract = false,
-                objectClass
+                SyntFunction(
+                    "equals",
+                    FunctionDescriptor(mutableListOf(Pair("other", Datatype.Object(objectClass))), Datatype.Bool()),
+                    isStatic = false,
+                    isTopLevel = false,
+                    isPrivate = false,
+                    isAbstract = false,
+                    objectClass
+                )
+
             )
-
-        ))
+        )
 
         objectClass.constructors.add(
             SyntConstructor(
@@ -77,6 +79,17 @@ object SyntheticAst {
             )
         )
 
+        stringClass.funcs.add(
+            SyntFunction(
+                "startsWith",
+                FunctionDescriptor(mutableListOf("prefix" to Datatype.Str()), Datatype.Bool()),
+                isStatic = false,
+                isTopLevel = false,
+                isPrivate = false,
+                isAbstract = false,
+                clazz = stringClass
+            )
+        )
     }
 
     /**
@@ -188,4 +201,381 @@ object SyntheticAst {
         root.classes.add(stringClass)
     }
 
+    @Deprecated("Only for testing, will probably remove soon")
+    fun addSwingTreeParts(root: AstNode.Program) {
+
+        val componentClass = SyntClass(
+            "Component",
+            staticFuncs = mutableListOf(),
+            funcs = mutableListOf(),
+            staticFields = mutableListOf(),
+            fields = mutableListOf(),
+            false,
+            objectClass,
+            "java/awt/Component"
+        )
+        root.classes.add(componentClass)
+
+        val containerClass = SyntClass(
+            "Container",
+            staticFuncs = mutableListOf(),
+            funcs = mutableListOf(),
+            staticFields = mutableListOf(),
+            fields = mutableListOf(),
+            false,
+            componentClass,
+            "java/awt/Container"
+        )
+        root.classes.add(containerClass)
+
+        val windowClass = SyntClass(
+            "Window",
+            staticFuncs = mutableListOf(),
+            funcs = mutableListOf(),
+            staticFields = mutableListOf(),
+            fields = mutableListOf(),
+            false,
+            containerClass,
+            "java/awt/Window"
+        )
+        root.classes.add(windowClass)
+
+        val windowSetSize = SyntFunction(
+            "setSize",
+            FunctionDescriptor(
+                mutableListOf("width" to Datatype.Integer(), "height" to Datatype.Integer()),
+                Datatype.Void()
+            ),
+            isStatic = false,
+            isTopLevel = false,
+            isPrivate = false,
+            isAbstract = false,
+            clazz = windowClass
+        )
+        windowClass.funcs.add(windowSetSize)
+
+        val windowSetVisible = SyntFunction(
+            "setVisible",
+            FunctionDescriptor(mutableListOf("visible" to Datatype.Bool()), Datatype.Void()),
+            isStatic = false,
+            isTopLevel = false,
+            isPrivate = false,
+            isAbstract = false,
+            clazz = windowClass
+        )
+        windowClass.funcs.add(windowSetVisible)
+
+        val frameClass = SyntClass(
+            "Frame",
+            staticFuncs = mutableListOf(),
+            funcs = mutableListOf(),
+            staticFields = mutableListOf(),
+            fields = mutableListOf(),
+            false,
+            windowClass,
+            "java/awt/Frame"
+        )
+        root.classes.add(frameClass)
+
+        val frameSetResizable = SyntFunction(
+            "setResizable",
+            FunctionDescriptor(mutableListOf("resizable" to Datatype.Bool()), Datatype.Void()),
+            isStatic = false,
+            isTopLevel = false,
+            isPrivate = false,
+            isAbstract = false,
+            clazz = frameClass
+        )
+        frameClass.funcs.add(frameSetResizable)
+
+        val jFrameClass = SyntClass(
+            "JFrame",
+            staticFuncs = mutableListOf(),
+            funcs = mutableListOf(),
+            staticFields = mutableListOf(),
+            fields = mutableListOf(),
+            false,
+            frameClass,
+            "javax/swing/JFrame"
+        )
+        root.classes.add(jFrameClass)
+
+        jFrameClass.constructors.add(DefaultConstructor(jFrameClass))
+
+        val jFrameSetClose = SyntFunction(
+            "setDefaultCloseOperation",
+            FunctionDescriptor(mutableListOf("operation" to Datatype.Integer()), Datatype.Void()),
+            isStatic = false,
+            isTopLevel = false,
+            isPrivate = false,
+            isAbstract = false,
+            clazz = jFrameClass
+        )
+        jFrameClass.funcs.add(jFrameSetClose)
+
+        val jFrameExitField = SyntField(
+            "EXIT_ON_CLOSE",
+            isPrivate = false,
+            isStatic = true,
+            isTopLevel = false,
+            fieldType = Datatype.Integer(),
+            isConst = true,
+            jFrameClass
+        )
+        jFrameClass.staticFields.add(jFrameExitField)
+
+        val awtEventClass = SyntClass(
+            "AWTEvent",
+            staticFuncs = mutableListOf(),
+            funcs = mutableListOf(),
+            staticFields = mutableListOf(),
+            fields = mutableListOf(),
+            false,
+            objectClass,
+            "java/awt/AWTEvent"
+        )
+        root.classes.add(awtEventClass)
+
+        val componentEventClass = SyntClass(
+            "ComponentEvent",
+            staticFuncs = mutableListOf(),
+            funcs = mutableListOf(),
+            staticFields = mutableListOf(),
+            fields = mutableListOf(),
+            false,
+            awtEventClass,
+            "java/awt/event/ComponentEvent"
+        )
+        root.classes.add(componentEventClass)
+
+        val inputEventClass = SyntClass(
+            "InputEvent",
+            staticFuncs = mutableListOf(),
+            funcs = mutableListOf(),
+            staticFields = mutableListOf(),
+            fields = mutableListOf(),
+            false,
+            componentEventClass,
+            "java/awt/event/InputEvent"
+        )
+        root.classes.add(inputEventClass)
+
+        val mouseEventClass = SyntClass(
+            "MouseEvent",
+            staticFuncs = mutableListOf(),
+            funcs = mutableListOf(),
+            staticFields = mutableListOf(),
+            fields = mutableListOf(),
+            false,
+            inputEventClass,
+            "java/awt/event/MouseEvent"
+        )
+        root.classes.add(mouseEventClass)
+
+        val mouseEventParamString = SyntFunction(
+            "paramString",
+            FunctionDescriptor(mutableListOf(), Datatype.Str()),
+            isStatic = false,
+            isTopLevel = false,
+            isPrivate = false,
+            isAbstract = false,
+            clazz = mouseEventClass
+        )
+        mouseEventClass.funcs.add(mouseEventParamString)
+
+        val layoutManagerClass = SyntClass(
+            "LayoutManager",
+            staticFuncs = mutableListOf(),
+            funcs = mutableListOf(),
+            staticFields = mutableListOf(),
+            fields = mutableListOf(),
+            false,
+            componentClass,
+            "java/awt/LayoutManager"
+        )
+        root.classes.add(layoutManagerClass)
+
+        val containerAdd = SyntFunction(
+            "add",
+            FunctionDescriptor(
+                mutableListOf("component" to Datatype.Object(componentClass)),
+                Datatype.Object(componentClass)
+            ),
+            isStatic = false,
+            isTopLevel = false,
+            isPrivate = false,
+            isAbstract = false,
+            clazz = containerClass
+        )
+        containerClass.funcs.add(containerAdd)
+
+        val containerSetLayout = SyntFunction(
+            "setLayout",
+            FunctionDescriptor(mutableListOf("layout" to Datatype.Object(layoutManagerClass)), Datatype.Void()),
+            isStatic = false,
+            isTopLevel = false,
+            isPrivate = false,
+            isAbstract = false,
+            clazz = containerClass
+        )
+        containerClass.funcs.add(containerSetLayout)
+
+        val containerProcessEvent = SyntFunction(
+            "processEvent",
+            FunctionDescriptor(mutableListOf("e" to Datatype.Object(awtEventClass)), Datatype.Void()),
+            isStatic = false,
+            isTopLevel = false,
+            isPrivate = false,
+            isAbstract = false,
+            clazz = containerClass
+        )
+        containerClass.funcs.add(containerProcessEvent)
+
+        val jComponentClass = SyntClass(
+            "JComponent",
+            staticFuncs = mutableListOf(),
+            funcs = mutableListOf(),
+            staticFields = mutableListOf(),
+            fields = mutableListOf(),
+            false,
+            containerClass,
+            "javax/swing/JComponent"
+        )
+        root.classes.add(jComponentClass)
+
+        val jLabelClass = SyntClass(
+            "JLabel",
+            staticFuncs = mutableListOf(),
+            funcs = mutableListOf(),
+            staticFields = mutableListOf(),
+            fields = mutableListOf(),
+            false,
+            containerClass,
+            "javax/swing/JLabel"
+        )
+        root.classes.add(jLabelClass)
+
+        jLabelClass.constructors.add(DefaultConstructor(jLabelClass))
+
+        val jLabelSetText = SyntFunction(
+            "setText",
+            FunctionDescriptor(mutableListOf("text" to Datatype.Str()), Datatype.Void()),
+            isStatic = false,
+            isTopLevel = false,
+            isPrivate = false,
+            isAbstract = false,
+            clazz = jLabelClass
+        )
+        jLabelClass.funcs.add(jLabelSetText)
+
+        val boxClass = SyntClass(
+            "Box",
+            staticFuncs = mutableListOf(),
+            funcs = mutableListOf(),
+            staticFields = mutableListOf(),
+            fields = mutableListOf(),
+            false,
+            jComponentClass,
+            "javax/swing/Box"
+        )
+        root.classes.add(boxClass)
+
+        val createVerticalBox = SyntFunction(
+            "createVerticalBox",
+            FunctionDescriptor(mutableListOf(), Datatype.Object(boxClass)),
+            isStatic = true,
+            isTopLevel = false,
+            isPrivate = false,
+            isAbstract = false,
+            clazz = boxClass
+        )
+        boxClass.staticFuncs.add(createVerticalBox)
+
+        val createVerticalStrut = SyntFunction(
+            "createVerticalStrut",
+            FunctionDescriptor(mutableListOf("height" to Datatype.Integer()), Datatype.Object(componentClass)),
+            isStatic = true,
+            isTopLevel = false,
+            isPrivate = false,
+            isAbstract = false,
+            clazz = boxClass
+        )
+        boxClass.staticFuncs.add(createVerticalStrut)
+
+        val jPanelClass = SyntClass(
+            "JPanel",
+            staticFuncs = mutableListOf(),
+            funcs = mutableListOf(),
+            staticFields = mutableListOf(),
+            fields = mutableListOf(),
+            false,
+            jComponentClass,
+            "javax/swing/JPanel"
+        )
+        root.classes.add(jPanelClass)
+
+        jPanelClass.constructors.add(DefaultConstructor(jPanelClass))
+
+        val gridLayoutClass = SyntClass(
+            "GridLayout",
+            staticFuncs = mutableListOf(),
+            funcs = mutableListOf(),
+            staticFields = mutableListOf(),
+            fields = mutableListOf(),
+            false,
+            layoutManagerClass,
+            "java/awt/GridLayout"
+        )
+        root.classes.add(gridLayoutClass)
+
+        val gridLayoutConstructor = SyntConstructor(
+            false,
+            FunctionDescriptor(mutableListOf("rows" to Datatype.Integer(), "cols" to Datatype.Integer()), Datatype.Object(gridLayoutClass)),
+            gridLayoutClass
+        )
+        gridLayoutClass.constructors.add(gridLayoutConstructor)
+
+        val abstractButtonClass = SyntClass(
+            "AbstractButton",
+            staticFuncs = mutableListOf(),
+            funcs = mutableListOf(),
+            staticFields = mutableListOf(),
+            fields = mutableListOf(),
+            false,
+            jComponentClass,
+            "javax/swing/AbstractButton"
+        )
+        root.classes.add(abstractButtonClass)
+
+        val jButtonClass = SyntClass(
+            "JButton",
+            staticFuncs = mutableListOf(),
+            funcs = mutableListOf(),
+            staticFields = mutableListOf(),
+            fields = mutableListOf(),
+            false,
+            abstractButtonClass,
+            "javax/swing/JButton"
+        )
+        root.classes.add(jButtonClass)
+
+        val jButtonConstructor = SyntConstructor(
+            false,
+            FunctionDescriptor(mutableListOf("text" to Datatype.Str()), Datatype.Object(jButtonClass)),
+            jButtonClass
+        )
+        jButtonClass.constructors.add(jButtonConstructor)
+
+        val abstractButtonSetText = SyntFunction(
+            "setText",
+            FunctionDescriptor(mutableListOf("text" to Datatype.Str()), Datatype.Void()),
+            isStatic = false,
+            isTopLevel = false,
+            isPrivate = false,
+            isAbstract = false,
+            clazz = abstractButtonClass
+        )
+        abstractButtonClass.funcs.add(abstractButtonSetText)
+
+    }
 }

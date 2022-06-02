@@ -1262,8 +1262,18 @@ data class FunctionDescriptor(val args: MutableList<Pair<String, Datatype>>, val
      * checks if this descriptor matches another descriptor (excluding return type)
      */
     fun matches(desc: FunctionDescriptor): Boolean {
-        if (desc.args.size != args.size) return false
-        for (i in desc.args.indices) if (args[i].first != "this" && desc.args[i].second != args[i].second) return false
+        var argsNoThis: MutableList<Pair<String, Datatype>> = args
+        if (args.isNotEmpty() && args[0].first == "this") {
+            argsNoThis = args.toMutableList()
+            argsNoThis.removeAt(0)
+        }
+        var argsNoThis2: MutableList<Pair<String, Datatype>> = args
+        if (desc.args.isNotEmpty() && desc.args[0].first == "this") {
+            argsNoThis2 = desc.args.toMutableList()
+            argsNoThis2.removeAt(0)
+        }
+        if (argsNoThis2.size != argsNoThis.size) return false
+        for (i in argsNoThis2.indices) if (argsNoThis2[i].second != argsNoThis[i].second) return false
         return true
     }
 

@@ -172,9 +172,11 @@ class JvmVariableResolver : AstNodeVisitor<Unit> {
 
     override fun visit(varInc: AstNode.VarAssignShorthand) {
         if (varInc.from != null) {
+            resolve(varInc.toAdd)
             resolve(varInc.from!!)
             return
         }
+        resolve(varInc.toAdd)
         varInc.jvmIndex = jvmVars.indexOf(varInc.name.lexeme)
     }
 

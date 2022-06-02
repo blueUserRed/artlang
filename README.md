@@ -102,7 +102,7 @@ fn main() {
 
 <br>
 
-####Primitive Types
+#### Primitive Types
 Primitive types are basic types used to represent e.g. numbers.
 * byte: 8-bit signed integer
 * short: 16-bit signed integer

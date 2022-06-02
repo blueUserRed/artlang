@@ -614,7 +614,10 @@ class TypeChecker : AstNodeVisitor<Datatype> {
     override fun visit(returnStmt: AstNode.Return): Datatype {
         val type = returnStmt.toReturn?.let { check(it, returnStmt) } ?: Datatype.Void()
         if (curFunction == null) return Datatype.Void()
-        if (!type.compatibleWith(curFunction!!.functionDescriptor.returnType)) {
+        if (
+            type != curFunction!!.functionDescriptor.returnType &&
+            !type.compatibleWith(curFunction!!.functionDescriptor.returnType)
+        ) {
             artError(Errors.IncompatibleTypesError(
                 returnStmt,
                 "return",
@@ -1134,12 +1137,11 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             Datakind.DOUBLE -> Datatype.Double()
             Datakind.OBJECT -> {
                 node as AstNode.ObjectTypeNode
-                var toRet: Datatype? = null
 
-                for (c in program.classes) if (c.name == node.identifier.lexeme) {
-                    toRet = Datatype.Object(c)
-                }
-                toRet ?: throw RuntimeException("unknown Type: ${node.identifier.lexeme}")
+                val clazz = lookupTopLevelClass(node.identifier.lexeme)
+                if (clazz == null) artError(Errors.UnknownIdentifierError(node.identifier, srcCode))
+
+                clazz?.let { Datatype.Object(it) } ?: Datatype.ErrorType()
             }
             else -> throw RuntimeException("invalid type")
         }
