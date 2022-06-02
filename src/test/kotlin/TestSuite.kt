@@ -1,9 +1,6 @@
-import onj.OnjArray
-import onj.OnjObject
-import onj.OnjParser
-import java.nio.file.Paths
-import java.util.regex.Pattern
-import kotlin.io.path.readText
+import onj.*
+import java.util.HashMap
+import java.util.stream.Stream
 
 /**
  * @author Simon Berthold
@@ -23,35 +20,31 @@ class TestSuite private constructor(val tests: List<Test>) {
         private val testSuitesCSV: List<String> = emptyList()
 
         fun byId(id: Int): TestSuite {
-            val testSuitesString = readTestSuitesCSV().map { it[1] }.toTypedArray()
-            val testSuites = testSuitesString.map { Test(it/*TODO filename*/, false) }
-            testSuites.forEach { test: Test -> println(test) }
-            return TestSuite(testSuites)
+            val testSuiteOnj = readTestSuitesOnj().value
+                    .filter { (it as OnjObject).get<Long>("id").toInt() == id }.get(0)
+            val message = testSuiteOnj.value as LinkedHashMap<*, *>
+            val tests = message["tests"] as OnjArray
+            val testSuites : List<Test> = tests.value.stream().map { Test(it.toString()) }.toList()
+            println(testSuites)
+//            println(message.toString() +"\n"+ tests)
+//            println((testSuiteOnj as OnjObject).get<OnjString>("tests"))
+
+            return TestSuite(TODO())
         }
 
         fun byName(name: String): TestSuite {
-            val testSuitesString = readTestSuitesCSV().map { it[0] }.toTypedArray()
-            val testSuites = testSuitesString.map { Test(it/*TODO filename*/, false) }
-            testSuites.forEach { test: Test -> println(test) }
-            return TestSuite(testSuites)
+            val testSuitesString = readTestSuitesOnj()
+            return TestSuite(TODO())
         }
 
         fun custom(tests: List<Test>): TestSuite {
             return TestSuite(tests)
         }
 
-        private fun readTestSuitesCSV(): Array<Array <String>> {
+        private fun readTestSuitesOnj(): OnjArray {
             val testSuitesONJ = OnjParser.parseFile("src/testSuites.onj") as OnjObject
             val testSuites = testSuitesONJ.get<OnjArray>("testSuites")
-            val suite = testSuites.get<String>(0)
-//            println(suite)
-
-            val testSuitesCSV: String = Paths.get("src/testSuites.csv").readText()
-            println(testSuitesCSV)
-            val lines: MutableList<String> = testSuitesCSV.split(Regex(Pattern.quote("\n"))).toMutableList().apply { removeAt(0) }
-            val values = lines.map { s: String -> s.split(";").toTypedArray() }.toTypedArray()
-            println(values.toString())
-            return values
+            return (testSuites)
         }
     }
 }
