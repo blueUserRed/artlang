@@ -1,0 +1,17 @@
+fn main() {
+    Animal.walk()
+    Animal.saySomething()
+}
+
+class Animal {
+    public {
+        field animalField: str = "sdsdfsdfjkl"
+        fn walk() {
+           print "Animal walking..."
+        }
+
+        fn saySomething() {
+           print "<generic animal sounds>"
+        }
+    } //TODO: multiple modifiers
+}
