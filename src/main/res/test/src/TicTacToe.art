@@ -10,7 +10,12 @@ class TicTacToe {
 
     const field frame: JFrame
     const field grid: TicTacToeField[][]
-    const field turnLabel: JLabel
+
+    const field turnLabel: JLabel = {
+        const label = JLabel()
+        label.setText("Player1's turn")
+        => label
+    }
 
     field currentPlayer: int = 1
     field isOver: bool = false
@@ -20,8 +25,6 @@ class TicTacToe {
         const vbox = Box.createVerticalBox()
 
         this.frame.add(vbox)
-        this.turnLabel = JLabel()
-        this.turnLabel.setText("Player1's turn")
         vbox.add(this.turnLabel)
         vbox.add(Box.createVerticalStrut(10))
 

@@ -522,7 +522,7 @@ class MethodBuilder {
     /**
      * List containing all StackMapFrames
      */
-    private val stackMapFrames: MutableList<StackMapTableAttribute.StackMapFrame> = mutableListOf()
+    var stackMapFrames: MutableList<StackMapTableAttribute.StackMapFrame> = mutableListOf()
 
     var isPublic: Boolean = false
     var isPrivate: Boolean = false
