@@ -15,6 +15,7 @@
   * [Primitive Types](#primitive-types)
   * [If & else](#if--else)
   * [Loops](#loops)
+  * [Block Expressions](#block-expressions)
 * [Examples](#_examples_)
   * [Hello World](#hello-world)
   * [FizzBuzz](#fizzbuzz)
@@ -193,8 +194,41 @@ fn main() {
 }
 ```
 
-
 <br>
+
+#### Block Expressions
+In Artlang, code-blocks can be used as Expressions. This is done by
+putting an arrow `=>` with an expression at the end of the block.
+
+```rust
+fn main() {
+  
+  let x = {
+    const a = someFn()
+    const b = someFn()
+    => a * b + 3 // this will get assigned to x
+  }
+  
+  // the arrow must be the last statement in the block and cant be
+  // contained in an if, while or similar
+  
+  let y = {
+    => 3 // syntax error, because '=>' is not the last statement
+    print "hi"
+  }
+  
+  // Block-expressions can be combined with if-expressions
+  
+  let z = if (someCondition) {
+    // ... some code ...
+    => value
+  } else {
+    // ... some code ...
+    => some_other_value
+  }
+  
+}
+```
 
 <!-- TODO: continue -->
 

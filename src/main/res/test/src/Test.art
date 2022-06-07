@@ -1,0 +1,18 @@
+
+fn main() {
+    Test(123)
+}
+
+class Test {
+
+    field test: int = {
+        const haha = 243
+        => haha
+    }
+
+    public constructor(test: int) {
+        print test
+        print this.test
+    }
+
+}

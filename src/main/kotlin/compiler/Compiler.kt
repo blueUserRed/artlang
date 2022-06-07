@@ -103,6 +103,8 @@ class Compiler : AstNodeVisitor<Unit> {
 
     private var curFunction: AstNode.Function? = null
 
+    private var constructorLocalsOffset: Int? = null
+
     /**
      * compiles a program in form of an Ast to class-files
      * @param program the program
@@ -234,12 +236,12 @@ class Compiler : AstNodeVisitor<Unit> {
             decStack()
             decStack()
             incStack(Datatype.Integer())
-            emit(ifgt, *Utils.getLastTwoBytes(7))
+            emit(ifgt, *Utils.getShortAsBytes(7))
             decStack()
             emit(iconst_0)
             incStack(Datatype.Integer())
             emitStackMapFrame()
-            emit(_goto, *Utils.getLastTwoBytes(4))
+            emit(_goto, *Utils.getShortAsBytes(4))
             decStack() // Because the first iconst instruction can be skipped
             emitStackMapFrame()
             emit(iconst_1)
@@ -251,12 +253,12 @@ class Compiler : AstNodeVisitor<Unit> {
             decStack()
             decStack()
             incStack(Datatype.Integer())
-            emit(iflt, *Utils.getLastTwoBytes(7))
+            emit(iflt, *Utils.getShortAsBytes(7))
             decStack()
             emit(iconst_0)
             incStack(Datatype.Integer())
             emitStackMapFrame()
-            emit(_goto, *Utils.getLastTwoBytes(4))
+            emit(_goto, *Utils.getShortAsBytes(4))
             decStack() // Because the first iconst instruction can be skipped
             emitStackMapFrame()
             emit(iconst_1)
@@ -268,12 +270,12 @@ class Compiler : AstNodeVisitor<Unit> {
             decStack()
             decStack()
             incStack(Datatype.Integer())
-            emit(iflt, *Utils.getLastTwoBytes(7))
+            emit(iflt, *Utils.getShortAsBytes(7))
             decStack()
             emit(iconst_1)
             incStack(Datatype.Integer())
             emitStackMapFrame()
-            emit(_goto, *Utils.getLastTwoBytes(4))
+            emit(_goto, *Utils.getShortAsBytes(4))
             decStack() // Because the first iconst instruction can be skipped
             emitStackMapFrame()
             emit(iconst_0)
@@ -285,12 +287,12 @@ class Compiler : AstNodeVisitor<Unit> {
             decStack()
             decStack()
             incStack(Datatype.Integer())
-            emit(ifgt, *Utils.getLastTwoBytes(7))
+            emit(ifgt, *Utils.getShortAsBytes(7))
             decStack()
             emit(iconst_1)
             incStack(Datatype.Integer())
             emitStackMapFrame()
-            emit(_goto, *Utils.getLastTwoBytes(4))
+            emit(_goto, *Utils.getShortAsBytes(4))
             decStack() // Because the first iconst instruction can be skipped
             emitStackMapFrame()
             emit(iconst_0)
@@ -302,12 +304,12 @@ class Compiler : AstNodeVisitor<Unit> {
             decStack()
             decStack()
             incStack(Datatype.Integer())
-            emit(ifne, *Utils.getLastTwoBytes(7))
+            emit(ifne, *Utils.getShortAsBytes(7))
             decStack()
             emit(iconst_1)
             incStack(Datatype.Integer())
             emitStackMapFrame()
-            emit(_goto, *Utils.getLastTwoBytes(4))
+            emit(_goto, *Utils.getShortAsBytes(4))
             decStack() // Because the first iconst instruction can be skipped
             emitStackMapFrame()
             emit(iconst_0)
@@ -319,12 +321,12 @@ class Compiler : AstNodeVisitor<Unit> {
             decStack()
             decStack()
             incStack(Datatype.Integer())
-            emit(ifne, *Utils.getLastTwoBytes(7))
+            emit(ifne, *Utils.getShortAsBytes(7))
             decStack()
             emit(iconst_0)
             incStack(Datatype.Integer())
             emitStackMapFrame()
-            emit(_goto, *Utils.getLastTwoBytes(4))
+            emit(_goto, *Utils.getShortAsBytes(4))
             decStack() // Because the first iconst instruction can be skipped
             emitStackMapFrame()
             emit(iconst_1)
@@ -463,7 +465,9 @@ class Compiler : AstNodeVisitor<Unit> {
         decStack()
         emitStackMapFrame()
         val jmpAddr = emitterTarget.curCodeOffset - (jmpAddrPos - 1)
-        overwriteByteCode(jmpAddrPos, *Utils.getLastTwoBytes(jmpAddr))
+        if (jmpAddr !in Short.MIN_VALUE..Short.MAX_VALUE)
+            throw JvmLimitationException("branch in boolean comparison is too long")
+        overwriteByteCode(jmpAddrPos, *Utils.getShortAsBytes(jmpAddr.toShort()))
     }
 
     override fun visit(literal: AstNode.Literal) {
@@ -653,7 +657,7 @@ class Compiler : AstNodeVisitor<Unit> {
                 initBuilder.name = "<init>"
                 initBuilder.isPrivate = con.isPrivate
                 initBuilder.isPublic = !initBuilder.isPrivate
-                initBuilder.maxLocals = max(maxFieldLocals, con.amountLocals)
+                initBuilder.maxLocals = max(con.descriptor.args.size + maxFieldLocals, con.amountLocals)
                 initBuilder.descriptor = con.jvmDescriptor.descriptorString
 
                 emitterTarget = MethodEmitter(initBuilder)
@@ -787,34 +791,37 @@ class Compiler : AstNodeVisitor<Unit> {
      * puts the verification type associated with a datatype into the locals array of the current [emitterTarget]
      * @param emitStore if true, the function will also emit the correct store instruction
      */
-    private fun putTypeInLocals(index: Int, type: Datatype, emitStore: Boolean) = when (type.kind) {
-        Datakind.INT, Datakind.BOOLEAN, Datakind.SHORT, Datakind.BYTE -> {
-            if (emitStore) emitIntVarStore(index)
-            emitterTarget.locals[index] = VerificationTypeInfo.Integer()
+    private fun putTypeInLocals(index: Int, type: Datatype, emitStore: Boolean) {
+        val adjustedIndex = index + (constructorLocalsOffset ?: 0)
+        when (type.kind) {
+            Datakind.INT, Datakind.BOOLEAN, Datakind.SHORT, Datakind.BYTE -> {
+                if (emitStore) emitIntVarStore(index)
+                emitterTarget.locals[adjustedIndex] = VerificationTypeInfo.Integer()
+            }
+            Datakind.FLOAT -> {
+                if (emitStore) emitFloatVarStore(index)
+                emitterTarget.locals[adjustedIndex] = VerificationTypeInfo.Float()
+            }
+            Datakind.OBJECT -> {
+                if (emitStore) emitObjectVarStore(index)
+                emitterTarget.locals[adjustedIndex] = getObjVerificationType((type as Datatype.Object).clazz.jvmName)
+            }
+            Datakind.ARRAY -> {
+                if (emitStore) emitObjectVarStore(index)
+                emitterTarget.locals[adjustedIndex] = getObjVerificationType(type.descriptorType)
+            }
+            Datakind.LONG -> {
+                if (emitStore) emitLongVarStore(index)
+                emitterTarget.locals[adjustedIndex] = VerificationTypeInfo.Long()
+                emitterTarget.locals[adjustedIndex + 1] = VerificationTypeInfo.Top()
+            }
+            Datakind.DOUBLE -> {
+                if (emitStore) emitDoubleVarStore(index)
+                emitterTarget.locals[adjustedIndex] = VerificationTypeInfo.Double()
+                emitterTarget.locals[adjustedIndex + 1] = VerificationTypeInfo.Top()
+            }
+            else -> TODO("local store type not implemented")
         }
-        Datakind.FLOAT -> {
-            if (emitStore) emitFloatVarStore(index)
-            emitterTarget.locals[index] = VerificationTypeInfo.Float()
-        }
-        Datakind.OBJECT -> {
-            if (emitStore) emitObjectVarStore(index)
-            emitterTarget.locals[index] = getObjVerificationType((type as Datatype.Object).clazz.jvmName)
-        }
-        Datakind.ARRAY -> {
-            if (emitStore) emitObjectVarStore(index)
-            emitterTarget.locals[index] = getObjVerificationType(type.descriptorType)
-        }
-        Datakind.LONG -> {
-            if (emitStore) emitLongVarStore(index)
-            emitterTarget.locals[index] = VerificationTypeInfo.Long()
-            emitterTarget.locals[index + 1] = VerificationTypeInfo.Top()
-        }
-        Datakind.DOUBLE -> {
-            if (emitStore) emitDoubleVarStore(index)
-            emitterTarget.locals[index] = VerificationTypeInfo.Double()
-            emitterTarget.locals[index + 1] = VerificationTypeInfo.Top()
-        }
-        else -> TODO("local store type not implemented")
     }
 
     override fun visit(varAssign: AstNode.Assignment) {
@@ -904,7 +911,11 @@ class Compiler : AstNodeVisitor<Unit> {
         emitStackMapFrame()
         val offset = emitterTarget.curCodeOffset
         for (addr in loopBreakAddressesToOverwrite) {
-            overwriteByteCode(addr, *Utils.getShortAsBytes((offset - (addr - 1)).toShort()))
+
+            val jmpOffset = offset - (addr - 1)
+            if (jmpOffset !in Short.MIN_VALUE..Short.MAX_VALUE)
+                throw JvmLimitationException("branch in loop-break is too far")
+            overwriteByteCode(addr, *Utils.getShortAsBytes(jmpOffset.toShort()))
         }
 
         loopContinueAddress = loopContinueAddressBefore
@@ -940,12 +951,16 @@ class Compiler : AstNodeVisitor<Unit> {
         if (hasElse && !skipGoto) emit(_goto, 0x00.toByte(), 0x00.toByte())
         val elseJmpAddrOffset = emitterTarget.curCodeOffset - 2
         val jmpAddr = emitterTarget.curCodeOffset - (jmpAddrOffset - 1)
-        overwriteByteCode(jmpAddrOffset, *Utils.getLastTwoBytes(jmpAddr))
+        if (jmpAddr !in Short.MIN_VALUE..Short.MAX_VALUE)
+            throw JvmLimitationException("branch in if-statement is too far")
+        overwriteByteCode(jmpAddrOffset, *Utils.getShortAsBytes(jmpAddr.toShort()))
         if (hasElse) emitStackMapFrame()
         if (hasElse) compile(ifStmt.elseStmt!!, ifStmt.type.kind == Datakind.VOID)
 
         val elseJmpAddr = emitterTarget.curCodeOffset - (elseJmpAddrOffset - 1)
-        if (hasElse && !skipGoto) overwriteByteCode(elseJmpAddrOffset, *Utils.getLastTwoBytes(elseJmpAddr))
+        if (hasElse && !skipGoto && elseJmpAddr !in Short.MIN_VALUE..Short.MAX_VALUE)
+            throw JvmLimitationException("branch in if-statement is too far")
+        if (hasElse && !skipGoto) overwriteByteCode(elseJmpAddrOffset, *Utils.getShortAsBytes(elseJmpAddr.toShort()))
         emitStackMapFrame()
     }
 
@@ -992,12 +1007,16 @@ class Compiler : AstNodeVisitor<Unit> {
         decStack()
         val jmpAddrOffset = emitterTarget.curCodeOffset - 2
         compile(whileStmt.body, true)
-        emit(_goto, *Utils.getShortAsBytes((startOffset - emitterTarget.curCodeOffset).toShort()))
+        emitGoto(startOffset - emitterTarget.curCodeOffset)
         val jmpAddr = emitterTarget.curCodeOffset - (jmpAddrOffset - 1)
-        overwriteByteCode(jmpAddrOffset, *Utils.getLastTwoBytes(jmpAddr))
+        if (jmpAddr !in Short.MIN_VALUE..Short.MAX_VALUE)
+            throw JvmLimitationException("branch in while-statement is too far")
+        overwriteByteCode(jmpAddrOffset, *Utils.getShortAsBytes(jmpAddr.toShort()))
         emitStackMapFrame()
         val offset = emitterTarget.curCodeOffset
         for (addr in loopBreakAddressesToOverwrite) {
+            if (addr !in Short.MIN_VALUE..Short.MAX_VALUE)
+                throw JvmLimitationException("branch in while-statement break is too far")
             overwriteByteCode(addr, *Utils.getShortAsBytes((offset - (addr - 1)).toShort()))
         }
 
@@ -1640,7 +1659,9 @@ class Compiler : AstNodeVisitor<Unit> {
         decStack()
         if (constructor.superConstructor != null) repeat(constructor.superCallArgs!!.size) { decStack() }
 
+        constructorLocalsOffset = constructor.descriptor.args.size
         doNonStaticFields(curClass!!.fields)
+        constructorLocalsOffset = null
 
         val fieldAssignDefs = constructor.fieldAssignArgFieldDefs
         val fieldAssignJvmIndices = constructor.fieldAssignArgJvmVarLocation
@@ -1766,14 +1787,6 @@ class Compiler : AstNodeVisitor<Unit> {
         emit(iconst_1)
         incStack(Datatype.Integer())
         emitStackMapFrame()
-    }
-
-    /**
-     * emits either a [_goto] or [goto_w] instruction depending on the size of offset
-     */
-    private fun emitGoto(offset: Int) {
-        if (offset !in Short.MIN_VALUE..Short.MAX_VALUE) emit(goto_w, *Utils.getIntAsBytes(offset))
-        else emit(_goto, *Utils.getShortAsBytes(offset.toShort()))
     }
 
     /**
@@ -1930,111 +1943,111 @@ class Compiler : AstNodeVisitor<Unit> {
     /**
      * loads an integer variable
      */
-    private fun emitIntVarLoad(index: Int) = when (index) {
+    private fun emitIntVarLoad(index: Int) = when (val i = index + (constructorLocalsOffset ?: 0)) {
         0 -> emit(iload_0)
         1 -> emit(iload_1)
         2 -> emit(iload_2)
         3 -> emit(iload_3)
-        else -> emit(iload, (index and 0xFF).toByte()) //TODO: wide
+        else -> emit(iload, (i and 0xFF).toByte()) //TODO: wide
     }
 
     /**
      * loads a float variable
      */
-    private fun emitFloatVarLoad(index: Int) = when (index) {
+    private fun emitFloatVarLoad(index: Int) = when (val i = index + (constructorLocalsOffset ?: 0)) {
         0 -> emit(fload_0)
         1 -> emit(fload_1)
         2 -> emit(fload_2)
         3 -> emit(fload_3)
-        else -> emit(fload, (index and 0xFF).toByte()) //TODO: wide
+        else -> emit(fload, (i and 0xFF).toByte()) //TODO: wide
     }
 
     /**
      * loads a long variable
      */
-    private fun emitLongVarLoad(index: Int) = when (index) {
+    private fun emitLongVarLoad(index: Int) = when (val i = index + (constructorLocalsOffset ?: 0)) {
         0 -> emit(lload_0)
         1 -> emit(lload_1)
         2 -> emit(lload_2)
         3 -> emit(lload_3)
-        else -> emit(lload, (index and 0xFF).toByte())
+        else -> emit(lload, (i and 0xFF).toByte())
     }
 
     /**
      * loads a double variable
      */
-    private fun emitDoubleVarLoad(index: Int) = when (index) {
+    private fun emitDoubleVarLoad(index: Int) = when (val i = index + (constructorLocalsOffset ?: 0)) {
         0 -> emit(dload_0)
         1 -> emit(dload_1)
         2 -> emit(dload_2)
         3 -> emit(dload_3)
-        else -> emit(dload, (index and 0xFF).toByte())
+        else -> emit(dload, (i and 0xFF).toByte())
     }
 
     /**
      * stores an integer in a variable
      */
-    private fun emitIntVarStore(index: Int) = when (index) {
+    private fun emitIntVarStore(index: Int) = when (val i = index + (constructorLocalsOffset ?: 0)) {
         0 -> emit(istore_0)
         1 -> emit(istore_1)
         2 -> emit(istore_2)
         3 -> emit(istore_3)
-        else -> emit(istore, (index and 0xFF).toByte()) //TODO: wide
+        else -> emit(istore, (i and 0xFF).toByte()) //TODO: wide
     }
 
     /**
      * stores a float in a variable
      */
-    private fun emitFloatVarStore(index: Int) = when (index) {
+    private fun emitFloatVarStore(index: Int) = when (val i = index + (constructorLocalsOffset ?: 0)) {
         0 -> emit(fstore_0)
         1 -> emit(fstore_1)
         2 -> emit(fstore_2)
         3 -> emit(fstore_3)
-        else -> emit(fstore, (index and 0xFF).toByte()) //TODO: wide
+        else -> emit(fstore, (i and 0xFF).toByte()) //TODO: wide
     }
 
     /**
      * stores a long in a variable
      */
-    private fun emitLongVarStore(index: Int) = when (index) {
+    private fun emitLongVarStore(index: Int) = when (val i = index + (constructorLocalsOffset ?: 0)) {
         0 -> emit(lstore_0)
         1 -> emit(lstore_1)
         2 -> emit(lstore_2)
         3 -> emit(lstore_3)
-        else -> emit(lstore, (index and 0xFF).toByte())
+        else -> emit(lstore, (i and 0xFF).toByte())
     }
 
     /**
      * stores a double in a variable
      */
-    private fun emitDoubleVarStore(index: Int) = when (index) {
+    private fun emitDoubleVarStore(index: Int) = when (val i = index + (constructorLocalsOffset ?: 0)) {
         0 -> emit(dstore_0)
         1 -> emit(dstore_1)
         2 -> emit(dstore_2)
         3 -> emit(dstore_3)
-        else -> emit(dstore, (index and 0xFF).toByte())
+        else -> emit(dstore, (i and 0xFF).toByte())
     }
 
     /**
      * loads an object variable
      */
-    private fun emitObjectVarLoad(index: Int) = when (index) {
+    private fun emitObjectVarLoad(index: Int) = when (val i = index + (constructorLocalsOffset ?: 0)) {
         0 -> emit(aload_0)
         1 -> emit(aload_1)
         2 -> emit(aload_2)
         3 -> emit(aload_3)
-        else -> emit(aload, (index and 0xFF).toByte()) //TODO: wide
+        else -> emit(aload, (i and 0xFF).toByte()) //TODO: wide
     }
 
     /**
      * stores an object in a variable
      */
-    private fun emitObjectVarStore(index: Int) = when (index) {
+    private fun emitObjectVarStore(index: Int) = when (val i = index + (constructorLocalsOffset ?: 0)) {
         0 -> emit(astore_0)
         1 -> emit(astore_1)
         2 -> emit(astore_2)
         3 -> emit(astore_3)
-        else -> emit(astore, (index and 0xFF).toByte()) //TODO: wide
+        else -> emit(astore, (i and 0xFF).toByte()) //TODO: wide
     }
 
     /**
@@ -2043,6 +2056,18 @@ class Compiler : AstNodeVisitor<Unit> {
     private fun emitLdc(index: Int) {
         if (index <= 255) emit(ldc, (index and 0xFF).toByte())
         else emit(ldc_w, *Utils.getLastTwoBytes(index))
+    }
+
+    /**
+     * emits either a [_goto] or [goto_w] instruction depending on the size of offset
+     * May throw a [JvmLimitationException] if [offset] can't fit in four bytes
+     */
+    private fun emitGoto(offset: Int, target: EmitterTarget = emitterTarget) {
+        if (offset in Short.MIN_VALUE..Short.MAX_VALUE) {
+            target.emitByteCode(_goto, *Utils.getShortAsBytes(offset.toShort()))
+        } else if (offset in Int.MIN_VALUE..Int.MAX_VALUE) {
+            target.emitByteCode(goto_w, *Utils.getIntAsBytes(offset))
+        } else throw JvmLimitationException("Branch spans to far") // TODO: better message
     }
 
     /**
@@ -2156,6 +2181,11 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     /**
+     * //TODO: do this properly, fix use goto_w where possible, etc.
+     */
+    class JvmLimitationException(val limitationMessage: String) : java.lang.RuntimeException()
+
+    /**
      * represents an object to which byte code can be emitted
      */
     abstract class EmitterTarget {
@@ -2178,6 +2208,11 @@ class Compiler : AstNodeVisitor<Unit> {
          * simulates the locals array of the jvm at compile time
          */
         abstract var locals: MutableList<VerificationTypeInfo?>
+
+        /**
+         * the list containing all StackMapFrames
+         */
+        abstract var stackMapFrames: MutableList<StackMapTableAttribute.StackMapFrame>
 
         /**
          * the maximum amount of locals
@@ -2236,6 +2271,12 @@ class Compiler : AstNodeVisitor<Unit> {
         override var locals: MutableList<VerificationTypeInfo?> = mutableListOf()
 
         override var lastStackMapFrameOffset: Int = -1
+
+        override var stackMapFrames: MutableList<StackMapTableAttribute.StackMapFrame>
+            get() = methodBuilder.stackMapFrames
+            set(value) {
+                methodBuilder.stackMapFrames = value
+            }
 
         override fun emitByteCode(vararg bytes: Byte) = methodBuilder.emitByteCode(*bytes)
 
