@@ -1,0 +1,18 @@
+fn main() {
+    let a = 100
+    let b = 10
+    let c = a + b
+    let d = a - b
+    let e = a * b
+    let f = a / b
+    let g = a % b
+    let h = -a -b
+    let i = a + b * b
+    print c
+    print d
+    print e
+    print f
+    print g
+    print h
+    print i
+}
