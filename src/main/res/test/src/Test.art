@@ -1,50 +1,31 @@
-
-const field f: byte = 4#B
-
-field test: str = {
-    const toAssign = "hi"
-    => toAssign
-}
-
-field myInt: int = {
-    const a = 324
-    const b = 34
-    => a * 2 + b
-}
-
 fn main() {
-    print f
-    print test
-    print myInt
-    print myInt := 234
-    test = "hello "
-    test += "world"
-    print test
 
-    const inst = MyCl()
+    byte[1]
+    short[1]
+    int[1]
+    long[1]
+    float[1]
+    double[1]
+    bool[1]
+    str[1]
+    Cat[1]
 
-    MyCl.t3 *= 2#D
-    print MyCl.t3
+    [1.byte]
+    [1#S]
+    [1#I]
+    [1#L]
+    [1#F]
+    [1#D]
+    [true]
+    ["sdf"]
+    [Cat()]
 
-    print inst.t2 := "jskdlj"
+    let myInts = [1, 2, 3, 4]
+    myInts[2] = 3423
+    print myInts[3]
+    print myInts[2] := myInts[0]
+
 }
 
-class MyCl {
-
-    const field t1: int = 3
-
-    public field t2: str = {
-        const x = "12"
-        const y = "34"
-        => x + y
-    }
-
-    public static field t3: double = 324#D
-
-    public static const field t4: int = {
-        let x = 214
-        let y = 43
-        => x * y + t3.int
-    }
-
+class Cat {
 }

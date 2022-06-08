@@ -10,6 +10,11 @@ fun main() {
     ts.run()
 }
 
+/**
+ * runs all test in a testsuite and saves the output in the corresponding outfile
+ *
+ * TODO: outputs nonsense in the console
+ */
 fun recordOutputs(suite: TestSuite) {
     for (test in suite.tests) if (test.outputFielName != null) {
         test.test()
@@ -53,16 +58,29 @@ class Test(
 
     fun test() {
 
-        File(testFileName.split(".")[0] + ".jar").delete() //TODO: good look with filenames that don't contain a dot
+        File(testFileName.split(".")[0] + ".jar").delete() //TODO: good luck with filenames that don't contain a dot
 
         println("---------------------------------------------")
         println("testing: $testFileName")
         if (expectCompileFailure) println("Expecting compilation to fail")
         if (expectRuntimeFailure) println("Expecting program to fail at runtime")
 
-        val args = arrayOf("compile", "$srcDir$testFileName")
+        val args = arrayOf("compile", "$srcDir$testFileName", "-leaveTmp")
         ErrorPool.clear()
-        Main.main(args)
+
+        try {
+            Main.main(args)
+        } catch (e: Exception) { // catch all Exceptions thrown by the compiler
+            println("compiler threw an Exception: ")
+            println(Ansi.red)
+            e.printStackTrace(System.out)
+            println(Ansi.reset)
+            println("\n")
+            println("${Ansi.red}$testFileName => Test failed [\u2718]${Ansi.reset}")
+            println("---------------------------------------------")
+            hasBeenTested = true
+            return
+        }
         val hadCompileFailures = ErrorPool.hasErrors()
 
         programOutput = if (hadCompileFailures) null else runProgram()
@@ -89,20 +107,6 @@ class Test(
             }
         }
 
-//        if (
-//            outputsMatch &&
-//            !ErrorPool.hasErrors() &&
-//            sampleOutput != null
-//        ) {
-//            println("${Ansi.green}$testFileName => Test succeeded [\u2713]${Ansi.reset}")
-//            succeeded = true
-//        } else {
-//            println("${Ansi.red}$testFileName => Test failed [\u2718]${Ansi.reset}")
-//            println("Program Output: «\n$programOutput\n»")
-//            if (sampleOutput != null) println("Sample Output: «\n$sampleOutput\n»") else {
-//                println("Sample output does not exist.")
-//            }
-//        }
         println("---------------------------------------------")
         hasBeenTested = true
     }
