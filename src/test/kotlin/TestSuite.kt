@@ -7,7 +7,7 @@ import onj.*
  * There are predefined Suites in testSuites.onj which can be selected with byName or byId. Otherwise it is possible to
  * create custom suites.
  */
-class TestSuite private constructor(private val tests: List<Test>) {
+class TestSuite private constructor(val tests: List<Test>) {
 
     /**
      * runs one test after the other, prints summary at the end
@@ -43,22 +43,52 @@ class TestSuite private constructor(private val tests: List<Test>) {
     }
 
     companion object {
+
         fun byId(id: Int): TestSuite {
-            val testSuiteOnj = readTestSuitesOnj().value
-                    .filter { (it as OnjObject).get<Long>("id").toInt() == id }[0]
-            val linkedHashMap = testSuiteOnj.value as LinkedHashMap<*, *>
-            val tests = linkedHashMap["tests"] as OnjArray
-            val testSuite: List<Test> = tests.value.stream().map { Test(it.toString().substring(1, it.toString().lastIndexOf('\''))) }.toList()
+            val testSuiteOnj = readTestSuitesOnj()
+                .value
+                .filter { (it as OnjObject).get<Long>("id").toInt() == id }
+                .apply { if (isEmpty()) throw RuntimeException("no test with id '$id'") }[0]
+            val hashMap = testSuiteOnj.value as HashMap<*, *>
+            val tests = hashMap["tests"] as OnjArray
+            val testSuite: List<Test> = tests
+                .value
+                .stream()
+                .map {
+                    Test(it.toString().substring(1, it.toString().lastIndexOf('\'')))
+                }
+                .toList()
             return TestSuite(testSuite)//TODO: better code
         }
 
         fun byName(name: String): TestSuite {
             val testSuiteOnj = readTestSuitesOnj().value
-                    .filter { (it as OnjObject).get<String>("name").toString() == name }[0]
-            val linkedHashMap = testSuiteOnj.value as LinkedHashMap<*, *>
-            val tests = linkedHashMap["tests"] as OnjArray
-            val testSuite: List<Test> = tests.value.stream().map { Test(it.toString().substring(1, it.toString().lastIndexOf('\''))) }.toList()
+                .filter { (it as OnjObject).get<String>("name").toString() == name }
+                .apply { if (isEmpty()) throw RuntimeException("no test with name '$name'") }[0]
+            val hashMap = testSuiteOnj.value as HashMap<*, *>
+            val tests = hashMap["tests"] as OnjArray
+            val testSuite: List<Test> = tests
+                .value
+                .stream()
+                .map {
+                    Test(it.toString().substring(1, it.toString().lastIndexOf('\'')))
+                }
+                .toList()
             return TestSuite(testSuite)//TODO: better code
+        }
+
+        fun getAll(): List<TestSuite> {
+            val suites: MutableList<TestSuite> = mutableListOf()
+            val onjSuites = readTestSuitesOnj()
+            for (suite in onjSuites.value) {
+                suite as OnjObject
+                suites.add(TestSuite(
+                    suite.get<OnjArray>("tests")
+                        .value
+                        .map { Test((it as OnjString).value) }
+                ))
+            }
+            return suites
         }
 
         fun custom(tests: List<Test>): TestSuite {
@@ -67,8 +97,7 @@ class TestSuite private constructor(private val tests: List<Test>) {
 
         private fun readTestSuitesOnj(): OnjArray {
             val testSuitesONJ = OnjParser.parseFile("src/testSuites.onj") as OnjObject
-            val testSuites = testSuitesONJ.get<OnjArray>("testSuites")
-            return (testSuites)
+            return testSuitesONJ.get<OnjArray>("testSuites")
         }
     }
 }

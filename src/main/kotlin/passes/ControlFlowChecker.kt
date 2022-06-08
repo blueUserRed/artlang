@@ -400,6 +400,7 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
     }
 
     override fun visit(supCall: AstNode.SuperCall): ControlFlowState {
+        for (arg in supCall.arguments) check(arg)
         return ControlFlowState()
     }
 

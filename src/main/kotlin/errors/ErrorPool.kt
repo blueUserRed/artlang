@@ -23,10 +23,17 @@ object ErrorPool {
     /**
      * prints the errors to the console
      */
-    fun printErrors() { for (err in errors) {
-        println(err.constructString())
-        println("\n")
-    } }
+    fun printErrors() {
+        for (err in errors) {
+            println(err.constructString())
+            println("\n")
+        }
+    }
+
+    /**
+     * removes all errors
+     */
+    fun clear() = errors.clear()
 
 }
 

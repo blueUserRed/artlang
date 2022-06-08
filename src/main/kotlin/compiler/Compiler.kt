@@ -1495,7 +1495,13 @@ class Compiler : AstNodeVisitor<Unit> {
      */
     private fun doOneDimensionalArray(arr: AstNode.ArrayCreate) {
         when (val kind = (arr.type as Datatype.ArrayType).type.kind) {
-            Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.FLOAT, Datakind.LONG, Datakind.DOUBLE -> {
+            Datakind.BYTE,
+            Datakind.SHORT,
+            Datakind.INT,
+            Datakind.FLOAT,
+            Datakind.LONG,
+            Datakind.DOUBLE,
+            Datakind.BOOLEAN -> {
                 compile(arr.amounts[0], false)
                 emit(newarray, getAType(kind))
                 decStack()
@@ -1522,10 +1528,16 @@ class Compiler : AstNodeVisitor<Unit> {
     override fun visit(arr: AstNode.ArrayLiteral) {
         when (val kind = (arr.type as Datatype.ArrayType).type.kind) {
 
-            Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.FLOAT, Datakind.LONG, Datakind.DOUBLE -> {
+            Datakind.BYTE,
+            Datakind.SHORT,
+            Datakind.INT,
+            Datakind.FLOAT,
+            Datakind.LONG,
+            Datakind.DOUBLE,
+            Datakind.BOOLEAN -> {
 
                 val storeInstruction = when (kind) {
-                    Datakind.INT -> iastore
+                    Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.BOOLEAN -> iastore
                     Datakind.FLOAT -> fastore
                     Datakind.LONG -> lastore
                     Datakind.DOUBLE -> dastore
@@ -1605,10 +1617,10 @@ class Compiler : AstNodeVisitor<Unit> {
         for (arg in supCall.arguments) compile(arg, false)
 
         val methodIndex = file.methodRefInfo(
-            file.classInfo(file.utf8Info(supCall.definition.clazz!!.jvmName)),
+            file.classInfo(file.utf8Info(supCall.definition!!.clazz!!.jvmName)),
             file.nameAndTypeInfo(
-                file.utf8Info(supCall.definition.name),
-                file.utf8Info(supCall.definition.functionDescriptor.descriptorString)
+                file.utf8Info(supCall.definition!!.name),
+                file.utf8Info(supCall.definition!!.functionDescriptor.descriptorString)
             )
         )
 
@@ -1733,6 +1745,8 @@ class Compiler : AstNodeVisitor<Unit> {
      * the byte for a specific type
      */
     private fun getAType(type: Datakind): Byte = when (type) {
+        Datakind.BYTE -> 8
+        Datakind.SHORT -> 9
         Datakind.INT -> 10
         Datakind.BOOLEAN -> 4
         Datakind.FLOAT -> 6

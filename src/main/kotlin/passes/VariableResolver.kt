@@ -247,6 +247,7 @@ class VariableResolver : AstNodeVisitor<Unit> {
     }
 
     override fun visit(supCall: AstNode.SuperCall) {
+        for (arg in supCall.arguments) resolve(arg, supCall)
     }
 
     override fun visit(cast: AstNode.Cast) {

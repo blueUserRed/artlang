@@ -22,7 +22,7 @@ fn main() {
 
     let myInts = [1, 2, 3, 4]
     myInts[2] = 3423
-    myInts[0] = 2312
+    print myInts[3]
     print myInts[2] := myInts[0]
 
 }

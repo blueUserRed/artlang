@@ -768,7 +768,7 @@ class Parser {
                     throw ParserResyncException()
                 }
                 left = AstNode.VarIncrement(left, -1, listOf(last()))
-            } else if (match(TokenType.L_BRACKET)) {
+            } else if (matchNSFB(TokenType.L_BRACKET)) {
                 val element = parseStatement()
                 consumeOrError(TokenType.R_BRACKET, "Expected right bracket")
                 if (match(TokenType.EQ)) {

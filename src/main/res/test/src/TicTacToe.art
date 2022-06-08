@@ -147,6 +147,7 @@ class TicTacToeField : JButton {
     }
 
     public override fn processEvent(e: AWTEvent) {
+        super.processEvent(e)
         if (!(e is MouseEvent) || this.game.isOver() || this.state != NOT_SELECTED) return
         const event = e as MouseEvent
         if (!event.paramString().startsWith("MOUSE_PRESSED")) return

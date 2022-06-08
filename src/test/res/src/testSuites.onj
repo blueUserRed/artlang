@@ -1,6 +1,17 @@
 testSuites: [
     {
         id: 0
+        name: "Full"
+        description: "Full test-suite, tests all features of the language"
+        tests: [
+            "OperationsBasic.art"
+            "ControlFlow.art"
+//            "Arrays.art"
+//            "Fields.art"
+        ]
+    }
+    {
+        id: 1
         name: "Default"
         description: "Runs simple programs like FizzBuzz and HelloWorld to test basic functions"
         tests: [ "HelloWorld.art" "FizzBuzz.art" ] // Paths to files

@@ -4,15 +4,16 @@ import java.nio.file.Paths
 import kotlin.io.path.readText
 
 fun main() {
-//    val test = Test("FizzBuzz.art", false)
-//    val test = Test("HelloWorld.art")
-//    test.test()
+    val ts = TestSuite.byName("Full")
+    recordOutputs(ts)
+//    ts.run()
+}
 
-    val ts: TestSuite = TestSuite.custom(listOf(Test("HelloWorld.art"), Test("OperationsBasic.art")))
-//    println(ts.toString())
-    ts.run()
-
-
+fun recordOutputs(suite: TestSuite) {
+    for (test in suite.tests) {
+        test.test()
+        File("sampleOutputs/${test.testFileName}").writeText(test.programOutput ?: "")
+    }
 }
 
 /**
@@ -22,7 +23,7 @@ fun main() {
  */
 class Test(val testFileName: String, private val printOutput: Boolean = true) {
 
-    private var hasbeentested = false
+    private var hasBeenTested = false
 
     private var sampleOutput = try {
         Paths.get("$sampleOutDir/$testFileName").readText()
@@ -30,26 +31,31 @@ class Test(val testFileName: String, private val printOutput: Boolean = true) {
         println("The sample output for this test does not exits. It can therefore not be compared with the programs output.")
         null
     }
+
     var succeeded: Boolean = false
+
+    var programOutput: String? = null
 
     fun test() {
         val args = arrayOf("compile", "$srcDir$testFileName")
+        File(testFileName.split(".")[0] + ".jar").delete()
+        ErrorPool.clear()
         Main.main(args)
-        val output = runProgram()
+        programOutput = runProgram()
         println()
-        if (printOutput) println(output)
-        if (sampleOutput == output && !ErrorPool.hasErrors()) {
+        if (printOutput) println(programOutput)
+        if (sampleOutput?.replace("\r", "") /* I love Windows */ == programOutput && !ErrorPool.hasErrors()) {
             println(Ansi.green + "$testFileName => Test succeeded [\u2713]")
             succeeded = true
         } else {
             println(Ansi.red + "$testFileName => Test failed [\u2718]")
-            println("Program Output: «$output»")
+            println("Program Output: «$programOutput»")
             if (sampleOutput != null) println("Sample Output: «$sampleOutput»") else {
                 println("Sample output does not exist.")
             }
         }
         println(Ansi.reset)
-        hasbeentested = true
+        hasBeenTested = true
     }
 
     private fun runProgram(): String {
@@ -81,7 +87,7 @@ class Test(val testFileName: String, private val printOutput: Boolean = true) {
         return "File to test: " + this.testFileName +
                 "\n Print Output? " + this.printOutput +
                 "\nTest succeeded? " + this.succeeded +
-                "\nHas been tested? " + this.hasbeentested
+                "\nHas been tested? " + this.hasBeenTested
     }
 
 }
