@@ -7,8 +7,7 @@ fun main() {
 //    val test = Test("FizzBuzz.art", false)
 //    val test = Test("HelloWorld.art")
 //    test.test()
-
-    val ts: TestSuite = TestSuite.custom(listOf(Test("HelloWorld.art"), Test("OperationsBasic.art")))
+    val ts: TestSuite = TestSuite.custom(listOf(Test("ModifierBlocks.art")))
 //    println(ts.toString())
     ts.run()
 
@@ -33,7 +32,7 @@ class Test(val testFileName: String, private val printOutput: Boolean = true) {
     var succeeded: Boolean = false
 
     fun test() {
-        val args = arrayOf("compile", "$srcDir$testFileName")
+        val args = arrayOf("compile", "$srcDir$testFileName", "-printAst")
         Main.main(args)
         val output = runProgram()
         println()

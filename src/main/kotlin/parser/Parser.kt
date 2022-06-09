@@ -63,7 +63,7 @@ class Parser {
             if (match(TokenType.K_CONST)) {
                 consumeIdentOrError("field", "Expected field declaration after const")
                 if (modifiers.isNotEmpty()) artError(Errors.ModifiersInTopLevelError(modifiers, srcCode))
-                fields.add(parseFieldDeclaration(listOf(),true, true))
+                fields.add(parseFieldDeclaration(listOf(), true, true))
                 continue
             }
 
@@ -71,7 +71,7 @@ class Parser {
                     "top level", srcCode))
             resyncTopLevel()
 
-        } catch(e: ParserResyncException) {
+        } catch (e: ParserResyncException) {
             resyncTopLevel()
             continue
         }
@@ -83,7 +83,7 @@ class Parser {
      */
     private fun resyncTopLevel() {
         while (peek().tokenType !in arrayOf(TokenType.K_FN, TokenType.K_CLASS, TokenType.K_CONST, TokenType.EOF) &&
-            !(peek().tokenType == TokenType.IDENTIFIER && peek().lexeme == "field")) cur++
+                !(peek().tokenType == TokenType.IDENTIFIER && peek().lexeme == "field")) cur++
     }
 
     /**
@@ -106,13 +106,13 @@ class Parser {
                 " after field declaration", peek())
 
         return AstNode.FieldDeclaration(
-            name,
-            type,
-            initializer,
-            isConst,
-            modifiers,
-            isTopLevel,
-            modifiers + listOf(fieldToken)
+                name,
+                type,
+                initializer,
+                isConst,
+                modifiers,
+                isTopLevel,
+                modifiers + listOf(fieldToken)
         )
     }
 
@@ -132,7 +132,7 @@ class Parser {
 
         if (funcName.lexeme == "main" && modifiers.isNotEmpty()) {
             artError(Errors.InvalidMainFunctionDeclarationError("Main function must not have modifiers",
-                srcCode, modifiers))
+                    srcCode, modifiers))
         }
 
         val args = mutableListOf<Pair<Token, AstNode.DatatypeNode>>()
@@ -155,11 +155,11 @@ class Parser {
         val statements = if (match(TokenType.L_BRACE)) parseBlock() else null
 
         val function = AstNode.FunctionDeclaration(
-            statements,
-            funcName,
-            if (funcName.lexeme == "main") listOf() else modifiers,
-            isTopLevel,
-            modifiers + listOf(fnToken, rParenToken)
+                statements,
+                funcName,
+                if (funcName.lexeme == "main") listOf() else modifiers,
+                isTopLevel,
+                modifiers + listOf(fnToken, rParenToken)
         )
 
         function.args = args
@@ -208,6 +208,7 @@ class Parser {
         val fields = mutableListOf<AstNode.Field>()
         val staticFields = mutableListOf<AstNode.Field>()
         val constructors = mutableListOf<AstNode.Constructor>()
+        var modifiersInModifierBlock: List<Token>? = null
 
         while (!match(TokenType.R_BRACE)) try {
 
@@ -218,24 +219,35 @@ class Parser {
 
             val modifiers = parseModifiers()
 
+            val modifiersIfInModifierBlock: List<Token> = if (modifiersInModifierBlock != null) modifiers + modifiersInModifierBlock else modifiers
             if (match(TokenType.K_FN)) {
-                val func = parseFunc(modifiers, false)
+                val func = parseFunc(modifiersIfInModifierBlock, false)
                 if (func.isStatic) staticFuncs.add(func) else funcs.add(func)
+                if (modifiersInModifierBlock != null && match(TokenType.R_BRACE)) modifiersInModifierBlock = null
                 continue
             }
             if (matchIdent("field")) {
-                val field = parseFieldDeclaration(modifiers, false, false)
+                val field = parseFieldDeclaration(modifiersIfInModifierBlock, false, false)
                 if (field.isStatic) staticFields.add(field) else fields.add(field)
+                if (modifiersInModifierBlock != null && match(TokenType.R_BRACE)) modifiersInModifierBlock = null
                 continue
             }
             if (match(TokenType.K_CONST)) {
                 consumeIdentOrError("field", "Expected field declaration after const")
-                val field = parseFieldDeclaration(modifiers, true, false)
+                val field = parseFieldDeclaration(modifiersIfInModifierBlock, true, false)
                 if (field.isStatic) staticFields.add(field) else fields.add(field)
+                if (modifiersInModifierBlock != null && match(TokenType.R_BRACE)) modifiersInModifierBlock = null
                 continue
             }
             if (matchIdent("constructor")) {
-                constructors.add(parseConstructor(modifiers))
+                constructors.add(parseConstructor(modifiersIfInModifierBlock))
+                if (modifiersInModifierBlock != null && match(TokenType.R_BRACE)) modifiersInModifierBlock = null
+                continue
+            }
+            if (match(TokenType.L_BRACE)) {
+                if (modifiersInModifierBlock != null) syntaxError("Can not nest modifier blocks", last())
+                modifiersInModifierBlock = modifiers
+                if (match(TokenType.R_BRACE)) modifiersInModifierBlock = null
                 continue
             }
             artError(Errors.SyntaxError(consume(), "Expected a function or field declaration in class", srcCode))
@@ -248,15 +260,15 @@ class Parser {
         val rBraceToken = last()
 
         return AstNode.ClassDefinition(
-            name,
-            staticFuncs,
-            funcs,
-            staticFields,
-            fields,
-            constructors,
-            extends,
-            classModifiers,
-            classModifiers + listOf(classToken, rBraceToken)
+                name,
+                staticFuncs,
+                funcs,
+                staticFields,
+                fields,
+                constructors,
+                extends,
+                classModifiers,
+                classModifiers + listOf(classToken, rBraceToken)
         )
     }
 
@@ -313,11 +325,11 @@ class Parser {
         var body: AstNode.Block? = null
         if (match(TokenType.L_BRACE)) body = parseBlock()
         return AstNode.ConstructorDeclaration(
-            modifiers,
-            body,
-            args,
-            superArgs,
-            relevantTokens
+                modifiers,
+                body,
+                args,
+                superArgs,
+                relevantTokens
         )
     }
 
@@ -326,10 +338,10 @@ class Parser {
      */
     private fun resyncClass() {
         while (
-            peek().tokenType !in arrayOf(TokenType.K_FN, TokenType.K_CONST, TokenType.EOF) &&
-            !(peek().tokenType == TokenType.IDENTIFIER && peek().lexeme == "field") &&
-            !(peek().tokenType == TokenType.IDENTIFIER && peek().lexeme == "constructor") &&
-            peek().tokenType != TokenType.R_BRACE
+                peek().tokenType !in arrayOf(TokenType.K_FN, TokenType.K_CONST, TokenType.EOF) &&
+                !(peek().tokenType == TokenType.IDENTIFIER && peek().lexeme == "field") &&
+                !(peek().tokenType == TokenType.IDENTIFIER && peek().lexeme == "constructor") &&
+                peek().tokenType != TokenType.R_BRACE
         ) {
             cur++
         }
@@ -384,9 +396,9 @@ class Parser {
                 }
                 "override" -> {
                     artError(Errors.InvalidModifierError(
-                        "Constructors can't override anything",
-                        modifier,
-                        srcCode
+                            "Constructors can't override anything",
+                            modifier,
+                            srcCode
                     ))
                 }
                 else -> throw RuntimeException("unknown modifier ${modifier.lexeme}")
@@ -466,34 +478,34 @@ class Parser {
     private fun parseVarAssignShorthand(variable: AstNode.Get, op: Token, num: AstNode): AstNode {
         when (op.tokenType) {
             TokenType.STAR_EQ, TokenType.SLASH_EQ -> return AstNode.VarAssignShorthand(
-                variable.from,
-                variable.name,
-                op,
-                num,
-                variable.relevantTokens
+                    variable.from,
+                    variable.name,
+                    op,
+                    num,
+                    variable.relevantTokens
             )
             TokenType.PLUS_EQ -> {
                 if (num is AstNode.Literal && num.literal.literal is Int && num.literal.literal in Byte.MIN_VALUE..Byte.MAX_VALUE) {
                     return AstNode.VarIncrement(variable, num.literal.literal.toByte(), variable.relevantTokens)
                 }
                 return AstNode.VarAssignShorthand(
-                    variable.from,
-                    variable.name,
-                    op,
-                    num,
-                    variable.relevantTokens
+                        variable.from,
+                        variable.name,
+                        op,
+                        num,
+                        variable.relevantTokens
                 )
             }
             TokenType.MINUS_EQ -> {
                 if (num is AstNode.Literal && num.literal.literal is Int && num.literal.literal in Byte.MIN_VALUE..Byte.MAX_VALUE) {
-                    return AstNode.VarIncrement(variable, (-num.literal.literal).toByte(),  variable.relevantTokens)
+                    return AstNode.VarIncrement(variable, (-num.literal.literal).toByte(), variable.relevantTokens)
                 }
                 return AstNode.VarAssignShorthand(
-                    variable.from,
-                    variable.name,
-                    op,
-                    num,
-                    variable.relevantTokens
+                        variable.from,
+                        variable.name,
+                        op,
+                        num,
+                        variable.relevantTokens
                 )
             }
             else -> throw RuntimeException("unreachable")
@@ -525,9 +537,9 @@ class Parser {
         }
         if (body is AstNode.YieldArrow) {
             artError(Errors.SyntaxError(
-                body.relevantTokens[0],
-                "Yield arrow can only be declared at the bottom of a block",
-                srcCode
+                    body.relevantTokens[0],
+                    "Yield arrow can only be declared at the bottom of a block",
+                    srcCode
             ))
         }
 
@@ -550,9 +562,9 @@ class Parser {
         }
         if (ifStmt is AstNode.YieldArrow) {
             artError(Errors.SyntaxError(
-                ifStmt.relevantTokens[0],
-                "Yield arrow can only be declared at the bottom of a block",
-                srcCode
+                    ifStmt.relevantTokens[0],
+                    "Yield arrow can only be declared at the bottom of a block",
+                    srcCode
             ))
         }
 
@@ -564,9 +576,9 @@ class Parser {
         }
         if (ifStmt is AstNode.YieldArrow) {
             artError(Errors.SyntaxError(
-                elseStmt.relevantTokens[0],
-                "Yield arrow can only be declared at the bottom of a block",
-                srcCode
+                    elseStmt.relevantTokens[0],
+                    "Yield arrow can only be declared at the bottom of a block",
+                    srcCode
             ))
         }
 
@@ -584,9 +596,9 @@ class Parser {
         }
         if (stmt is AstNode.YieldArrow) {
             artError(Errors.SyntaxError(
-                stmt.relevantTokens[0],
-                "Yield arrow can only be declared at the bottom of a block",
-                srcCode
+                    stmt.relevantTokens[0],
+                    "Yield arrow can only be declared at the bottom of a block",
+                    srcCode
             ))
         }
         return AstNode.Loop(stmt, listOf(loopToken))
@@ -727,8 +739,8 @@ class Parser {
         while (match(TokenType.K_AS, TokenType.K_IS)) {
             val token = last()
             val type = parseType()
-            left =  if (token.tokenType == TokenType.K_AS) AstNode.Cast(left, type, listOf(token, last()))
-                    else AstNode.InstanceOf(left, type, listOf(token, last()))
+            left = if (token.tokenType == TokenType.K_AS) AstNode.Cast(left, type, listOf(token, last()))
+            else AstNode.InstanceOf(left, type, listOf(token, last()))
         }
         return left
     }
@@ -742,13 +754,13 @@ class Parser {
             if (match(TokenType.DOT)) {
                 val dotToken = last()
                 if (match(
-                        TokenType.T_BYTE,
-                        TokenType.T_SHORT,
-                        TokenType.T_INT,
-                        TokenType.T_LONG,
-                        TokenType.T_FLOAT,
-                        TokenType.T_DOUBLE
-                )) {
+                                TokenType.T_BYTE,
+                                TokenType.T_SHORT,
+                                TokenType.T_INT,
+                                TokenType.T_LONG,
+                                TokenType.T_FLOAT,
+                                TokenType.T_DOUBLE
+                        )) {
                     left = AstNode.TypeConvert(left, last(), listOf(last(), dotToken))
                 } else {
                     consumeOrError(TokenType.IDENTIFIER, "Expected indentifier after dot")
@@ -780,8 +792,7 @@ class Parser {
                 } else {
                     left = AstNode.ArrGet(left, element, listOf(last()))
                 }
-            }
-            else break
+            } else break
         }
         return left
     }
@@ -803,15 +814,15 @@ class Parser {
         }
 
         if (match(
-                TokenType.T_BYTE,
-                TokenType.T_SHORT,
-                TokenType.T_INT,
-                TokenType.T_LONG,
-                TokenType.T_FLOAT,
-                TokenType.T_DOUBLE,
-                TokenType.T_BOOLEAN,
-                TokenType.T_STRING
-        )) {
+                        TokenType.T_BYTE,
+                        TokenType.T_SHORT,
+                        TokenType.T_INT,
+                        TokenType.T_LONG,
+                        TokenType.T_FLOAT,
+                        TokenType.T_DOUBLE,
+                        TokenType.T_BOOLEAN,
+                        TokenType.T_STRING
+                )) {
             val primitive = last()
             consumeOrError(TokenType.L_BRACKET, "Expected array initializer")
             val amount = parseStatement()
@@ -833,15 +844,15 @@ class Parser {
         }
 
         if (!match(
-                TokenType.BYTE,
-                TokenType.SHORT,
-                TokenType.INT,
-                TokenType.LONG,
-                TokenType.FLOAT,
-                TokenType.DOUBLE,
-                TokenType.STRING,
-                TokenType.BOOLEAN
-        )) {
+                        TokenType.BYTE,
+                        TokenType.SHORT,
+                        TokenType.INT,
+                        TokenType.LONG,
+                        TokenType.FLOAT,
+                        TokenType.DOUBLE,
+                        TokenType.STRING,
+                        TokenType.BOOLEAN
+                )) {
             artError(Errors.SyntaxError(consume(), "Expected a statement, got '${peek().lexeme}'", srcCode))
             throw ParserResyncException()
         }
@@ -898,7 +909,7 @@ class Parser {
         }
         if (func !is AstNode.Get) throw RuntimeException("cant call ${func.accept(AstPrinter())} like a function")
         return AstNode.FunctionCall(func.from, func.name, args,
-            listOf(func.name, last()) + (func.from?.relevantTokens ?: listOf()))
+                listOf(func.name, last()) + (func.from?.relevantTokens ?: listOf()))
     }
 
     /**
@@ -959,14 +970,14 @@ class Parser {
      */
     private fun parseType(): AstNode.DatatypeNode {
         val primitives = arrayOf(
-            TokenType.T_BYTE,
-            TokenType.T_SHORT,
-            TokenType.T_INT,
-            TokenType.T_LONG,
-            TokenType.T_FLOAT,
-            TokenType.T_LONG,
-            TokenType.T_DOUBLE,
-            TokenType.T_BOOLEAN
+                TokenType.T_BYTE,
+                TokenType.T_SHORT,
+                TokenType.T_INT,
+                TokenType.T_LONG,
+                TokenType.T_FLOAT,
+                TokenType.T_LONG,
+                TokenType.T_DOUBLE,
+                TokenType.T_BOOLEAN
         )
 
         val typeNode: AstNode.DatatypeNode
@@ -974,7 +985,7 @@ class Parser {
         if (match(*primitives)) typeNode = AstNode.PrimitiveTypeNode(tokenTypeToDataKind(last().tokenType))
         else if (match(TokenType.T_STRING)) {
             typeNode = AstNode.ObjectTypeNode(
-                Token(TokenType.IDENTIFIER, "\$String", "\$String", "", -1 ,-1),
+                    Token(TokenType.IDENTIFIER, "\$String", "\$String", "", -1, -1),
             )
         } else {
             consumeOrError(TokenType.IDENTIFIER, "Expected Type")
@@ -1108,9 +1119,9 @@ class Parser {
 
     private fun syntaxError(message: String, token: Token) {
         artError(Errors.SyntaxError(
-            token,
-            message,
-            srcCode
+                token,
+                message,
+                srcCode
         ))
     }
 

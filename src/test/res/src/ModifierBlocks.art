@@ -4,7 +4,7 @@ fn main() {
 }
 
 class Animal {
-    public {
+    public static {
         field animalField: str = "sdsdfsdfjkl"
         fn walk() {
            print "Animal walking..."
@@ -14,4 +14,6 @@ class Animal {
            print "<generic animal sounds>"
         }
     } //TODO: multiple modifiers
+
+    public constructor()
 }
