@@ -7,6 +7,7 @@ import errors.Errors
 import errors.artError
 import tokenizer.Token
 import tokenizer.TokenType
+import javax.xml.crypto.Data
 
 /**
  * checks type-safety, checks that function/fields that are referenced exist
@@ -472,7 +473,10 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         }
         val ifPart = check(ifStmt.ifStmt, ifStmt)
         val elsePart = ifStmt.elseStmt?.let { check(it, ifStmt) }
-        if (elsePart != null && ifPart.kind != Datakind.VOID) {
+        if (elsePart != null && !elsePart.matches(Datakind.VOID) && ifPart.kind != Datakind.VOID) {
+            if (elsePart is Datatype.Object && ifPart is Datatype.Object) {
+                return getLowestSharedType(elsePart, ifPart) ?: Datatype.Void()
+            }
             if (ifPart.compatibleWith(elsePart)) {
                 ifStmt.ifStmt.type = elsePart
                 return elsePart
@@ -920,13 +924,23 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         for (i in 1 until arr.elements.size) {
             val el = arr.elements[i]
             val type = check(el, arr)
-            if (type.compatibleWith(lowestType)) continue
-            if (lowestType.compatibleWith(type)) {
-                lowestType = type
-                continue
+            if (lowestType is Datatype.Object && type is Datatype.Object) {
+                val newLowest = getLowestSharedType(type, lowestType)
+                if (newLowest == null) {
+                    artError(Errors.IncompatibleTypesError(el, "array literal", type, lowestType, srcCode))
+                    lowestType = Datatype.ErrorType()
+                    continue
+                }
+                lowestType = newLowest
+            } else {
+                if (type.compatibleWith(lowestType)) continue
+                if (lowestType.compatibleWith(type)) {
+                    lowestType = type
+                    continue
+                }
+                artError(Errors.IncompatibleTypesError(el, "array literal", type, lowestType, srcCode))
+                lowestType = Datatype.ErrorType()
             }
-            artError(Errors.IncompatibleTypesError(el, "array literal", type, lowestType, srcCode))
-            lowestType = Datatype.ErrorType()
         }
 
         //if array literal only contains nulls, set type to Object[]
@@ -1023,8 +1037,10 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         newVars[0] = Datatype.Object(constructor.clazz)
 
         val fieldAssignArgsIndices = constructor.fieldAssignArgsIndices
+        var counter = 0
         for (i in constructor.descriptor.args.indices) if (i !in fieldAssignArgsIndices) {
-            newVars[i] = constructor.descriptor.args[i].second
+            newVars[counter] = constructor.descriptor.args[i].second
+            counter++
         }
 
         vars = newVars
@@ -1069,6 +1085,14 @@ class TypeChecker : AstNodeVisitor<Datatype> {
         curFunction = null
         inConstructor = false
         return Datatype.Void()
+    }
+
+    private fun getLowestSharedType(t1: Datatype.Object, t2: Datatype.Object): Datatype.Object? {
+        var curClass = t1.clazz
+        while (true) {
+            if (t2.compatibleWith(Datatype.Object(curClass))) return Datatype.Object(curClass)
+            curClass = curClass.extends ?: return null
+        }
     }
 
     /**

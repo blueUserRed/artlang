@@ -70,7 +70,7 @@ object Main {
             println("------------------------------------\n\n")
         }
 
-        val tokens = doTask("Tokenizer") { Tokenizer.tokenize(code, file) }
+        val tokens = doTask("Tokenizer") { Tokenizer().tokenize(code, file) }
 
         if (Settings.printTokens) {
             println("---------------tokens---------------")

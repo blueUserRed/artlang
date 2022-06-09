@@ -28,6 +28,12 @@ testSuites: [
                 expectCompileFailure: false
                 expectRuntimeFailure: false
             }
+            {
+                srcFile: "Constructors.art"
+                outputFile: "Constructors.txt"
+                expectCompileFailure: false
+                expectRuntimeFailure: false
+            }
         ]
     }
 //    {
