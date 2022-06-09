@@ -7,7 +7,7 @@ import kotlin.math.pow
 /**
  * separates a string in a list of tokens
  */
-object Tokenizer {
+class Tokenizer {
 
     /**
      * the current character

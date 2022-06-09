@@ -1,0 +1,79 @@
+
+fn main() {
+    T1()
+    T2("jksdf", 234, 234.long)
+    T3("Hello world")
+    T3(234)
+    T4("sdf")
+    print T5("sdf2", 23, "sdlfjk").hi
+}
+
+class T1 {
+}
+
+class T2 {
+
+    public constructor(s: str, i: int, hi: long) {
+        print s
+        print i
+        print hi
+    }
+
+    constructor(s: str, i: int, hi: double) {
+        print s
+        print i
+        print hi
+    }
+
+}
+
+class T3 {
+
+    const field hi: str
+
+    public constructor(field hi,)
+
+    public constructor(i: int) {
+        if (i == 0) {
+            this.hi = "shdfhs"
+        } else if (i == 1) {
+            this.hi = "jskfsfd"
+        } else {
+            this.hi = "ksjdf"
+        }
+    }
+
+}
+
+class T4 : T3 {
+
+    public constructor(s: str, ) : (s)
+
+    public constructor(i: int) : (i, )
+
+}
+
+class T5 : T4 {
+
+    public const field hi: int = {
+        const t1 = 123
+        const t2 = 234
+        const t3 = 2
+        => t1 + t2 * t3
+    }
+
+    public field t: str = {
+        const hi = "ksdfj"
+        const hi2 = "lskdfj"
+        => hi + hi2
+    }
+
+    const field ggggg: str
+
+    public constructor(field ggggg, param: int, param2: str) : ("Hello World") {
+        print param
+        print param2
+        print this.hi
+    }
+
+}

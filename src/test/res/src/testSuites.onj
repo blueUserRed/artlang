@@ -4,36 +4,62 @@ testSuites: [
         name: "Full"
         description: "Full test-suite, tests all features of the language"
         tests: [
-            "OperationsBasic.art"
-            "ControlFlow.art"
-//            "Arrays.art"
-//            "Fields.art"
+            {
+                srcFile: "OperationsBasic.art"
+                outputFile: "OperationsBasic.txt"
+                expectCompileFailure: false
+                expectRuntimeFailure: false
+            }
+            {
+                srcFile: "ControlFlow.art"
+                outputFile: "ControlFlow.txt"
+                expectCompileFailure: false
+                expectRuntimeFailure: false
+            }
+            {
+                srcFile: "Arrays.art"
+                outputFile: "Arrays.txt"
+                expectCompileFailure: false
+                expectRuntimeFailure: false
+            }
+            {
+                srcFile: "Fields.art"
+                outputFile: "Fields.txt"
+                expectCompileFailure: false
+                expectRuntimeFailure: false
+            }
+            {
+                srcFile: "Constructors.art"
+                outputFile: "Constructors.txt"
+                expectCompileFailure: false
+                expectRuntimeFailure: false
+            }
         ]
     }
-    {
-        id: 1
-        name: "Default"
-        description: "Runs simple programs like FizzBuzz and HelloWorld to test basic functions"
-        tests: [ "HelloWorld.art" "FizzBuzz.art" ] // Paths to files
-    }
-    {
-        id: 1
-        name: "Classes"
-        description: "Tests creation of classes, constructing and running methods from classes on Animal Example"
-        tests: [ "Animal.art" "Cat.art" "Dog.art" ] // Paths to files
-    }
-    {
-        id: 2
-        name: "Block Expressions"
-        description: "Tests Blockexpressions TODO"
-        tests: [ "BlockExpressions.art" ]
-    }
-    {
-        id: 3
-        name: "Operations"
-        description: "TODO"
-        tests: [ "OperationsBasic.art" "OperationsComplex.art" ]
-    }
+//    {
+//        id: 1
+//        name: "Default"
+//        description: "Runs simple programs like FizzBuzz and HelloWorld to test basic functions"
+//        tests: [ "HelloWorld.art" "FizzBuzz.art" ] // Paths to files
+//    }
+//    {
+//        id: 1
+//        name: "Classes"
+//        description: "Tests creation of classes, constructing and running methods from classes on Animal Example"
+//        tests: [ "Animal.art" "Cat.art" "Dog.art" ] // Paths to files
+//    }
+//    {
+//        id: 2
+//        name: "Block Expressions"
+//        description: "Tests Blockexpressions TODO"
+//        tests: [ "BlockExpressions.art" ]
+//    }
+//    {
+//        id: 3
+//        name: "Operations"
+//        description: "TODO"
+//        tests: [ "OperationsBasic.art" "OperationsComplex.art" ]
+//    }
 ]
 
 /* old csv

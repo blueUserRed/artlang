@@ -1387,7 +1387,9 @@ class Compiler : AstNodeVisitor<Unit> {
      * emits the array store instruction for the type
      */
     fun emitAStore(type: Datatype) = when (type.kind) {
-        Datakind.BYTE, Datakind.SHORT, Datakind.INT -> emit(iastore)
+        Datakind.BYTE, Datakind.BOOLEAN -> emit(bastore)
+        Datakind.SHORT -> emit(sastore)
+        Datakind.INT -> emit(iastore)
         Datakind.LONG -> emit(lastore)
         Datakind.FLOAT -> emit(fastore)
         Datakind.DOUBLE -> emit(dastore)
@@ -1537,7 +1539,9 @@ class Compiler : AstNodeVisitor<Unit> {
             Datakind.BOOLEAN -> {
 
                 val storeInstruction = when (kind) {
-                    Datakind.BYTE, Datakind.SHORT, Datakind.INT, Datakind.BOOLEAN -> iastore
+                    Datakind.BYTE, Datakind.BOOLEAN -> bastore
+                    Datakind.SHORT -> sastore
+                    Datakind.INT -> iastore
                     Datakind.FLOAT -> fastore
                     Datakind.LONG -> lastore
                     Datakind.DOUBLE -> dastore
@@ -1764,10 +1768,18 @@ class Compiler : AstNodeVisitor<Unit> {
         val init = MethodBuilder()
         init.name = "<init>"
         init.descriptor = "()V"
-        init.maxLocals = 1
         init.isPublic = true
 
+        var maxLocals = 1 // calling the super-constructor uses one local
+        for (field in curClass!!.fields) if (field !is SyntheticNode) {
+            field as AstNode.FieldDeclaration
+            if (field.amountLocals > maxLocals) maxLocals = field.amountLocals
+        }
+        init.maxLocals = maxLocals
+
         emitterTarget = MethodEmitter(init)
+
+        emitterTarget.locals = MutableList(maxLocals) { null }
 
         val superConstructorIndex = file.methodRefInfo(
             file.classInfo(file.utf8Info(curClass?.extends?.jvmName ?: "java/lang/Object")),
@@ -1783,6 +1795,9 @@ class Compiler : AstNodeVisitor<Unit> {
         )
         incStack(VerificationTypeInfo.UninitializedThis())
         decStack()
+
+        doNonStaticFields(curClass!!.fields)
+        emit(_return)
 
         file.addMethod(init)
     }
@@ -2374,6 +2389,8 @@ class Compiler : AstNodeVisitor<Unit> {
         const val iload_2: Byte = 0x1c.toByte()
         const val iload_3: Byte = 0x1d.toByte()
 
+        const val bastore: Byte = 0x54.toByte()
+        const val sastore: Byte = 0x56.toByte()
         const val istore: Byte = 0x36.toByte()
         const val istore_0: Byte = 0x3b.toByte()
         const val istore_1: Byte = 0x3c.toByte()

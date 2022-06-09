@@ -25,7 +25,15 @@ fn main() {
     print myInts[3]
     print myInts[2] := myInts[0]
 
+    const myAnimals: Animal[] = [ Cat(), Dog(), Animal() ]
+
 }
 
-class Cat {
+class Animal {
+}
+
+class Cat : Animal {
+}
+
+class Dog : Animal {
 }
