@@ -1,18 +1,96 @@
 fn main() {
-    let a = 100
-    let b = 10
-    let c = a + b
-    let d = a - b
-    let e = a * b
-    let f = a / b
-    let g = a % b
-    let h = -a -b
-    let i = a + b * b
-    print c
-    print d
-    print e
-    print f
-    print g
-    print h
-    print i
+    const b: byte = 12#B
+    const s: short = 234#S
+    const i: int = 242
+    const l: long = 1243#L
+    const f: float = 23.23
+    const d: double = 234.234#D
+    const z: bool = true
+    const string: str = "hsdklfj"
+
+    let b1: byte = b + b
+    let b2: byte = b - b
+    let b3: byte = b * b
+    let b4: byte = b / b
+    let b5: byte = b % b
+
+    let s1: short = s + s
+    let s2: short = s - s
+    let s3: short = s * s
+    let s4: short = s / s
+    let s5: short = s % s
+
+    let i1: int = i + i
+    let i2: int = i - i
+    let i3: int = i * i
+    let i4: int = i / i
+    let i5: int = i % i
+    
+    let l1: long = l + l
+    let l2: long = l - l
+    let l3: long = l * l
+    let l4: long = l / l
+    let l5: long = l % l
+
+    let f1: float = f + f
+    let f2: float = f - f
+    let f3: float = f * f
+    let f4: float = f / f
+    let f5: float = f % f
+    
+    let d1: double = d + d
+    let d2: double = d - d
+    let d3: double = d * d
+    let d4: double = d / d
+    let d5: double = d % d
+    
+    let string1 = string + string
+    
+    let z1: bool = z || z
+    let z2: bool = z && z
+    let z3: bool = z == z
+    let z4: bool = z != z
+    
+    let ba1: bool = b == b
+    let ba2: bool = b != b
+    let ba3: bool = b < b
+    let ba4: bool = b > b
+    let ba5: bool = b <= b
+    let ba6: bool = b >= b
+    
+    let sa1: bool = s == s
+    let sa2: bool = s != s
+    let sa3: bool = s < s
+    let sa4: bool = s > s
+    let sa5: bool = s <= s
+    let sa6: bool = s >= s
+    
+    let ia1: bool = i == i
+    let ia2: bool = i != i
+    let ia3: bool = i < i
+    let ia4: bool = i > i
+    let ia5: bool = i <= i
+    let ia6: bool = i >= i
+    
+    let la1: bool = l == l
+    let la2: bool = l != l
+    let la3: bool = l < l
+    let la4: bool = l > l
+    let la5: bool = l <= l
+    let la6: bool = l >= l
+    
+    let fa1: bool = f == f
+    let fa2: bool = f != f
+    let fa3: bool = f < f
+    let fa4: bool = f > f
+    let fa5: bool = f <= f
+    let fa6: bool = f >= f
+    
+    let da1: bool = d == d
+    let da2: bool = d != d
+    let da3: bool = d < d
+    let da4: bool = d > d
+    let da5: bool = d <= d
+    let da6: bool = d >= d
+ 
 }

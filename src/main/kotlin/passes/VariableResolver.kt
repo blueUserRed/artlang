@@ -247,6 +247,7 @@ class VariableResolver : AstNodeVisitor<Unit> {
     }
 
     override fun visit(supCall: AstNode.SuperCall) {
+        for (arg in supCall.arguments) resolve(arg, supCall)
     }
 
     override fun visit(cast: AstNode.Cast) {
@@ -265,7 +266,7 @@ class VariableResolver : AstNodeVisitor<Unit> {
         vars.add("this")
         varDecs.add(null)
 
-        val fieldAssignArgsIndices = constructor.fieldAssignArgsIndices
+        val fieldAssignArgsIndices = constructor.fieldAssignArgsIndices.map { it - 1 }
 
         for (i in constructor.args.indices) if (i !in fieldAssignArgsIndices) {
             val arg = constructor.args[i]

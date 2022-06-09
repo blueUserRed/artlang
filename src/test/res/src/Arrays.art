@@ -25,7 +25,7 @@ fn main() {
     print myInts[3]
     print myInts[2] := myInts[0]
 
-    const myAnimals: Animal[] = [ Animal(), Cat(), Dog() ]
+    const myAnimals: Animal[] = [ Cat(), Dog(), Animal() ]
 
 }
 

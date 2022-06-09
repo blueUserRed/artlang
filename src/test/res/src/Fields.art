@@ -1,0 +1,50 @@
+
+const field f: byte = 4#B
+
+field test: str = {
+    const toAssign = "hi"
+    => toAssign
+}
+
+field myInt: int = {
+    const a = 324
+    const b = 34
+    => a * 2 + b
+}
+
+fn main() {
+    print f
+    print test
+    print myInt
+    print myInt := 234
+    test = "hello "
+    test += "world"
+    print test
+
+    const inst = MyCl()
+
+    MyCl.t3 *= 2#D
+    print MyCl.t3
+
+    print inst.t2 := "jskdlj"
+}
+
+class MyCl {
+
+    const field t1: int = 3
+
+    public field t2: str = {
+        const x = "12"
+        const y = "34"
+        => x + y
+    }
+
+    public static field t3: double = 324#D
+
+    public static const field t4: int = {
+        let x = 214
+        let y = 43
+        => x * y + t3.int
+    }
+
+}

@@ -243,10 +243,10 @@ class InheritanceChecker : AstNodeVisitor<Unit> {
 
     override fun visit(supCall: AstNode.SuperCall) {
         for (arg in supCall.arguments) check(arg)
-        if (supCall.definition.isAbstract) {
+        if (supCall.definition != null && supCall.definition!!.isAbstract) {
             artError(Errors.CannotCallAbstractFunctionViaSuperError(
                 supCall,
-                supCall.definition.name,
+                supCall.definition!!.name,
                 srcCode
             ))
         }

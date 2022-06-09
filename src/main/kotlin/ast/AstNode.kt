@@ -1057,7 +1057,7 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         /**
          * the definition of the function
          */
-        lateinit var definition: Function
+        var definition: Function? = null
 
         override fun swap(orig: AstNode, to: AstNode) {
             for (i in arguments.indices) if (arguments[i] === orig) {

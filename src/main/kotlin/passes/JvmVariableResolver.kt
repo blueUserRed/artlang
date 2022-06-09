@@ -109,7 +109,7 @@ class JvmVariableResolver : AstNodeVisitor<Unit> {
     override fun visit(varInc: AstNode.VarIncrement) {
         varInc.name.from?.let { resolve(it) }
         val index = jvmVars.indexOf(varInc.name.name.lexeme)
-        varInc.index = index
+        varInc.jvmIndex = index
     }
 
     override fun visit(clazz: AstNode.ArtClass) {
@@ -188,6 +188,7 @@ class JvmVariableResolver : AstNodeVisitor<Unit> {
     }
 
     override fun visit(supCall: AstNode.SuperCall) {
+        for (arg in supCall.arguments) resolve(arg)
     }
 
     override fun visit(cast: AstNode.Cast) {
