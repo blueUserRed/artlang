@@ -7,12 +7,7 @@ class Test {
 
     constructor(field test2) {
         if (false) this.test = 2
-        else {
-            loop {
-                if (false) continue
-                this.test = 23
-            }
-        }
+        else this.test = 23
     }
 
 }

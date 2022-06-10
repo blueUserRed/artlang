@@ -906,6 +906,7 @@ class Compiler : AstNodeVisitor<Unit> {
         loopBreakAddressesToOverwrite = mutableListOf()
 
         compile(loop.body, true)
+        emitStackMapFrame()
         val absOffset = (before - emitterTarget.curCodeOffset)
         emitGoto(absOffset)
         emitStackMapFrame()

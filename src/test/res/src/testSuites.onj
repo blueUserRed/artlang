@@ -46,13 +46,6 @@ testSuites: [
                 expectCompileFailure: false
                 expectRuntimeFailure: false
             }
-        ]
-    }
-    {
-        id: 1
-        name: "Some"
-        description: "For testing specific files"
-        tests: [
             {
                 srcFile: "IsAndAs.art"
                 outputFile: "IsAndAs.txt"
@@ -101,6 +94,19 @@ testSuites: [
                 expectCompileFailure: true
                 expectRuntimeFailure: false
             }
+            {
+                srcFile: "MultiDimensionalArrays.art"
+                outputFile: "MultiDimensionalArrays.txt"
+                expectCompileFailure: false
+                expectRuntimeFailure: false
+            }
+        ]
+    }
+    {
+        id: 1
+        name: "Some"
+        description: "For testing specific files"
+        tests: [
         ]
     }
 ]

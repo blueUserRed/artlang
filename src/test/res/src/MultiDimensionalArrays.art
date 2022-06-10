@@ -1,0 +1,30 @@
+
+fn main() {
+
+    const arrArr: int[][] = int[5][5]
+    print arrArr[3][3]
+
+    const aarr = [
+        ["hello", "world"],
+        ["hello", "world"],
+        ["hello", "world"],
+        ["hello", "world"],
+    ]
+
+    print aarr[2][0] := "goodbye"
+    print aarr[2][1]
+
+    arrArr[3] = [1, 2, 3, 4]
+
+    print getArr(5).size
+
+}
+
+fn getArr(size: int): Cat[][] {
+    const toRet = Cat[size]
+    if (size != toRet.size) 1 / 0 //// lol
+    return [toRet, toRet, toRet]
+}
+
+class Cat {
+}

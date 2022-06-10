@@ -5,7 +5,7 @@ import java.nio.file.Paths
 import kotlin.io.path.readText
 
 fun main() {
-    val ts = TestSuite.byName("Full")
+    val ts = TestSuite.byName("Some")
 //    recordOutputs(ts)
     ts.run()
 }

@@ -102,29 +102,14 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
         var alwaysBreak = false
         var sometimesBreak = false
         var sometimesRet = false
-//        var newFields = fields
+
         for (s in block.statements) {
             val result = check(s)
 
-//            if (inConstructor) {
-//                for ((field, state) in newFields) when (state) {
-//                    FieldInitState.INITIALISED -> continue
-//                    FieldInitState.MAYBE_INITIALISED -> {
-//                        if (alwaysRet || sometimesRet) continue
-//                        if (fields[field] == FieldInitState.INITIALISED) {
-//                            newFields[field] = FieldInitState.INITIALISED
-//                        }
-//                    }
-//                    FieldInitState.NOT_INITIALISED -> {
-//
-//                    }
-//                }
-//            }
-
-            if (result.alwaysReturns) alwaysRet = true
-            if (result.alwaysBreaks) alwaysBreak = true
-            if (result.sometimesReturns) sometimesRet = true
-            if (result.sometimesBreaks) sometimesBreak = true
+            alwaysRet = (alwaysRet || result.alwaysReturns) && !sometimesBreak
+            alwaysBreak = alwaysBreak|| result.alwaysBreaks
+            sometimesRet = sometimesRet || result.sometimesReturns
+            sometimesBreak = sometimesBreak || result.sometimesBreaks
         }
         return ControlFlowState(alwaysRet, alwaysBreak, sometimesRet, sometimesBreak)
     }
@@ -241,7 +226,8 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
     }
 
     override fun visit(returnStmt: AstNode.Return): ControlFlowState {
-        if (curFunction == null && !inConstructor) {
+//        if (curFunction == null && !inConstructor) { //TODO: returning in constructors (issues with field initializations)
+        if (curFunction == null) {
             artError(Errors.CanOnlyBeUsedInError(
                 "return",
                 "function",

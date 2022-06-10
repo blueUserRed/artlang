@@ -2,15 +2,8 @@ fn main() {
     const a = 20
     const b = 33
 
-//    if ((a == 2 && b == 3) || b == a) {
-//        print "Hi"
-//    } else if (false) print "sfkl"
-//    else {
-//        print 2
-//    }
-//
-//    let i = -1
-//    while ((i := i + 1) <= a + b) print i
+    let z = -1
+    while ((z := z + 1) < 40) {  }
 
     let i = 53
 
@@ -21,4 +14,8 @@ fn main() {
     }
 
     print if (true) "was true" else "was false"
+}
+
+fn test() {
+    loop break
 }
