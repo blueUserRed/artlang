@@ -134,7 +134,8 @@ object SyntheticAst {
         override val isTopLevel: Boolean,
         override val isPrivate: Boolean,
         override val isAbstract: Boolean,
-        override var clazz: ArtClass?
+        override var clazz: ArtClass?,
+        override val jvmName: String = name
     ) : AstNode.Function(listOf()), SyntheticNode {
 
         override fun swap(orig: AstNode, to: AstNode) = throw CantSwapException()
@@ -199,6 +200,77 @@ object SyntheticAst {
     fun addSyntheticTreeParts(root: AstNode.Program) {
         root.classes.add(objectClass)
         root.classes.add(stringClass)
+
+        val systemClass = SyntClass(
+            "System",
+            mutableListOf(),
+            mutableListOf(),
+            mutableListOf(),
+            mutableListOf(),
+            true,
+            objectClass,
+            "java/lang/System"
+        )
+        root.classes.add(systemClass)
+
+        val printStreamClass = SyntClass(
+            "PrintStream",
+            mutableListOf(),
+            mutableListOf(),
+            mutableListOf(),
+            mutableListOf(),
+            true,
+            objectClass,
+            "java/io/PrintStream"
+        )
+
+        val printSFunc = SyntFunction(
+            "printNoNl",
+            FunctionDescriptor(mutableListOf("s" to Datatype.Str()), Datatype.Void()),
+            false,
+            false,
+            false,
+            false,
+            printStreamClass,
+            "print" //TODO: fix
+        )
+        printStreamClass.funcs.add(printSFunc)
+
+        val printIFunc = SyntFunction(
+            "printNoNl",
+            FunctionDescriptor(mutableListOf("i" to Datatype.Integer()), Datatype.Void()),
+            false,
+            false,
+            false,
+            false,
+            printStreamClass,
+            "print"
+        )
+        printStreamClass.funcs.add(printIFunc)
+
+        val printFFunc = SyntFunction(
+            "printNoNl",
+            FunctionDescriptor(mutableListOf("f" to Datatype.Float()), Datatype.Void()),
+            false,
+            false,
+            false,
+            false,
+            printStreamClass,
+            "print"
+        )
+        printStreamClass.funcs.add(printFFunc)
+
+        val outField = SyntField(
+            "out",
+            false,
+            true,
+            false,
+            Datatype.Object(printStreamClass),
+            true,
+            systemClass
+        )
+        systemClass.staticFields.add(outField)
+
     }
 
     @Deprecated("Only for testing, will probably remove soon")

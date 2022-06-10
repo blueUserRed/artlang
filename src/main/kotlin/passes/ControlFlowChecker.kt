@@ -205,6 +205,7 @@ class ControlFlowChecker : AstNodeVisitor<ControlFlowState> {
 
     override fun visit(whileStmt: AstNode.While): ControlFlowState {
         val tmp = surroundingLoop
+        surroundingLoop = whileStmt
         val fieldsBefore = fields.toMutableMap()
         val result = check(whileStmt.body)
         surroundingLoop = tmp

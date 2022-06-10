@@ -88,10 +88,11 @@ class TypeChecker : AstNodeVisitor<Datatype> {
             }
 
             TokenType.D_EQ, TokenType.NOT_EQ -> {
-                if (left.matches(Datakind.NULL) && right.matches(Datakind.OBJECT)) return Datatype.Bool()
-                if (right.matches(Datakind.NULL) && left.matches(Datakind.OBJECT)) return Datatype.Bool()
+                if (left.matches(Datakind.NULL) && right.matches(Datakind.OBJECT, Datakind.ARRAY)) return Datatype.Bool()
+                if (right.matches(Datakind.NULL) && left.matches(Datakind.OBJECT, Datakind.ARRAY)) return Datatype.Bool()
 
                 if (left.matches(Datakind.OBJECT) && right.matches(Datakind.OBJECT)) return Datatype.Bool()
+                if (left.matches(Datakind.ARRAY) && right.matches(Datakind.ARRAY)) return Datatype.Bool()
 
                 if (
                     left.matches(

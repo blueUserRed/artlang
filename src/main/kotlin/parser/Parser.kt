@@ -159,7 +159,7 @@ class Parser {
                 funcName,
                 if (funcName.lexeme == "main") listOf() else modifiers,
                 isTopLevel,
-                modifiers + listOf(fnToken, rParenToken)
+                relevantTokens = modifiers + listOf(fnToken, rParenToken)
         )
 
         function.args = args

@@ -305,7 +305,7 @@ abstract class Datatype(val kind: Datakind) {
         override val descriptorType: String = "Ljava/lang/Object;"
 
         override fun compatibleWith(other: Datatype): Boolean {
-            return other.kind in arrayOf(Datakind.ERROR, Datakind.OBJECT, Datakind.NULL)
+            return other.kind in arrayOf(Datakind.ERROR, Datakind.OBJECT, Datakind.NULL, Datakind.ARRAY)
         }
 
         override fun equals(other: Any?): Boolean = other != null && other::class == NullType::class

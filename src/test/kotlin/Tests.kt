@@ -4,8 +4,8 @@ import java.lang.Exception
 import java.nio.file.Paths
 import kotlin.io.path.readText
 
-fun main() {
-    val ts = TestSuite.byName("Some")
+fun main(args: Array<String>) {
+    val ts = TestSuite.byName(args[0])
 //    recordOutputs(ts)
     ts.run()
 }
@@ -57,8 +57,7 @@ class Test(
     }
 
     fun test() {
-
-        File(testFileName.split(".")[0] + ".jar").delete() //TODO: good luck with filenames that don't contain a dot
+        File(File(testFileName).nameWithoutExtension + ".jar").delete()
 
         println("---------------------------------------------")
         println("testing: $testFileName")
@@ -113,7 +112,7 @@ class Test(
 
     private fun runProgram(): String? {
         try {
-            val jarFile = testFileName.split(".")[0] + ".jar"
+            val jarFile = File(testFileName).nameWithoutExtension + ".jar"
             println("running: $jarFile")
             val builder = ProcessBuilder("java", "-jar", jarFile)
             builder.directory(File(outDir))

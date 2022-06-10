@@ -1,0 +1,33 @@
+
+fn main() {
+    print zweiHoch(10)
+    print fact(3)
+    print fact(0)
+    print countDigits(123)
+}
+
+fn zweiHoch(n: int): float {
+    let result = 2.0
+    let i = 0
+    while ((i := i + 1) < n) result *= 2.0
+    return result
+}
+
+fn fact(n: int): double {
+    if (n == 0) return 1#D
+    let result = 1#D
+    let cur = n + 1
+    while ((cur := cur - 1) > 1) result *= cur.double
+    return result
+}
+
+fn countDigits(n: int): int {
+    let counter = 0
+    let cur = n
+    loop { // could be a while
+        if (cur == 0) break
+        counter++
+        cur /= 10
+    }
+    return counter
+}

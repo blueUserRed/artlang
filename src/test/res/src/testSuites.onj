@@ -47,12 +47,6 @@ testSuites: [
                 expectRuntimeFailure: false
             }
             {
-                srcFile: "IsAndAs.art"
-                outputFile: "IsAndAs.txt"
-                expectCompileFailure: false
-                expectRuntimeFailure: false
-            }
-            {
                 srcFile: "Return.art"
                 outputFile: "Return.txt"
                 expectCompileFailure: false
@@ -100,29 +94,44 @@ testSuites: [
                 expectCompileFailure: false
                 expectRuntimeFailure: false
             }
+            {
+                srcFile: "PrimitivesNC1.art"
+                outputFile: null
+                expectCompileFailure: true
+                expectRuntimeFailure: false
+            }
         ]
     }
     {
-        id: 1
+        id: 3
+        name: "SEW"
+        description: "Some tasks from the software engineering subject"
+        tests: [
+            {
+                srcFile: "sew/2DArrays.art"
+                outputFile: "sew/2DArrays.txt"
+                expectCompileFailure: false
+                expectRuntimeFailure: false
+            }
+            {
+                srcFile: "sew/methoden2.art"
+                outputFile: "sew/methoden2.txt"
+                expectCompileFailure: false
+                expectRuntimeFailure: false
+            }
+            {
+                 srcFile: "sew/raetselreihen.art"
+                 outputFile: "sew/raetselreihen.txt"
+                 expectCompileFailure: false
+                 expectRuntimeFailure: false
+             }
+        ]
+    }
+    {
+        id: 2
         name: "Some"
         description: "For testing specific files"
         tests: [
         ]
     }
 ]
-
-/* old csv
-test suite name; test suite id; test suite description; test1; test2; test3; testn
-Default;0;Runs simple programs like FizzBuzz and HelloWorld to test basic functions;HelloWorld.art;FizzBuzz.art
-Classes;1;Tests creation of classes, constructing and running methods from classes on Animal Example TODO;Animal.art
-OverridingFunctions;
-AbstractClasses;
-ControlFlow;
-Variables;
-Arrays;
-Fields;
-Types;
-Operations; +, -, !, --, &&, etc.
-IsAndAs;
-BlockExpressions;
-*/

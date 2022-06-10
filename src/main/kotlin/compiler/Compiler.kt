@@ -152,7 +152,7 @@ class Compiler : AstNodeVisitor<Unit> {
                 Datakind.FLOAT -> doNonIntCompare(binary.operator.tokenType, fcmpg)
                 Datakind.LONG -> doNonIntCompare(binary.operator.tokenType, lcmp)
                 Datakind.DOUBLE -> doNonIntCompare(binary.operator.tokenType, dcmpg)
-                Datakind.OBJECT -> doObjectCompare(binary)
+                Datakind.OBJECT, Datakind.ARRAY, Datakind.NULL -> doObjectCompare(binary)
 
                 Datakind.BOOLEAN -> when (binary.operator.tokenType) {
                     TokenType.D_EQ -> doIntCompare(if_icmpeq)
@@ -516,7 +516,7 @@ class Compiler : AstNodeVisitor<Unit> {
         emitterTarget.maxLocals = function.amountLocals
 
         methodBuilder.descriptor = function.functionDescriptor.descriptorString
-        methodBuilder.name = function.name
+        methodBuilder.name = function.jvmName
 
         function.statements?.let { compile(it, true) }
 
@@ -887,7 +887,7 @@ class Compiler : AstNodeVisitor<Unit> {
         when (varAssign.toAssign.type.kind) {
             Datakind.INT -> emitIntVarStore(varAssign.jvmIndex)
             Datakind.FLOAT -> emitFloatVarStore(varAssign.jvmIndex)
-            Datakind.OBJECT, Datakind.NULL -> emitObjectVarStore(varAssign.jvmIndex)
+            Datakind.OBJECT, Datakind.NULL, Datakind.ARRAY -> emitObjectVarStore(varAssign.jvmIndex)
             Datakind.BOOLEAN -> emitIntVarStore(varAssign.jvmIndex)
             else -> TODO("type for local assignment not implemented")
         }
@@ -1047,7 +1047,7 @@ class Compiler : AstNodeVisitor<Unit> {
                     if (funcCall.definition.isTopLevel) topLevelName else funcCall.definition.clazz!!.jvmName
                 )),
                 file.nameAndTypeInfo(
-                    file.utf8Info(funcCall.name.lexeme),
+                    file.utf8Info(funcCall.definition.jvmName),
                     file.utf8Info(funcCall.definition.functionDescriptor.descriptorString)
                 )
             )
@@ -1064,7 +1064,7 @@ class Compiler : AstNodeVisitor<Unit> {
         val funcRef = file.methodRefInfo(
             file.classInfo(file.utf8Info(funcCall.definition.clazz!!.jvmName)),
             file.nameAndTypeInfo(
-                file.utf8Info(funcCall.name.lexeme),
+                file.utf8Info(funcCall.definition.jvmName),
                 file.utf8Info(funcCall.definition.functionDescriptor.descriptorString)
             )
         )

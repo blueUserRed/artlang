@@ -1,0 +1,51 @@
+fn main() {
+    printRaetselReihe1(10)
+    print "\n---------------"
+    printRaetselReihe2(10)
+    print "\n---------------"
+    printRaetselReihe5(10)
+}
+
+fn printRaetselReihe1(n: int) {
+    let cur = 13
+    let i = 0
+    while ((i := i + 1) <= n) {
+        printNoNl(cur)
+        printNoNl("  ")
+        cur += 4
+    }
+}
+
+fn printRaetselReihe2(n: int) {
+    let cur = 2.0
+    let i = 0
+    while ((i := i + 1) <= n) {
+        if (cur % 1.0 == 0.0) System.out.printNoNl(cur.int) else System.out.printNoNl(cur)
+        printNoNl("  ")
+        cur -= 0.5
+    }
+}
+
+fn printRaetselReihe5(n: int) {
+    let i = 1
+    while ((i := i + 1) <= n + 1) {
+        if (i % 2 == 0) printNoNl("a")
+        else {
+            printNoNl("b")
+            printNoNl(i / 2)
+        }
+        printNoNl("  ")
+    }
+}
+
+fn printNoNl(s: str) {
+    System.out.printNoNl(s)
+}
+
+fn printNoNl(f: float) {
+    System.out.printNoNl(f)
+}
+
+fn printNoNl(i: int) {
+    System.out.printNoNl(i)
+}

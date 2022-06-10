@@ -60,6 +60,11 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         abstract val name: String
 
         /**
+         * the name this function has on the jvm
+         */
+        abstract val jvmName: String
+
+        /**
          * The descriptor of the function containing the actual arg-types and the return type
          */
         abstract val functionDescriptor: FunctionDescriptor
@@ -101,6 +106,7 @@ abstract class AstNode(val relevantTokens: List<Token>) {
         val nameToken: Token,
         val modifiers: List<Token>,
         override val isTopLevel: Boolean,
+        override val jvmName: String = nameToken.lexeme,
         relevantTokens: List<Token>
     ) : Function(relevantTokens) {
 
@@ -1267,7 +1273,7 @@ data class FunctionDescriptor(val args: MutableList<Pair<String, Datatype>>, val
             argsNoThis = args.toMutableList()
             argsNoThis.removeAt(0)
         }
-        var argsNoThis2: MutableList<Pair<String, Datatype>> = args
+        var argsNoThis2: MutableList<Pair<String, Datatype>> = desc.args
         if (desc.args.isNotEmpty() && desc.args[0].first == "this") {
             argsNoThis2 = desc.args.toMutableList()
             argsNoThis2.removeAt(0)
