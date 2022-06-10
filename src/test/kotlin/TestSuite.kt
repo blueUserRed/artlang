@@ -45,11 +45,17 @@ class TestSuite private constructor(val tests: List<Test>) {
         return !suiteFailed
     }
 
+    /**
+     * Returns all the tests from the suite
+     */
     @Override
     override fun toString(): String {
         return this.tests.toString()
     }
 
+    /**
+     * contains functions to initialize the TestSuite
+     */
     companion object {
 
 //        fun byId(id: Int): TestSuite { //TODO: necessary?
@@ -69,8 +75,14 @@ class TestSuite private constructor(val tests: List<Test>) {
 //            return TestSuite(testSuite)//TODO: better code
 //        }
 
+        /**
+         * configures the ONJ Schema (How the ONJ file has to be formatted)
+         */
         val testSuitesOnjSchema: OnjSchema by lazy { OnjParser.parseSchema(testSuitesOnjSchemaString) }
 
+        /**
+         * reads all the testSuites from [src/testSuites.onj]
+         */
         val testSuitesOnj: OnjArray by lazy {
             val testSuitesOnj = OnjParser.parseFile("src/testSuites.onj")
 
@@ -80,6 +92,9 @@ class TestSuite private constructor(val tests: List<Test>) {
             testSuitesOnj.get<OnjArray>("testSuites")
         }
 
+        /**
+         * initialization by test suite name
+         */
         fun byName(name: String): TestSuite {
             val testSuiteOnj = testSuitesOnj.value
                 .filter { (it as OnjObject).get<String>("name").toString() == name }
@@ -94,6 +109,9 @@ class TestSuite private constructor(val tests: List<Test>) {
             return TestSuite(testSuite)//TODO: better code
         }
 
+        /**
+         * initializes a TestSuite with all Tests
+         */
         fun getAll(): List<TestSuite> {
             val suites: MutableList<TestSuite> = mutableListOf()
             for (suite in testSuitesOnj.value) {
@@ -107,10 +125,16 @@ class TestSuite private constructor(val tests: List<Test>) {
             return suites
         }
 
+        /**
+         * Creates a TestSuite with a custom set of tests
+         */
         fun custom(tests: List<Test>): TestSuite {
             return TestSuite(tests)
         }
 
+        /**
+         * Converts a OnjObject to a Test
+         */
         private fun onjToTest(obj: OnjObject): Test {
             val srcFile = obj.get<String>("srcFile")
             val outputFile = obj.get<String?>("outputFile")
@@ -119,7 +143,9 @@ class TestSuite private constructor(val tests: List<Test>) {
             return Test(srcFile, outputFile, expectCompileFailure, expectRuntimeFailure)
         }
 
-
+        /**
+         * scheme for the onj testSuites file
+         */
         const val testSuitesOnjSchemaString = """
             
             !test = {
