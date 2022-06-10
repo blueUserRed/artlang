@@ -16,9 +16,9 @@ fun main(args: Array<String>) {
  * TODO: outputs nonsense in the console
  */
 fun recordOutputs(suite: TestSuite) {
-    for (test in suite.tests) if (test.outputFielName != null) {
+    for (test in suite.tests) if (test.outputFileName != null) {
         test.test()
-        File("sampleOutputs/${test.outputFielName}").writeText(test.programOutput ?: "")
+        File("sampleOutputs/${test.outputFileName}").writeText(test.programOutput ?: "")
     }
 }
 
@@ -28,34 +28,72 @@ fun recordOutputs(suite: TestSuite) {
  * The meanwhile generated .jar file is placed in WORKING_DIR/out
  */
 class Test(
-    val testFileName: String,
-    val outputFielName: String?,
-    val expectCompileFailure: Boolean,
-    val expectRuntimeFailure: Boolean,
-    private val printOutput: Boolean = false
+
+        /**
+         *  name of the file that is being tested
+         */
+        val testFileName: String,
+
+        /**
+         *  name of the .jar file to generate
+         */
+        val outputFileName: String?,
+
+        /**
+         * whether the program expects failure during compiling
+         */
+        val expectCompileFailure: Boolean,
+
+        /**
+         * whether the program expects failure during runtime
+         */
+        val expectRuntimeFailure: Boolean,
+
+        /**
+         * whether to print the output of the program
+         */
+        private val printOutput: Boolean = false
 ) {
 
+    /**
+     * Saves whether the Test has been tested yet
+     */
     private var hasBeenTested = false
 
+    /**
+     * reads the sample output file and saves it to [sampleOutput]
+     */
     private val sampleOutput: String? = run {
-        if (outputFielName == null) null else try {
-            Paths.get("$sampleOutDir/$outputFielName").readText()
-        } catch(e: java.nio.file.NoSuchFileException) {
-            println("Unable to read file $outputFielName")
+        if (outputFileName == null) null else try {
+            Paths.get("$sampleOutDir/$outputFileName").readText()
+        } catch (e: java.nio.file.NoSuchFileException) {
+            println("Unable to read file $outputFileName")
             null
         }
     }
 
+    /**
+     * Saves if the test succeeded
+     */
     var succeeded: Boolean = false
 
+    /**
+     * The output of the program is saved here
+     */
     var programOutput: String? = null
 
+    /**
+     * Throws an error if the Test expects failure while compiling and runtime
+     */
     init {
         if (expectCompileFailure && expectRuntimeFailure) {
             throw IllegalArgumentException("cant expect compiletime and runtime failure simultaneously")
         }
     }
 
+    /**
+     * Test the file, optionally prints additional information and whether the test succeeded
+     */
     fun test() {
         File(File(testFileName).nameWithoutExtension + ".jar").delete()
 
@@ -110,6 +148,9 @@ class Test(
         hasBeenTested = true
     }
 
+    /**
+     * Runs the program and returns the output if there were no errors else null
+     */
     private fun runProgram(): String? {
         try {
             val jarFile = File(testFileName).nameWithoutExtension + ".jar"
@@ -131,19 +172,34 @@ class Test(
     }
 
 
-
     companion object {
         // Working directory set to artlang/src/test/res
+        /**
+         * Directory where .jar files are placed
+         */
         const val outDir = "out/"
+
+        /**
+         * Directory where .art file [testFileName] is located
+         */
         const val srcDir = "src/"
+
+        /**
+         * Directory where the correct outputs for the .art files are located
+         */
         const val sampleOutDir = "sampleOutputs/"
     }
 
+    /**
+     * Returns a String with all important information about the Test
+     */
     override fun toString(): String {
         return "File to test: " + this.testFileName +
                 "\n Print Output? " + this.printOutput +
                 "\nTest succeeded? " + this.succeeded +
-                "\nHas been tested? " + this.hasBeenTested
+                "\nHas been tested? " + this.hasBeenTested +
+                "\nExpecting a compile failure? " + this.expectCompileFailure +
+                "\nExpecting a runtime failure? " + this.expectRuntimeFailure
     }
 
 }
