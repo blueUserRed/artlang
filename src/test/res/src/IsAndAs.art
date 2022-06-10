@@ -1,0 +1,23 @@
+
+fn main() {
+
+    print Animal() is Animal
+    print Cat() is Animal
+    print Cat() is Cat
+    print Dog() is Cat
+
+    const obj: Object = Dog()
+
+    const an: Animal = obj as Animal
+    const dog: Dog = an as Dog
+    obj as Dog
+}
+
+class Animal {
+}
+
+class Cat : Animal {
+}
+
+class Dog : Animal {
+}

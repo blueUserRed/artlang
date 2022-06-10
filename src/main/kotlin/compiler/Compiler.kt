@@ -943,7 +943,9 @@ class Compiler : AstNodeVisitor<Unit> {
 
         wasReturn = false
         compile(ifStmt.ifStmt, ifStmt.type.kind == Datakind.VOID)
-        if (ifStmt.type.kind != Datakind.VOID) decStack()
+        if (ifStmt.type.kind != Datakind.VOID) {
+            decStack()
+        }
 
         val skipGoto = wasReturn
         wasReturn = false
@@ -951,15 +953,24 @@ class Compiler : AstNodeVisitor<Unit> {
         if (hasElse && !skipGoto) emit(_goto, 0x00.toByte(), 0x00.toByte())
         val elseJmpAddrOffset = emitterTarget.curCodeOffset - 2
         val jmpAddr = emitterTarget.curCodeOffset - (jmpAddrOffset - 1)
+
         if (jmpAddr !in Short.MIN_VALUE..Short.MAX_VALUE)
             throw JvmLimitationException("branch in if-statement is too far")
         overwriteByteCode(jmpAddrOffset, *Utils.getShortAsBytes(jmpAddr.toShort()))
+
         if (hasElse) emitStackMapFrame()
         if (hasElse) compile(ifStmt.elseStmt!!, ifStmt.type.kind == Datakind.VOID)
 
+        if (ifStmt.type.kind != Datakind.VOID) {
+            decStack()
+            incStack(ifStmt.type)
+        }
+
         val elseJmpAddr = emitterTarget.curCodeOffset - (elseJmpAddrOffset - 1)
+
         if (hasElse && !skipGoto && elseJmpAddr !in Short.MIN_VALUE..Short.MAX_VALUE)
             throw JvmLimitationException("branch in if-statement is too far")
+
         if (hasElse && !skipGoto) overwriteByteCode(elseJmpAddrOffset, *Utils.getShortAsBytes(elseJmpAddr.toShort()))
         emitStackMapFrame()
     }

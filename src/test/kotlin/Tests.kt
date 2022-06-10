@@ -65,7 +65,7 @@ class Test(
         if (expectCompileFailure) println("Expecting compilation to fail")
         if (expectRuntimeFailure) println("Expecting program to fail at runtime")
 
-        val args = arrayOf("compile", "$srcDir$testFileName", "-leaveTmp")
+        val args = arrayOf("compile", "$srcDir$testFileName")
         ErrorPool.clear()
 
         try {

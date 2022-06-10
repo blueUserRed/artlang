@@ -1,0 +1,19 @@
+
+fn test(): int {
+    loop {
+        if (false) continue
+        if (true) {
+            return 2
+        }
+    }
+}
+
+fn test2(): int {
+    loop {
+        if (false) {
+            return test()
+        } else if (true) {
+            return 2 + 2
+        } else return 2 * 6
+    }
+}

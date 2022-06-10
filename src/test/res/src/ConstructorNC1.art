@@ -1,0 +1,6 @@
+class Test {
+    const field test: str
+    constructor(field test) {
+        this.test = "hisf"
+    }
+}

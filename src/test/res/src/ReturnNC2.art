@@ -1,0 +1,6 @@
+fn test(): int {
+    loop {
+        if (false) break
+        return 2
+    }
+}

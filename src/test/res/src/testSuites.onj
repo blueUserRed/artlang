@@ -34,32 +34,75 @@ testSuites: [
                 expectCompileFailure: false
                 expectRuntimeFailure: false
             }
+            {
+                srcFile: "Inheritance.art"
+                outputFile: "Inheritance.txt"
+                expectCompileFailure: false
+                expectRuntimeFailure: false
+            }
+            {
+                srcFile: "IsAndAs.art"
+                outputFile: "IsAndAs.txt"
+                expectCompileFailure: false
+                expectRuntimeFailure: false
+            }
         ]
     }
-//    {
-//        id: 1
-//        name: "Default"
-//        description: "Runs simple programs like FizzBuzz and HelloWorld to test basic functions"
-//        tests: [ "HelloWorld.art" "FizzBuzz.art" ] // Paths to files
-//    }
-//    {
-//        id: 1
-//        name: "Classes"
-//        description: "Tests creation of classes, constructing and running methods from classes on Animal Example"
-//        tests: [ "Animal.art" "Cat.art" "Dog.art" ] // Paths to files
-//    }
-//    {
-//        id: 2
-//        name: "Block Expressions"
-//        description: "Tests Blockexpressions TODO"
-//        tests: [ "BlockExpressions.art" ]
-//    }
-//    {
-//        id: 3
-//        name: "Operations"
-//        description: "TODO"
-//        tests: [ "OperationsBasic.art" "OperationsComplex.art" ]
-//    }
+    {
+        id: 1
+        name: "Some"
+        description: "For testing specific files"
+        tests: [
+            {
+                srcFile: "IsAndAs.art"
+                outputFile: "IsAndAs.txt"
+                expectCompileFailure: false
+                expectRuntimeFailure: false
+            }
+            {
+                srcFile: "Return.art"
+                outputFile: "Return.txt"
+                expectCompileFailure: false
+                expectRuntimeFailure: false
+            }
+            {
+                srcFile: "FieldInits.art"
+                outputFile: "FieldInits.txt"
+                expectCompileFailure: false
+                expectRuntimeFailure: false
+            }
+            {
+                srcFile: "ReturnNC1.art"
+                outputFile: null
+                expectCompileFailure: true
+                expectRuntimeFailure: false
+            }
+            {
+                srcFile: "ReturnNC2.art"
+                outputFile: null
+                expectCompileFailure: true
+                expectRuntimeFailure: false
+            }
+            {
+                srcFile: "FieldsInitNC1.art"
+                outputFile: null
+                expectCompileFailure: true
+                expectRuntimeFailure: false
+            }
+            {
+                srcFile: "FieldsInitNC2.art"
+                outputFile: null
+                expectCompileFailure: true
+                expectRuntimeFailure: false
+            }
+            {
+                srcFile: "ConstructorNC1.art"
+                outputFile: null
+                expectCompileFailure: true
+                expectRuntimeFailure: false
+            }
+        ]
+    }
 ]
 
 /* old csv

@@ -172,9 +172,10 @@ abstract class Datatype(val kind: Datakind) {
         /**
          * looks up a field with the name [name]
          */
-        fun lookupField(name: String): AstNode.Field? {
+        fun lookupField(name: String, origClass: AstNode.ArtClass? = null): AstNode.Field? {
             for (field in clazz.fields) if (field.name == name) return field
-            if (clazz.extends != null) return Object(clazz.extends!!).lookupField(name)
+            if (clazz.extends === origClass) return null //protect against inheritance loops
+            if (clazz.extends != null) return Object(clazz.extends!!).lookupField(name, origClass ?: clazz)
             return null
         }
 

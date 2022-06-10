@@ -1,9 +1,11 @@
 fn main() {
     Animal.walk()
     Animal.saySomething()
+    print Animal.t
 }
 
 class Animal {
+
     public static {
         field animalField: str = "sdsdfsdfjkl"
         fn walk() {
@@ -13,7 +15,9 @@ class Animal {
         fn saySomething() {
            print "<generic animal sounds>"
         }
-    } //TODO: multiple modifiers
+    }
 
-    public constructor()
+    static {
+        public field t: int = 23
+    }
 }

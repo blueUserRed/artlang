@@ -1,0 +1,9 @@
+class Test {
+    const field test: str
+    constructor() {
+        loop {
+            if (true) break
+            this.test = "hi"
+        }
+    }
+}

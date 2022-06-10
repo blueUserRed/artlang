@@ -1,0 +1,61 @@
+
+fn main() {
+
+    Cat().walk()
+    Kitten().walk()
+    Kitten().kittenFn()
+
+    const x = if (true) Kitten() else Dog()
+
+    const arr = [ Kitten(), Dog(), Car() ]
+
+    Cat().talk()
+    Kitten().talk()
+    Dog().talk()
+    print Car().capacity
+
+}
+
+abstract class Animal {
+
+    public fn walk() {
+    }
+
+    public abstract fn talk()
+}
+
+class Cat : Animal {
+
+    public override fn talk() {
+        print "MEOW"
+    }
+
+}
+
+class Kitten : Cat {
+
+    public fn kittenFn() {
+    }
+
+    public override fn talk() {
+        print "meow"
+    }
+
+}
+
+class Dog : Animal {
+
+    public override fn talk() {
+        print "Wuff"
+    }
+
+}
+
+class Vehicle {
+
+    public field capacity: int = 4
+
+}
+
+class Car : Vehicle {
+}
