@@ -1,0 +1,10 @@
+
+class Test {
+    field hi: str
+    constructor() {
+        loop {
+            break
+            this.hi = "sdjf"
+        }
+    }
+}

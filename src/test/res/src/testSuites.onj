@@ -1,3 +1,15 @@
+
+!noFailures = {
+    expectCompileFailure: false
+    expectRuntimeFailure: false
+}
+
+!compileFailure = {
+    outputFile: null
+    expectCompileFailure: true
+    expectRuntimeFailure: false
+}
+
 testSuites: [
     {
         id: 0
@@ -7,98 +19,95 @@ testSuites: [
             {
                 srcFile: "OperationsBasic.art"
                 outputFile: "OperationsBasic.txt"
-                expectCompileFailure: false
-                expectRuntimeFailure: false
+                ...!noFailures
             }
             {
                 srcFile: "ControlFlow.art"
                 outputFile: "ControlFlow.txt"
-                expectCompileFailure: false
-                expectRuntimeFailure: false
+                ...!noFailures
             }
             {
                 srcFile: "Arrays.art"
                 outputFile: "Arrays.txt"
-                expectCompileFailure: false
-                expectRuntimeFailure: false
+                ...!noFailures
             }
             {
                 srcFile: "Fields.art"
                 outputFile: "Fields.txt"
-                expectCompileFailure: false
-                expectRuntimeFailure: false
+                ...!noFailures
             }
             {
                 srcFile: "Constructors.art"
                 outputFile: "Constructors.txt"
-                expectCompileFailure: false
-                expectRuntimeFailure: false
+                ...!noFailures
             }
             {
                 srcFile: "Inheritance.art"
                 outputFile: "Inheritance.txt"
-                expectCompileFailure: false
-                expectRuntimeFailure: false
+                ...!noFailures
             }
             {
                 srcFile: "IsAndAs.art"
                 outputFile: "IsAndAs.txt"
-                expectCompileFailure: false
-                expectRuntimeFailure: false
+                ...!noFailures
             }
             {
                 srcFile: "Return.art"
                 outputFile: "Return.txt"
-                expectCompileFailure: false
-                expectRuntimeFailure: false
+                ...!noFailures
             }
             {
                 srcFile: "FieldInits.art"
                 outputFile: "FieldInits.txt"
-                expectCompileFailure: false
-                expectRuntimeFailure: false
+                ...!noFailures
             }
             {
                 srcFile: "ReturnNC1.art"
-                outputFile: null
-                expectCompileFailure: true
-                expectRuntimeFailure: false
+                ...!compileFailure
             }
             {
                 srcFile: "ReturnNC2.art"
-                outputFile: null
-                expectCompileFailure: true
-                expectRuntimeFailure: false
+                ...!compileFailure
             }
             {
                 srcFile: "FieldsInitNC1.art"
-                outputFile: null
-                expectCompileFailure: true
-                expectRuntimeFailure: false
+                ...!compileFailure
             }
             {
                 srcFile: "FieldsInitNC2.art"
-                outputFile: null
-                expectCompileFailure: true
-                expectRuntimeFailure: false
+                ...!compileFailure
             }
             {
                 srcFile: "ConstructorNC1.art"
-                outputFile: null
-                expectCompileFailure: true
-                expectRuntimeFailure: false
+                ...!compileFailure
             }
             {
                 srcFile: "MultiDimensionalArrays.art"
                 outputFile: "MultiDimensionalArrays.txt"
-                expectCompileFailure: false
-                expectRuntimeFailure: false
+                ...!noFailures
             }
             {
                 srcFile: "PrimitivesNC1.art"
-                outputFile: null
-                expectCompileFailure: true
-                expectRuntimeFailure: false
+                ...!compileFailure
+            }
+            {
+                srcFile: "OperationsBasic.art"
+                outputFile: "OperationsBasic.txt"
+                ...!noFailures
+            }
+            {
+                srcFile: "Comments.art"
+                outputFile: "Comments.txt"
+                ...!noFailures
+            }
+            {
+                srcFile: "StringEscapes.art"
+                outputFile: "StringEscapes.txt"
+                ...!noFailures
+            }
+            {
+                srcFile: "ConstructorNC2.art"
+                ...!compileFailure
             }
         ]
     }
@@ -110,20 +119,17 @@ testSuites: [
             {
                 srcFile: "sew/2DArrays.art"
                 outputFile: "sew/2DArrays.txt"
-                expectCompileFailure: false
-                expectRuntimeFailure: false
+                ...!noFailures
             }
             {
                 srcFile: "sew/methoden2.art"
                 outputFile: "sew/methoden2.txt"
-                expectCompileFailure: false
-                expectRuntimeFailure: false
+                ...!noFailures
             }
             {
                  srcFile: "sew/raetselreihen.art"
                  outputFile: "sew/raetselreihen.txt"
-                 expectCompileFailure: false
-                 expectRuntimeFailure: false
+                 ...!noFailures
              }
         ]
     }
@@ -132,6 +138,10 @@ testSuites: [
         name: "Some"
         description: "For testing specific files"
         tests: [
+            {
+                srcFile: "ConstructorNC2.art"
+                ...!compileFailure
+            }
         ]
     }
 ]

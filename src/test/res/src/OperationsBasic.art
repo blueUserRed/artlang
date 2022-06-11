@@ -92,5 +92,14 @@ fn main() {
     let da4: bool = d > d
     let da5: bool = d <= d
     let da6: bool = d >= d
+
+    const zInv: bool = !z
+
+    let q: bool = Cat() == Cat()
+    let q1: bool = null == Cat()
+    let q2: bool = null == null
  
+}
+
+class Cat {
 }

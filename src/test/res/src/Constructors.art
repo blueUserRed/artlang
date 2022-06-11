@@ -25,6 +25,10 @@ class T2 {
         print hi
     }
 
+    public constructor(field: int, h: long) {
+        field.long + h
+    }
+
 }
 
 class T3 {

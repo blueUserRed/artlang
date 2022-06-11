@@ -1,0 +1,13 @@
+
+// line comment
+
+fn main() {
+    //sdjfl
+    print "hi"
+    /*
+        print "comment"
+    */
+}
+
+/*
+block comments can be left unterminated

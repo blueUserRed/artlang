@@ -93,6 +93,7 @@ class TypeChecker : AstNodeVisitor<Datatype> {
 
                 if (left.matches(Datakind.OBJECT) && right.matches(Datakind.OBJECT)) return Datatype.Bool()
                 if (left.matches(Datakind.ARRAY) && right.matches(Datakind.ARRAY)) return Datatype.Bool()
+                if (left.matches(Datakind.NULL) && right.matches(Datakind.NULL)) return Datatype.Bool()
 
                 if (
                     left.matches(

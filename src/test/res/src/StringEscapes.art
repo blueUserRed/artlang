@@ -1,0 +1,9 @@
+
+fn main() {
+    print "\f"
+    print "\t"
+    print "\b"
+    print "\n"
+    print "\r"
+    print "\u2588"
+}

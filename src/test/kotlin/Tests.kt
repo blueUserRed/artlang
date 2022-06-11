@@ -5,9 +5,8 @@ import java.nio.file.Paths
 import kotlin.io.path.readText
 
 fun main(args: Array<String>) {
-    val ts = TestSuite.byName(args[0])
-//    recordOutputs(ts)
-    ts.run()
+    for (arg in args) TestSuite.byName(arg).run()
+//    recordOutputs(TestSuite.byName("Some"))
 }
 
 /**

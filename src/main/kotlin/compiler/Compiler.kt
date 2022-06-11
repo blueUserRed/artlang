@@ -2135,7 +2135,7 @@ class Compiler : AstNodeVisitor<Unit> {
         val stackSizeBefore = emitterTarget.stack.size
         node.accept(this)
         if (forceNoValueOnStack && emitterTarget.stack.size > stackSizeBefore) {
-            println(emitterTarget.stack.size - stackSizeBefore) //TODO: remove
+//            println(emitterTarget.stack.size - stackSizeBefore) //TODO: remove
             while (emitterTarget.stack.size > stackSizeBefore) doPop()
         }
     }
