@@ -140,6 +140,11 @@ testSuites: [
                  outputFile: "sew/raetselreihen.txt"
                  ...!noFailures
              }
+             {
+                  srcFile: "sew/Circuit.art"
+                  outputFile: "sew/Circuit.txt"
+                  ...!noFailures
+              }
         ]
     }
     {
@@ -147,7 +152,11 @@ testSuites: [
         name: "Some"
         description: "For testing specific files"
         tests: [
-
+             {
+                  srcFile: "sew/Circuit.art"
+                  outputFile: "sew/Circuit.txt"
+                  ...!noFailures
+              }
         ]
     }
 ]

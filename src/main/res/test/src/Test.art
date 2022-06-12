@@ -3,11 +3,62 @@ abstract class Circuit {
 
     public abstract fn getResistance(): double
 
-//    public abstract override fn toString(): str
+    public abstract fn getCount(): int
 
 }
 
 class Resistor : Circuit {
+
+    const field resistance: double
+
+    public constructor(field resistance)
+
+    public override fn getResistance(): double {
+        return this.resistance
+    }
+
+    public override fn getCount(): int {
+        return 1
+    }
+
+}
+
+class SerialCircuit : Circuit {
+
+    const field c1: Circuit
+    const field c2: Circuit
+
+    public constructor(field c1, field c2)
+
+    public override fn getResistance(): double {
+        return this.c1.getResistance() + this.c2.getResistance()
+    }
+
+    public override fn getCount(): int {
+        return this.c1.getCount() + this.c2.getCount()
+    }
+
+}
+
+class ParallelCircuit : Circuit {
+
+    const field c1: Circuit
+    const field c2: Circuit
+
+    public constructor(field c1, field c2)
+
+    public override fn getResistance(): double {
+        // Dont quote me on the formula
+        return (this.c1.getResistance() + this.c2.getResistance()) / (this.c1.getResistance() * this.c2.getResistance())
+    }
+
+    public override fn getCount(): int {
+        return this.c1.getCount() + this.c2.getCount()
+    }
+
+}
+
+class Potentiometer : Circuit {
 
     field resistance: double
 
@@ -17,17 +68,12 @@ class Resistor : Circuit {
         return this.resistance
     }
 
-}
+    public override fn getCount(): int {
+        return 1
+    }
 
-class SerialCircuit : Circuit {
-
-    field c1: Circuit
-    field c2: Circuit
-
-    public constructor(field c1, field c2)
-
-    public override fn getResistance(): double {
-        return this.c1.getResistance() + this.c2.getResistance()
+    public fn setResistance(resistance: double) {
+        this.resistance = resistance
     }
 
 }
@@ -39,6 +85,38 @@ fn main() {
 
     const c2: Circuit = SerialCircuit(Resistor(100#D), Resistor(200#D))
     printCircuit(c2, "c2")
+
+    const c3: Circuit = ParallelCircuit(Resistor(100#D), Resistor(200#D))
+    printCircuit(c3, "c3")
+
+    const potentiometer = Potentiometer(400#D)
+
+    const complicated = ParallelCircuit(
+        ParallelCircuit(
+            Resistor(600#D),
+            SerialCircuit(potentiometer, Resistor(500#D))
+        ),
+        SerialCircuit(
+            ParallelCircuit(Resistor(100#D), Resistor(300#D)),
+            Resistor(200#D)
+        )
+    )
+    printCircuit(complicated, "complicated")
+    print complicated.getCount()
+    print c1.getCount()
+    print c2.getCount()
+
+    print "-----------Potentiometer-----------"
+    let cur = -200
+    while ((cur := cur + 200) <= 5000) {
+        potentiometer.setResistance(cur.double)
+        printNNl("Potentiometer = ")
+        printNNl(cur.double)
+        printNNl("; Wiederstand = ")
+        printNNl(complicated.getResistance())
+        print ";"
+    }
+
 }
 
 fn printCircuit(c: Circuit, name: str) {
