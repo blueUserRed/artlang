@@ -22,12 +22,18 @@ abstract class Animal {
     }
 
     public abstract fn talk()
+
+    public abstract override fn toString(): str
 }
 
 class Cat : Animal {
 
     public override fn talk() {
         print "MEOW"
+    }
+
+    public override fn toString(): str {
+        return "Cat"
     }
 
 }
@@ -47,6 +53,10 @@ class Dog : Animal {
 
     public override fn talk() {
         print "Wuff"
+    }
+
+    public override fn toString(): str {
+        return "Dog"
     }
 
 }

@@ -134,7 +134,7 @@ class InheritanceChecker : AstNodeVisitor<Unit> {
 
         for (toImpl in funcsToImplement) {
             val thisFunc = Datatype.Object(clazz).lookupFuncExact(toImpl.name, toImpl.functionDescriptor, true)
-            if (thisFunc == null) {
+            if (thisFunc == null || Datatype.StatClass(thisFunc.clazz!!).isSuperClassOf(toImpl.clazz!!)) {
                 artError(Errors.ClassDoesNotImplementAbstractFunctionError(
                     clazz.nameToken,
                     toImpl.name,

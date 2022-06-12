@@ -3,8 +3,6 @@ abstract class Circuit {
 
     public abstract fn getResistance(): double
 
-//    public abstract override fn toString(): str
-
 }
 
 class Resistor : Circuit {

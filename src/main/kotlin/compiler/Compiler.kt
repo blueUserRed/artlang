@@ -94,7 +94,7 @@ class Compiler : AstNodeVisitor<Unit> {
     /**
      * the current target to which bytecode is emitted
      */
-    private lateinit var emitterTarget: EmitterTarget
+    private var emitterTarget: EmitterTarget? = null
 
     /**
      * the program that is being compiled
@@ -459,12 +459,12 @@ class Compiler : AstNodeVisitor<Unit> {
         if (isAnd) emit(ifeq) else emit(ifne)
         decStack()
         emit(0x00.toByte(), 0x00.toByte())
-        val jmpAddrPos = emitterTarget.curCodeOffset - 2
+        val jmpAddrPos = emitterTarget!!.curCodeOffset - 2
         compile(exp.right, false)
         if (isAnd) emit(iand) else emit(ior)
         decStack()
         emitStackMapFrame()
-        val jmpAddr = emitterTarget.curCodeOffset - (jmpAddrPos - 1)
+        val jmpAddr = emitterTarget!!.curCodeOffset - (jmpAddrPos - 1)
         if (jmpAddr !in Short.MIN_VALUE..Short.MAX_VALUE)
             throw JvmLimitationException("branch in boolean comparison is too long")
         overwriteByteCode(jmpAddrPos, *Utils.getShortAsBytes(jmpAddr.toShort()))
@@ -502,8 +502,8 @@ class Compiler : AstNodeVisitor<Unit> {
         method = MethodEmitter(methodBuilder)
         emitterTarget = method!!
 
-        emitterTarget.stack = Stack()
-        emitterTarget.locals = MutableList(function.amountLocals) { null }
+        emitterTarget!!.stack = Stack()
+        emitterTarget!!.locals = MutableList(function.amountLocals) { null }
 
         if (!function.isAbstract) {
             for (i in function.functionDescriptor.args.indices) {
@@ -511,9 +511,9 @@ class Compiler : AstNodeVisitor<Unit> {
             }
         }
 
-        emitterTarget.maxStack = 0
-        emitterTarget.lastStackMapFrameOffset = -1
-        emitterTarget.maxLocals = function.amountLocals
+        emitterTarget!!.maxStack = 0
+        emitterTarget!!.lastStackMapFrameOffset = -1
+        emitterTarget!!.maxLocals = function.amountLocals
 
         methodBuilder.descriptor = function.functionDescriptor.descriptorString
         methodBuilder.name = function.jvmName
@@ -547,7 +547,7 @@ class Compiler : AstNodeVisitor<Unit> {
         if (function.functionDescriptor.returnType == Datatype.Void()) emit(_return) //ensure void method always returns
 
         //TODO: can probably be done better
-        if (emitterTarget.lastStackMapFrameOffset >= emitterTarget.curCodeOffset) emitterTarget.popStackMapFrame()
+        if (emitterTarget!!.lastStackMapFrameOffset >= emitterTarget!!.curCodeOffset) emitterTarget!!.popStackMapFrame()
 
         file.addMethod(methodBuilder)
     }
@@ -661,7 +661,7 @@ class Compiler : AstNodeVisitor<Unit> {
                 initBuilder.descriptor = con.jvmDescriptor.descriptorString
 
                 emitterTarget = MethodEmitter(initBuilder)
-                emitterTarget.locals = MutableList(initBuilder.maxLocals) { null }
+                emitterTarget!!.locals = MutableList(initBuilder.maxLocals) { null }
 
                 val args = con.descriptor.args
                 for (i in args.indices) putTypeInLocals(i, args[i].second, false)
@@ -711,8 +711,8 @@ class Compiler : AstNodeVisitor<Unit> {
             file.addField(fieldToAdd)
 
         }
-        emitterTarget.maxLocals = maxLocals
-        emitterTarget.locals = MutableList(maxLocals) { null }
+        emitterTarget!!.maxLocals = maxLocals
+        emitterTarget!!.locals = MutableList(maxLocals) { null }
 
         for (field in fields) compile(field, true)
     }
@@ -796,29 +796,29 @@ class Compiler : AstNodeVisitor<Unit> {
         when (type.kind) {
             Datakind.INT, Datakind.BOOLEAN, Datakind.SHORT, Datakind.BYTE -> {
                 if (emitStore) emitIntVarStore(index)
-                emitterTarget.locals[adjustedIndex] = VerificationTypeInfo.Integer()
+                emitterTarget!!.locals[adjustedIndex] = VerificationTypeInfo.Integer()
             }
             Datakind.FLOAT -> {
                 if (emitStore) emitFloatVarStore(index)
-                emitterTarget.locals[adjustedIndex] = VerificationTypeInfo.Float()
+                emitterTarget!!.locals[adjustedIndex] = VerificationTypeInfo.Float()
             }
             Datakind.OBJECT -> {
                 if (emitStore) emitObjectVarStore(index)
-                emitterTarget.locals[adjustedIndex] = getObjVerificationType((type as Datatype.Object).clazz.jvmName)
+                emitterTarget!!.locals[adjustedIndex] = getObjVerificationType((type as Datatype.Object).clazz.jvmName)
             }
             Datakind.ARRAY -> {
                 if (emitStore) emitObjectVarStore(index)
-                emitterTarget.locals[adjustedIndex] = getObjVerificationType(type.descriptorType)
+                emitterTarget!!.locals[adjustedIndex] = getObjVerificationType(type.descriptorType)
             }
             Datakind.LONG -> {
                 if (emitStore) emitLongVarStore(index)
-                emitterTarget.locals[adjustedIndex] = VerificationTypeInfo.Long()
-                emitterTarget.locals[adjustedIndex + 1] = VerificationTypeInfo.Top()
+                emitterTarget!!.locals[adjustedIndex] = VerificationTypeInfo.Long()
+                emitterTarget!!.locals[adjustedIndex + 1] = VerificationTypeInfo.Top()
             }
             Datakind.DOUBLE -> {
                 if (emitStore) emitDoubleVarStore(index)
-                emitterTarget.locals[adjustedIndex] = VerificationTypeInfo.Double()
-                emitterTarget.locals[adjustedIndex + 1] = VerificationTypeInfo.Top()
+                emitterTarget!!.locals[adjustedIndex] = VerificationTypeInfo.Double()
+                emitterTarget!!.locals[adjustedIndex + 1] = VerificationTypeInfo.Top()
             }
             else -> TODO("local store type not implemented")
         }
@@ -897,7 +897,7 @@ class Compiler : AstNodeVisitor<Unit> {
 
     override fun visit(loop: AstNode.Loop) {
         emitStackMapFrame()
-        val before = emitterTarget.curCodeOffset
+        val before = emitterTarget!!.curCodeOffset
 
         val loopContinueAddressBefore = loopContinueAddress
         val loopBreakAddressesToOverwriteBefore = loopBreakAddressesToOverwrite
@@ -907,10 +907,10 @@ class Compiler : AstNodeVisitor<Unit> {
 
         compile(loop.body, true)
         emitStackMapFrame()
-        val absOffset = (before - emitterTarget.curCodeOffset)
+        val absOffset = (before - emitterTarget!!.curCodeOffset)
         emitGoto(absOffset)
         emitStackMapFrame()
-        val offset = emitterTarget.curCodeOffset
+        val offset = emitterTarget!!.curCodeOffset
         for (addr in loopBreakAddressesToOverwrite) {
 
             val jmpOffset = offset - (addr - 1)
@@ -924,14 +924,14 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     override fun visit(block: AstNode.Block) {
-        val before = emitterTarget.locals.toMutableList()
+        val before = emitterTarget!!.locals.toMutableList()
         for (s in block.statements) {
             if (s is AstNode.YieldArrow) {
                 compile(s, false)
                 break
             } else compile(s, true)
         }
-        emitterTarget.locals = before
+        emitterTarget!!.locals = before
     }
 
     override fun visit(ifStmt: AstNode.If) {
@@ -940,7 +940,7 @@ class Compiler : AstNodeVisitor<Unit> {
         compile(ifStmt.condition, false)
         emit(ifeq, 0x00.toByte(), 0x00.toByte())
         decStack()
-        val jmpAddrOffset = emitterTarget.curCodeOffset - 2
+        val jmpAddrOffset = emitterTarget!!.curCodeOffset - 2
 
         wasReturn = false
         compile(ifStmt.ifStmt, ifStmt.type.kind == Datakind.VOID)
@@ -952,8 +952,8 @@ class Compiler : AstNodeVisitor<Unit> {
         wasReturn = false
 
         if (hasElse && !skipGoto) emit(_goto, 0x00.toByte(), 0x00.toByte())
-        val elseJmpAddrOffset = emitterTarget.curCodeOffset - 2
-        val jmpAddr = emitterTarget.curCodeOffset - (jmpAddrOffset - 1)
+        val elseJmpAddrOffset = emitterTarget!!.curCodeOffset - 2
+        val jmpAddr = emitterTarget!!.curCodeOffset - (jmpAddrOffset - 1)
 
         if (jmpAddr !in Short.MIN_VALUE..Short.MAX_VALUE)
             throw JvmLimitationException("branch in if-statement is too far")
@@ -967,7 +967,7 @@ class Compiler : AstNodeVisitor<Unit> {
             incStack(ifStmt.type)
         }
 
-        val elseJmpAddr = emitterTarget.curCodeOffset - (elseJmpAddrOffset - 1)
+        val elseJmpAddr = emitterTarget!!.curCodeOffset - (elseJmpAddrOffset - 1)
 
         if (hasElse && !skipGoto && elseJmpAddr !in Short.MIN_VALUE..Short.MAX_VALUE)
             throw JvmLimitationException("branch in if-statement is too far")
@@ -1005,7 +1005,7 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     override fun visit(whileStmt: AstNode.While) {
-        val startOffset = emitterTarget.curCodeOffset
+        val startOffset = emitterTarget!!.curCodeOffset
 
         val loopContinueAddressBefore = loopContinueAddress
         val loopBreakAddressesToOverwriteBefore = loopBreakAddressesToOverwrite
@@ -1017,15 +1017,15 @@ class Compiler : AstNodeVisitor<Unit> {
         compile(whileStmt.condition, false)
         emit(ifeq, 0x00.toByte(), 0x00.toByte())
         decStack()
-        val jmpAddrOffset = emitterTarget.curCodeOffset - 2
+        val jmpAddrOffset = emitterTarget!!.curCodeOffset - 2
         compile(whileStmt.body, true)
-        emitGoto(startOffset - emitterTarget.curCodeOffset)
-        val jmpAddr = emitterTarget.curCodeOffset - (jmpAddrOffset - 1)
+        emitGoto(startOffset - emitterTarget!!.curCodeOffset)
+        val jmpAddr = emitterTarget!!.curCodeOffset - (jmpAddrOffset - 1)
         if (jmpAddr !in Short.MIN_VALUE..Short.MAX_VALUE)
             throw JvmLimitationException("branch in while-statement is too far")
         overwriteByteCode(jmpAddrOffset, *Utils.getShortAsBytes(jmpAddr.toShort()))
         emitStackMapFrame()
-        val offset = emitterTarget.curCodeOffset
+        val offset = emitterTarget!!.curCodeOffset
         for (addr in loopBreakAddressesToOverwrite) {
             if (addr !in Short.MIN_VALUE..Short.MAX_VALUE)
                 throw JvmLimitationException("branch in while-statement break is too far")
@@ -1398,7 +1398,7 @@ class Compiler : AstNodeVisitor<Unit> {
     /**
      * emits the array store instruction for the type
      */
-    fun emitAStore(type: Datatype) = when (type.kind) {
+    private fun emitAStore(type: Datatype) = when (type.kind) {
         Datakind.BYTE, Datakind.BOOLEAN -> emit(bastore)
         Datakind.SHORT -> emit(sastore)
         Datakind.INT -> emit(iastore)
@@ -1412,7 +1412,7 @@ class Compiler : AstNodeVisitor<Unit> {
     /**
      * emits the array load instruction for the type
      */
-    fun emitALoad(type: Datatype) = when (type.kind) {
+    private fun emitALoad(type: Datatype) = when (type.kind) {
         Datakind.BYTE, Datakind.SHORT, Datakind.INT -> emit(iaload)
         Datakind.FLOAT -> emit(faload)
         Datakind.OBJECT, Datakind.ARRAY -> emit(aaload)
@@ -1422,12 +1422,12 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     override fun visit(cont: AstNode.Continue) {
-        emitGoto(loopContinueAddress - emitterTarget.curCodeOffset)
+        emitGoto(loopContinueAddress - emitterTarget!!.curCodeOffset)
     }
 
     override fun visit(breac: AstNode.Break) {
         emit(_goto, 0x00, 0x00)
-        loopBreakAddressesToOverwrite.add(emitterTarget.curCodeOffset - 2)
+        loopBreakAddressesToOverwrite.add(emitterTarget!!.curCodeOffset - 2)
     }
 
     override fun visit(constructorCall: AstNode.ConstructorCall) {
@@ -1629,7 +1629,7 @@ class Compiler : AstNodeVisitor<Unit> {
 
     override fun visit(supCall: AstNode.SuperCall) {
         emit(aload_0)
-        incStack(emitterTarget.locals[0]!!)
+        incStack(emitterTarget!!.locals[0]!!)
         for (arg in supCall.arguments) compile(arg, false)
 
         val methodIndex = file.methodRefInfo(
@@ -1791,7 +1791,7 @@ class Compiler : AstNodeVisitor<Unit> {
 
         emitterTarget = MethodEmitter(init)
 
-        emitterTarget.locals = MutableList(maxLocals) { null }
+        emitterTarget!!.locals = MutableList(maxLocals) { null }
 
         val superConstructorIndex = file.methodRefInfo(
             file.classInfo(file.utf8Info(curClass?.extends?.jvmName ?: "java/lang/Object")),
@@ -1834,6 +1834,7 @@ class Compiler : AstNodeVisitor<Unit> {
      * emits either a dup or dup2 instruction depending on the type and updates the stack
      */
     private fun doDup() {
+        val emitterTarget = emitterTarget!!
         if (emitterTarget.stack.peek() is VerificationTypeInfo.Top) {
             emit(dup2)
             incStack(emitterTarget.stack[emitterTarget.stack.size - 2])
@@ -1848,6 +1849,7 @@ class Compiler : AstNodeVisitor<Unit> {
      * emits either a dup_x1 or dup2_x1 instruction depending on the type and updates the stack
      */
     private fun doDupBelow() {
+        val emitterTarget = emitterTarget!!
         if (emitterTarget.stack.peek() is VerificationTypeInfo.Top) {
             if (emitterTarget.stack[emitterTarget.stack.size - 3] is VerificationTypeInfo.Top) doDupX2()
             else doDupX1()
@@ -1858,6 +1860,7 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     private fun doDupX1() {
+        val emitterTarget = emitterTarget!!
         if (emitterTarget.stack.peek() is VerificationTypeInfo.Top) {
             emit(dup2_x1)
             val top = emitterTarget.stack.pop()
@@ -1879,6 +1882,7 @@ class Compiler : AstNodeVisitor<Unit> {
     }
 
     private fun doDupX2() {
+        val emitterTarget = emitterTarget!!
         if (emitterTarget.stack.peek() is VerificationTypeInfo.Top) {
             emit(dup2_x2)
             val top1 = emitterTarget.stack.pop()
@@ -1911,6 +1915,7 @@ class Compiler : AstNodeVisitor<Unit> {
 
         //TODO: instead of always emitting FullStackMapFrames also use other types of StackMapFrames
 
+        val emitterTarget = emitterTarget!!
         val offsetDelta = if (emitterTarget.lastStackMapFrameOffset == -1) emitterTarget.curCodeOffset
         else (emitterTarget.curCodeOffset - emitterTarget.lastStackMapFrameOffset) - 1
 
@@ -2103,7 +2108,7 @@ class Compiler : AstNodeVisitor<Unit> {
      * emits either a [_goto] or [goto_w] instruction depending on the size of offset
      * May throw a [JvmLimitationException] if [offset] can't fit in four bytes
      */
-    private fun emitGoto(offset: Int, target: EmitterTarget = emitterTarget) {
+    private fun emitGoto(offset: Int, target: EmitterTarget = emitterTarget!!) {
         if (offset in Short.MIN_VALUE..Short.MAX_VALUE) {
             target.emitByteCode(_goto, *Utils.getShortAsBytes(offset.toShort()))
         } else if (offset in Int.MIN_VALUE..Int.MAX_VALUE) {
@@ -2120,7 +2125,7 @@ class Compiler : AstNodeVisitor<Unit> {
      * emits the correct pop-instruction for the datatype on top of the stack
      */
     private fun doPop() {
-        if (emitterTarget.stack.peek() is VerificationTypeInfo.Top) emit(pop2)
+        if (emitterTarget!!.stack.peek() is VerificationTypeInfo.Top) emit(pop2)
         else emit(pop)
         decStack()
     }
@@ -2132,11 +2137,16 @@ class Compiler : AstNodeVisitor<Unit> {
      * stack, and if so pop it
      */
     private fun compile(node: AstNode, forceNoValueOnStack: Boolean) {
-        val stackSizeBefore = emitterTarget.stack.size
+        val stackSizeBefore = emitterTarget?.stack?.size
         node.accept(this)
-        if (forceNoValueOnStack && emitterTarget.stack.size > stackSizeBefore) {
+        if (
+            forceNoValueOnStack &&
+            stackSizeBefore != null &&
+            emitterTarget != null &&
+            emitterTarget!!.stack.size > stackSizeBefore
+        ) {
 //            println(emitterTarget.stack.size - stackSizeBefore) //TODO: remove
-            while (emitterTarget.stack.size > stackSizeBefore) doPop()
+            while (emitterTarget!!.stack.size > stackSizeBefore) doPop()
         }
     }
 
@@ -2150,26 +2160,28 @@ class Compiler : AstNodeVisitor<Unit> {
     /**
      * emits byte code to the current [emitterTarget]
      */
-    private fun emit(vararg bytes: Byte) = emitterTarget.emitByteCode(*bytes)
+    private fun emit(vararg bytes: Byte) = emitterTarget!!.emitByteCode(*bytes)
 
     /**
      * overwrites byte code of the current [emitterTarget]
      * @param pos the offset at which the first byte is inserted
      */
-    private fun overwriteByteCode(pos: Int, vararg bytes: Byte) = emitterTarget.overwriteByteCode(pos, *bytes)
+    private fun overwriteByteCode(pos: Int, vararg bytes: Byte) = emitterTarget!!.overwriteByteCode(pos, *bytes)
 
     /**
      * increments the stack of the current [emitterTarget] and sets the maxStack property if necessary
      */
     private fun incStack(type: VerificationTypeInfo) {
+        val emitterTarget = emitterTarget!!
         emitterTarget.stack.push(type)
-        if (emitterTarget.stack.size >emitterTarget.maxStack) emitterTarget.maxStack = emitterTarget.stack.size
+        if (emitterTarget.stack.size > emitterTarget.maxStack) emitterTarget.maxStack = emitterTarget.stack.size
     }
 
     /**
      * increments the stack of the current [emitterTarget] and sets the maxStack property if necessary
      */
     private fun incStack(type: Datatype) {
+        val emitterTarget = emitterTarget!!
         when (type.kind) {
             Datakind.INT, Datakind.BOOLEAN, Datakind.BYTE, Datakind.SHORT -> {
                 emitterTarget.stack.push(VerificationTypeInfo.Integer())
@@ -2197,6 +2209,7 @@ class Compiler : AstNodeVisitor<Unit> {
      * inserted at `at`.
      */
     private fun incStackAt(at: Int, type: Datatype) {
+        val emitterTarget = emitterTarget!!
         when (type.kind) {
             Datakind.INT, Datakind.BOOLEAN, Datakind.BYTE, Datakind.SHORT -> {
                 emitterTarget.stack.add(at, VerificationTypeInfo.Integer())
@@ -2209,6 +2222,10 @@ class Compiler : AstNodeVisitor<Unit> {
                 emitterTarget.stack.add(at - 1, VerificationTypeInfo.Long())
                 emitterTarget.stack.add(at, VerificationTypeInfo.Top())
             }
+            Datakind.DOUBLE -> {
+                emitterTarget.stack.add(at - 1, VerificationTypeInfo.Double())
+                emitterTarget.stack.add(at, VerificationTypeInfo.Top())
+            }
             else -> TODO("not yet implemented")
         }
         if (emitterTarget.stack.size > emitterTarget.maxStack) emitterTarget.maxStack = emitterTarget.stack.size
@@ -2218,7 +2235,7 @@ class Compiler : AstNodeVisitor<Unit> {
      * decrements the stack of the current [emitterTarget]; twice if VerificationType.Top is at the top of the stack
      */
     private fun decStack() {
-        if (emitterTarget.stack.pop() is VerificationTypeInfo.Top) emitterTarget.stack.pop()
+        if (emitterTarget!!.stack.pop() is VerificationTypeInfo.Top) emitterTarget!!.stack.pop()
     }
 
     /**

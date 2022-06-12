@@ -109,6 +109,15 @@ testSuites: [
                 srcFile: "ConstructorNC2.art"
                 ...!compileFailure
             }
+            {
+               srcFile: "Inheritance.art"
+               outputFile: "Inheritance.txt"
+               ...!noFailures
+            }
+            {
+               srcFile: "AbstractOverrideNC1.art"
+               ...!compileFailure
+            }
         ]
     }
     {
@@ -138,10 +147,7 @@ testSuites: [
         name: "Some"
         description: "For testing specific files"
         tests: [
-            {
-                srcFile: "ConstructorNC2.art"
-                ...!compileFailure
-            }
+
         ]
     }
 ]

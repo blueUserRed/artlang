@@ -1,0 +1,7 @@
+
+abstract class Test {
+    public abstract override fn toString(): str
+}
+
+class Test2 : Test {
+}

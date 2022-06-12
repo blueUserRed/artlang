@@ -260,6 +260,18 @@ object SyntheticAst {
         )
         printStreamClass.funcs.add(printFFunc)
 
+        val printDFunc = SyntFunction(
+            "printNoNl",
+            FunctionDescriptor(mutableListOf("d" to Datatype.Double()), Datatype.Void()),
+            false,
+            false,
+            false,
+            false,
+            printStreamClass,
+            "print"
+        )
+        printStreamClass.funcs.add(printDFunc)
+
         val outField = SyntField(
             "out",
             false,
